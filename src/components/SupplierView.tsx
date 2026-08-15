@@ -287,6 +287,13 @@ export default function SupplierView({
         "Phụ trách": contact["Phụ trách"] || ''
       });
     } else {
+      const matchSupp = suppliers.find(s => 
+        (defaultCompany && s["Mã nhà cung cấp"]?.toLowerCase() === defaultCompany.toLowerCase()) || 
+        (defaultCompany && s["Tên Nhà Cung Cấp"]?.toLowerCase() === defaultCompany.toLowerCase()) ||
+        (defaultCompany && s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(defaultCompany.toLowerCase()))
+      );
+      const resolvedCompany = matchSupp ? (matchSupp["Tên Nhà Cung Cấp"] || matchSupp["Mã nhà cung cấp"]) : (defaultCompany || suppliers[0]?.["Tên Nhà Cung Cấp"] || suppliers[0]?.["Mã nhà cung cấp"] || '');
+
       setEditingContact(null);
       setContactFormData({
         ID: `contact_${Date.now()}`,
@@ -294,7 +301,7 @@ export default function SupplierView({
         "Tên": '',
         "Chức vụ": '',
         "Phòng ban": '',
-        "Công ty": defaultCompany || (suppliers[0]?.["Tên Nhà Cung Cấp"] || suppliers[0]?.["Mã nhà cung cấp"] || ''),
+        "Công ty": resolvedCompany,
         "Điện thoại": '',
         "Email": '',
         "Mức độ quan hệ": '3',
@@ -1246,7 +1253,7 @@ export default function SupplierView({
 
       {/* Supplier Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
@@ -1445,7 +1452,7 @@ export default function SupplierView({
 
       {/* Supplier Contact Modal */}
       {isContactModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
@@ -1717,7 +1724,7 @@ export default function SupplierView({
 
       {/* Supplier Contact Detail Inspector Modal */}
       {selectedContactDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
               <div className="flex items-center gap-3.5">

@@ -350,6 +350,13 @@ export default function CustomerView({
         "Phụ trách": contact["Phụ trách"] || ''
       });
     } else {
+      const matchCust = customers.find(c => 
+        (defaultCompany && c["Customer_ID"]?.toLowerCase() === defaultCompany.toLowerCase()) || 
+        (defaultCompany && c["Tên đầy đủ"]?.toLowerCase() === defaultCompany.toLowerCase()) ||
+        (defaultCompany && c["Tên đầy đủ"]?.toLowerCase().includes(defaultCompany.toLowerCase()))
+      );
+      const resolvedCompany = matchCust ? matchCust["Customer_ID"] : (defaultCompany || customers[0]?.["Customer_ID"] || '');
+
       setEditingContact(null);
       setContactFormData({
         ID: `contact_${Date.now()}`,
@@ -357,7 +364,7 @@ export default function CustomerView({
         "Tên": '',
         "Chức vụ": '',
         "Phòng ban": '',
-        "Công ty": defaultCompany || (customers[0]?.["Customer_ID"] || ''),
+        "Công ty": resolvedCompany,
         "Điện thoại": '',
         "Email": '',
         "Mức độ quan hệ": '3',
@@ -1403,7 +1410,7 @@ export default function CustomerView({
 
       {/* Customer Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
@@ -1611,7 +1618,7 @@ export default function CustomerView({
 
       {/* Contact Add/Edit Modal */}
       {isContactModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
@@ -1959,7 +1966,7 @@ export default function CustomerView({
 
       {/* Contact Detail Inspector Modal */}
       {selectedContactDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
               <div className="flex items-center gap-3.5">
