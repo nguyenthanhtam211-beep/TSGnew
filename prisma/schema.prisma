@@ -1,0 +1,126 @@
+// TSG Business OS - Single Unified Relational Database Schema
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Products Master Table
+model Product {
+  id            String              @id @default(uuid())
+  sku           String              @unique
+  name          String
+  spec          String?             // Specs / Quy cách
+  unit          String              // Unit / Đơn vị tính
+  category      String?             // Category / Nhóm hàng
+  priceBooks    CustomerPriceBook[]
+  poLines       PurchaseOrderLine[]
+  deliveryLines DeliveryLine[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+// 2. Partners (Customers & Suppliers)
+model Partner {
+  id             String              @id @default(uuid())
+  code           String              @unique
+  name           String
+  type           String              // "CUSTOMER" | "SUPPLIER"
+  address        String?
+  phone          String?
+  priceBooks     CustomerPriceBook[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime            @default(now())
+}
+
+// 3. Customer Master Price Book (Bảng Giá Bán Chi Tiết)
+model CustomerPriceBook {
+  id            String    @id @default(uuid())
+  priceCode     String    @unique
+  customerId    String
+  customer      Partner   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unitPrice     Float
+  effectiveDate DateTime  @default(now())
+
+  @@index([customerId, productId])
+}
+
+// 4. Purchase Orders (PO Header)
+model PurchaseOrder {
+  id              String              @id @default(uuid())
+  poNumber        String              @unique
+  customerId      String
+  customer        Partner             @relation(fields: [customerId], references: [id])
+  receiveDate     String
+  deliveryAddress String
+  deliveryFrom    String?
+  deliveryTo      String?
+  totalValue      Float
+  status          String              @default("Mới nhận") // "Mới nhận" | "Đang xử lý" | "Đang giao" | "Hoàn tất" | "Hủy"
+  lines           PurchaseOrderLine[]
+  deliveries      DeliveryOrder[]
+  reconciliations Reconciliation[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+// 5. Purchase Order Lines (Chi Tiết Dòng Đơn Hàng PO)
+model PurchaseOrderLine {
+  id            String         @id @default(uuid())
+  poId          String
+  po            PurchaseOrder  @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product        @relation(fields: [productId], references: [id])
+  quantity      Float
+  deliveredQty  Float          @default(0)
+  unitPrice     Float
+  totalPrice    Float
+  supplier      String?
+  purchasePrice Float?
+  deliveryLines DeliveryLine[]
+}
+
+// 6. Delivery Orders (Phiếu Xuất Kho / Giao Hàng PXK)
+model DeliveryOrder {
+  id           String         @id @default(uuid())
+  pxkNumber    String         @unique
+  poId         String
+  po           PurchaseOrder  @relation(fields: [poId], references: [id])
+  deliveryDate String
+  deliverer    String
+  receiver     String
+  status       String         @default("Chờ phê duyệt") // "Chờ phê duyệt" | "Đã phê duyệt" | "Có sai lệch" | "Từ chối"
+  lines        DeliveryLine[]
+  createdAt    DateTime       @default(now())
+}
+
+// 7. Delivery Order Lines (Chi Tiết Dòng PXK)
+model DeliveryLine {
+  id                String            @id @default(uuid())
+  deliveryOrderId   String
+  deliveryOrder     DeliveryOrder     @relation(fields: [deliveryOrderId], references: [id], onDelete: Cascade)
+  poLineId          String?
+  poLine            PurchaseOrderLine? @relation(fields: [poLineId], references: [id])
+  productId         String
+  product           Product           @relation(fields: [productId], references: [id])
+  deliveredQuantity Float
+  receivedQuantity  Float
+  discrepancy       Float             @default(0)
+}
+
+// 8. 3-Way Reconciliation (Bảng Khống Khép Kín Đối Soát PO - PXK - Hóa Đơn)
+model Reconciliation {
+  id                String        @id @default(uuid())
+  poId              String
+  po                PurchaseOrder @relation(fields: [poId], references: [id])
+  reconcileDate     DateTime      @default(now())
+  poTotalValue      Float
+  actualDelivered   Float
+  discrepancyAmount Float
+  status            String        @default("Khớp 100%") // "Khớp 100%" | "Có sai lệch" | "Đã xử lý"
+  notes             String?
+}

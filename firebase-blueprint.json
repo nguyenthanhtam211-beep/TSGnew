@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Danh sách khách hàng",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "address": { "type": "string" },
+        "po": { "type": "string" }
+      },
+      "required": ["customerId"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Nhà cung cấp",
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string" },
+        "category": { "type": "string" },
+        "name": { "type": "string" },
+        "rating": { "type": "number" },
+        "status": { "type": "string" },
+        "address": { "type": "string" },
+        "website": { "type": "string" }
+      },
+      "required": ["supplierId"]
+    },
+    "Delivery": {
+      "title": "Delivery",
+      "description": "Giao hàng (PXK)",
+      "type": "object",
+      "properties": {
+        "deliveryId": { "type": "string" },
+        "poNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "productCode": { "type": "string" },
+        "productName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "delivered": { "type": "number" },
+        "progress": { "type": "number" },
+        "status": { "type": "string" },
+        "customer": { "type": "string" },
+        "incident": { "type": "string" },
+        "revenue": { "type": "number" },
+        "profit": { "type": "number" }
+      },
+      "required": ["deliveryId"]
+    },
+    "FileStorage": {
+      "title": "File Storage",
+      "description": "Lưu trữ tệp tin trên Google Drive",
+      "type": "object",
+      "properties": {
+        "fileId": { "type": "string" },
+        "driveFileId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "documentType": { "type": "string" },
+        "documentNumber": { "type": "string" },
+        "uploadDate": { "type": "string", "format": "date-time" },
+        "year": { "type": "number" },
+        "month": { "type": "number" },
+        "driveLink": { "type": "string" },
+        "uploader": { "type": "string" }
+      },
+      "required": ["fileId", "driveFileId"]
+    }
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Danh sách khách hàng"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Nhà cung cấp"
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": "Delivery",
+      "description": "Giao hàng (PXK)"
+    },
+    "/file_storage/{fileId}": {
+      "schema": "FileStorage",
+      "description": "Lưu trữ tệp tin trên Google Drive"
+    }
+  }
+}

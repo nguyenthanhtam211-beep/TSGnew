@@ -1,0 +1,2549 @@
+import * as XLSX from 'xlsx';
+import { Toaster, toast } from 'react-hot-toast';
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer } from "lucide-react";
+import { motion } from "motion/react";
+import clsx from "clsx";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import Papa from "papaparse";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { parse, isBefore, startOfDay } from "date-fns";
+import { db, auth } from "./firebase";
+import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
+import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
+import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances } from './lib/business-logic';
+import { SYSTEM_PROMPT } from "./prompt";
+import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA } from "./data";
+import { 
+  DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
+  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
+  StorageView, SpecsView, ProductDetailModal, PODetailModal, 
+  ProductHoverCard, ProductCombobox, PricingCombobox 
+} from "./components";
+import { exportGenericTableToPDF } from './lib/pdf-exporter';
+
+const FULL_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
+
+=== DỮ LIỆU HỆ THỐNG HIỆN TẠI ===
+[BẢNG GIÁ 2026]
+${PRICING_DATA}
+
+[PO HEADER]
+${PO_HEADER_DATA}
+
+[PO LINES]
+${PO_LINES_DATA}
+
+[GIAO HÀNG]
+${DELIVERY_DATA}
+=== KẾT THÚC ===`;
+
+function parseCSV(csvText: string) {
+  return Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true }).data;
+}
+
+export default function App() {
+  const [selectedProductDetails, setSelectedProductDetails] = useState<string | null>(null);
+  const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  
+  
+  const initialPricing = useMemo(() => parseCSV(PRICING_DATA), []);
+  const initialPOHeader = useMemo(() => parseCSV(PO_HEADER_DATA), []);
+  const initialPOLines = useMemo(() => parseCSV(PO_LINES_DATA), []);
+  const initialDelivery = useMemo(() => parseCSV(DELIVERY_DATA), []);
+  const initialCustomer = useMemo(() => parseCSV(CUSTOMER_DATA), []);
+  const initialSupplier = useMemo(() => parseCSV(SUPPLIER_DATA), []);
+  const initialContact = useMemo(() => parseCSV(CONTACT_DATA), []);
+  const initialProducts = useMemo(() => parseCSV(PRODUCT_DATA), []);
+  const initialDeliveryPlan = useMemo(() => parseCSV(DELIVERY_PLAN_DATA), []);
+
+  const pricingData = useFirestoreCollection('pricing', initialPricing);
+  const poHeaderData = useFirestoreCollection('po_headers', initialPOHeader);
+  const poLinesData = useFirestoreCollection('po_lines', initialPOLines);
+  const deliveryData = useFirestoreCollection('deliveries', initialDelivery);
+  const customerData = useFirestoreCollection('customers', initialCustomer);
+  const supplierData = useFirestoreCollection('suppliers', initialSupplier);
+  const contactData = useFirestoreCollection('contacts', initialContact);
+  const productData = useFirestoreCollection('products', initialProducts);
+  const deliveryPlanData = useFirestoreCollection('delivery_plans', initialDeliveryPlan);
+  const specsData = useFirestoreCollection('specs', []);
+  const fileStorageData = useFirestoreCollection('file_storage', []);
+  const [googleToken, setGoogleToken] = useState<string | null>(() => {
+    return localStorage.getItem('google_access_token');
+  });
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'google_access_token') {
+        setGoogleToken(e.newValue);
+        if (e.newValue) {
+          toast.success('Đã đồng bộ Google Access Token từ Tab khác thành công!');
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'connect_google') {
+      ensureGoogleToken([
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/spreadsheets'
+      ], true).then((newToken) => {
+        if (newToken) {
+          setGoogleToken(newToken);
+          toast.success('🎉 Đã kết nối Google thành công trong Tab mới! Bạn có thể đóng tab này.', { duration: 10000 });
+        }
+      }).catch((err) => {
+        console.error('Auto connect error:', err);
+      });
+    }
+
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const handleSignInGoogle = async () => {
+    try {
+      const token = await ensureGoogleToken([
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/spreadsheets'
+      ], true);
+      if (token) {
+        setGoogleToken(token);
+        toast.success('Đã kết nối với Google!');
+        return token;
+      }
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
+    }
+    return null;
+  };
+
+  const handleCreateCalendarEvent = async (eventData: { summary: string, description: string, start: string, end: string, location?: string }) => {
+    let token = googleToken;
+    if (!token) {
+      token = await handleSignInGoogle();
+    }
+    
+    if (!token) return;
+
+    try {
+      const response = await fetch('/api/calendar/events', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(eventData)
+      });
+
+      const resText = await response.text();
+      let errorData: any = null;
+      try {
+        errorData = JSON.parse(resText);
+      } catch (e) {
+        // Not JSON
+      }
+
+      if (!response.ok) {
+        if (resText.includes('<!doctype') || resText.includes('<html')) {
+          throw new Error('Xác thực Google bị gián đoạn trong khung iframe. Vui lòng Mở ứng dụng trong Tab mới.');
+        }
+        throw new Error(errorData?.error || 'Failed to create calendar event');
+      }
+
+      toast.success('Đã thêm sự kiện vào Google Calendar!');
+    } catch (error) {
+      console.error('Calendar Event Error:', error);
+      toast.error('Lỗi khi thêm sự kiện vào Calendar.');
+    }
+  };
+
+  const enrichedPricingData = useMemo(() => {
+    return pricingData.map(row => {
+      const product = productData.find(p => p['Mã sản phẩm'] === row['Mã sản phẩm']);
+      if (product) {
+        return {
+          ...row,
+          'Tên sản phẩm': product['Tên sản phẩm'] || row['Tên sản phẩm'],
+          'ĐVT': product['Đơn Vị Tính'] || row['ĐVT'],
+          'Nhóm sản phẩm': product['Nhóm hàng'] || row['Nhóm sản phẩm'],
+        };
+      }
+      return row;
+    });
+  }, [pricingData, productData]);
+
+  const enrichedPoLinesData = useMemo(() => {
+    return poLinesData.map(row => {
+      let productCode = row['Mã của khách']?.split(',')[0];
+      const priceRow = pricingData.find(p => p['Mã giá bán'] === row['Mã giá bán']);
+      if (priceRow && priceRow['Mã sản phẩm']) {
+          productCode = priceRow['Mã sản phẩm'];
+      }
+      
+      const product = productData.find(p => p['Mã sản phẩm'] === productCode || p['Mã sản phẩm'] === row['Mã của khách']);
+      
+      const lineFinances = calculatePOLineFinances(row, pricingData);
+
+      // Calculate real-time delivery metrics dynamically from delivery slips
+      const lineId = row['STT'];
+      const associatedDeliveries = deliveryData.filter(d => !d.isDeleted && d['Chi tiết đơn hàng'] === lineId);
+      const totalDelivered = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
+      const ordered = parseNumber(row['Số lượng']);
+      const remaining = Math.max(0, ordered - totalDelivered);
+      const progressPercent = ordered > 0 ? (totalDelivered / ordered) * 100 : 0;
+      const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
+      const isCompleted = totalDelivered >= ordered ? "1" : "0";
+
+      const enrichedRow = {
+        ...row,
+        'Số lượng': (ordered || 0).toLocaleString('en-US'),
+        'Đã giao': (totalDelivered || 0).toLocaleString('en-US'),
+        'Còn lại': (remaining || 0).toLocaleString('en-US'),
+        'Tiến độ sản phẩm': progressString,
+        'Tiến độ giao': progressString,
+        'Hoàn thành': isCompleted,
+        'Doanh thu': (lineFinances.revenue || 0).toLocaleString('en-US'),
+        'Đơn giá bán': (lineFinances.sellPrice || 0).toLocaleString('en-US'),
+      };
+
+      if (product) {
+        enrichedRow['Tên sản phẩm'] = product['Tên sản phẩm'] || row['Tên sản phẩm'];
+        enrichedRow['ĐVT'] = product['Đơn Vị Tính'] || row['ĐVT'];
+        enrichedRow['Nhóm hàng'] = product['Nhóm hàng'] || row['Nhóm hàng'];
+      }
+      return enrichedRow;
+    });
+  }, [poLinesData, pricingData, productData, deliveryData]);
+
+  const enrichedDeliveryPlanData = useMemo(() => {
+    return deliveryPlanData.map(row => {
+      const product = productData.find(p => p['Tên sản phẩm'] === row['Sản phẩm'] || p['Mã sản phẩm'] === row['Sản phẩm']);
+      if (product) {
+        return {
+          ...row,
+          'Sản phẩm': product['Tên sản phẩm'] || row['Sản phẩm']
+        };
+      }
+      return row;
+    });
+  }, [deliveryPlanData, productData]);
+
+  const enrichedDeliveryData = useMemo(() => {
+    return deliveryData.map(row => {
+      const finances = calculateDeliveryFinances(row, pricingData, poLinesData);
+      const poLine = poLinesData.find(l => !l.isDeleted && l['STT'] === row['Chi tiết đơn hàng']);
+      
+      let productCode = finances.priceCode !== 'N/A' ? finances.priceCode : (row['Mã sản phẩm'] || (poLine ? poLine['Mã của khách'] : ''));
+      const product = productData.find(p => p['Mã sản phẩm'] === productCode);
+
+      const qtyDeliveredThisSlip = parseNumber(row['Số lượng giao']);
+      const associatedDeliveries = deliveryData.filter(d => !d.isDeleted && d['Chi tiết đơn hàng'] === row['Chi tiết đơn hàng']);
+      const totalDeliveredForLine = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
+      const qtyOrdered = poLine ? parseNumber(poLine['Số lượng']) : parseNumber(row['Số lượng đặt']);
+      
+      const remainingForLine = Math.max(0, qtyOrdered - totalDeliveredForLine);
+      const progressPercent = qtyOrdered > 0 ? (totalDeliveredForLine / qtyOrdered) * 100 : 0;
+      const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
+
+      const enrichedRow = {
+        ...row,
+        'Số lượng đặt': (qtyOrdered || 0).toLocaleString('en-US'),
+        'Đã giao': (totalDeliveredForLine || 0).toLocaleString('en-US'),
+        'Còn lại': (remainingForLine || 0).toLocaleString('en-US'),
+        'Tiến độ giao': progressString,
+        'Đơn giá bán': (finances.sellPrice || 0).toLocaleString('en-US'),
+        'Đơn giá nhập': (finances.buyPrice || 0).toLocaleString('en-US'),
+        'Doanh thu': (finances.revenue || 0).toLocaleString('en-US'),
+        'Lợi nhuận gộp': (finances.profit || 0).toLocaleString('en-US'),
+        '% Lợi nhuận': `${(finances.margin || 0).toFixed(2)}%`,
+      };
+
+      if (product) {
+        enrichedRow['Tên sản phẩm'] = product['Tên sản phẩm'] || row['Tên sản phẩm'];
+        enrichedRow['ĐVT'] = product['Đơn Vị Tính'] || row['ĐVT'];
+        enrichedRow['Nhóm hàng'] = product['Nhóm hàng'] || row['Nhóm hàng'];
+      }
+      return enrichedRow;
+    });
+  }, [deliveryData, pricingData, productData, poLinesData]);
+
+  const enrichedPoHeaderData = useMemo(() => {
+    return poHeaderData.map((row, idx) => {
+      const poNum = row['Đơn hàng'];
+      const lines = enrichedPoLinesData.filter(l => !l.isDeleted && l['Số đơn hàng'] === poNum);
+      
+      const totalValue = lines.reduce((sum, l) => sum + parseNumber(l['Doanh thu']), 0);
+      
+      // Calculate overall status
+      const totalLines = lines.length;
+      const completedLines = lines.filter(l => l['Hoàn thành'] === "1").length;
+      
+      let status = row['Trạng Thái'] || 'Mới';
+      if (totalLines > 0) {
+        if (completedLines === totalLines) {
+          status = 'Hoàn thành';
+        } else if (completedLines > 0) {
+          status = 'Đang giao';
+        } else {
+          // Check if any delivery exists
+          const hasDeliveries = deliveryData.some(d => !d.isDeleted && lines.some(l => l['STT'] === d['Chi tiết đơn hàng']));
+          if (hasDeliveries) {
+            status = 'Đang xử lý';
+          }
+        }
+      }
+
+      return {
+        'STT': idx + 1,
+        ...row,
+        'Tổng giá trị đơn hàng': (totalValue || 0).toLocaleString('en-US'),
+        'Trạng Thái': status
+      };
+    });
+  }, [poHeaderData, enrichedPoLinesData, deliveryData]);
+
+
+  const handleAddToFirestore = async (colName: string, row: any) => {
+    try {
+      const key = getItemKey(row, colName);
+      if (key) {
+        await setDoc(doc(db, colName, key), row);
+      } else {
+        await addDoc(collection(db, colName), row);
+      }
+    } catch (err) {
+      console.error(`Failed to add to ${colName}`, err);
+      throw err;
+    }
+  };
+
+  const handleBatchAddToFirestore = async (colName: string, rows: any[]) => {
+    if (!rows || rows.length === 0) return;
+    try {
+      const batch = writeBatch(db);
+      rows.forEach(row => {
+        const key = getItemKey(row, colName) || row.STT || row.id || `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const cleanKey = String(key).replace(/\//g, '_');
+        const ref = doc(db, colName, cleanKey);
+        batch.set(ref, row, { merge: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error(`Failed to batch add to ${colName}`, err);
+      throw err;
+    }
+  };
+
+  const handleUpdateToFirestore = async (colName: string, row: any) => {
+    try {
+      const id = row.id || getItemKey(row, colName);
+      if (!id) {
+        throw new Error("Không thể xác định ID của dòng dữ liệu");
+      }
+      
+      // Clean data: remove temporary UI fields and calculations before saving
+      const dataToSave = { ...row };
+      
+      // Remove known enriched/calculated fields to keep Firestore clean
+      const uiFields = [
+        'id', 'Doanh thu dự kiến', 'Lợi nhuận dự kiến', 'Tiến độ', 'Số dòng', 'Status',
+        'Tên sản phẩm', 'ĐVT', 'Nhóm sản phẩm', 'Doanh thu', 'Lợi nhuận gộp', 
+        'Tiến độ giao', 'isOverdue', 'qtyOrdered', 'qtyDelivered', 'remainingQty',
+        'currentRevenue', 'currentProfit', 'margin', 'isDelayed', 'isReconciled'
+      ];
+      uiFields.forEach(field => delete dataToSave[field]);
+      
+      await setDoc(doc(db, colName, id), { 
+        ...dataToSave, 
+        updatedAt: new Date().toISOString() 
+      }, { merge: true });
+      toast.success("Cập nhật thành công!");
+    } catch (err) {
+      console.error(`Failed to update ${colName}`, err);
+      toast.error("Lỗi cập nhật!");
+    }
+  };
+
+  const handleDeleteFromFirestore = async (colName: string, row: any) => {
+    try {
+      const batch = writeBatch(db);
+      let deletedCount = 0;
+
+      // 1. Standard delete by IDs
+      const id = row.id ? String(row.id).replace(/\//g, '_') : null;
+      const businessIdRaw = getItemKey(row, colName);
+      const businessId = businessIdRaw ? String(businessIdRaw).replace(/\//g, '_') : null;
+      
+      if (id) {
+        batch.delete(doc(db, colName, id));
+        deletedCount++;
+      }
+      if (businessId && businessId !== id) {
+        batch.delete(doc(db, colName, businessId));
+        deletedCount++;
+      }
+
+      // 2. Aggressive delete by exact field match for critical collections
+      let fieldToQuery = '';
+      if (colName === 'delivery_plans') fieldToQuery = 'Mã kế hoạch';
+      else if (colName === 'products') fieldToQuery = 'Mã hàng';
+      else if (colName === 'customers') fieldToQuery = 'Mã KH';
+      else if (colName === 'suppliers') fieldToQuery = 'Mã NCC';
+      
+      if (fieldToQuery && row[fieldToQuery]) {
+        const q = query(collection(db, colName), where(fieldToQuery, '==', row[fieldToQuery]));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(d => {
+          batch.delete(d.ref);
+          deletedCount++;
+        });
+      }
+
+      if (deletedCount === 0) {
+        throw new Error("Không thể xác định dữ liệu để xóa");
+      }
+
+      // Add audit log
+      const auditRef = doc(collection(db, 'audit_logs'));
+      batch.set(auditRef, {
+        action: 'delete',
+        collection: colName,
+        documentId: id || businessId || (fieldToQuery ? row[fieldToQuery] : 'unknown'),
+        user: auth.currentUser?.email || 'Unknown',
+        timestamp: new Date().toISOString(),
+      });
+
+      await batch.commit();
+
+      toast.success("Xóa thành công!");
+    } catch (err) {
+      console.error(`Failed to delete from ${colName}`, err);
+      toast.error("Lỗi khi xóa!");
+    }
+  };
+
+  const handleUploadToDrive = async (file: File, metadata: { documentType: string, documentNumber: string, fileName?: string }) => {
+    try {
+      let token = googleToken || localStorage.getItem('google_access_token');
+      if (!token) {
+        token = await handleSignInGoogle();
+      }
+
+      if (!token) {
+        throw new Error("Chưa có quyền truy cập Google Drive. Vui lòng Bấm Đăng nhập Google hoặc Mở ứng dụng trong Tab mới.");
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', metadata.fileName || file.name);
+      formData.append('documentType', metadata.documentType);
+      formData.append('documentNumber', metadata.documentNumber);
+      
+      const now = new Date();
+      formData.append('year', now.getFullYear().toString());
+      formData.append('month', (now.getMonth() + 1).toString().padStart(2, '0'));
+
+      let response: Response;
+      try {
+        response = await fetch('/api/drive/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData,
+        });
+      } catch (fetchErr: any) {
+        console.error("Fetch /api/drive/upload error:", fetchErr);
+        throw new Error("Lỗi kết nối máy chủ khi tải tệp lên Drive.");
+      }
+
+      if (!response.ok && response.status === 401) {
+        localStorage.removeItem('google_access_token');
+        setGoogleToken(null);
+        token = await handleSignInGoogle();
+        if (token) {
+          try {
+            response = await fetch('/api/drive/upload', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              body: formData,
+            });
+          } catch (fetchErr2: any) {
+            throw new Error("Lỗi kết nối máy chủ sau khi thử lại đăng nhập Google.");
+          }
+        } else {
+          throw new Error("Xác thực Google bị hết hạn. Vui lòng đăng nhập lại Google.");
+        }
+      }
+
+      const resText = await response.text();
+      let driveData: any = null;
+      try {
+        driveData = JSON.parse(resText);
+      } catch (e) {
+        // Not JSON
+      }
+
+      if (!response.ok) {
+        if (resText.includes('<!doctype') || resText.includes('<html')) {
+          throw new Error('Đường truyền Google bị chặn hoặc chuyển hướng trong iframe. Vui lòng Bấm "Mở ứng dụng trong Tab mới" ở góc trên bên phải.');
+        }
+        throw new Error(driveData?.error || `Tải tệp lên Google Drive thất bại (${response.status})`);
+      }
+
+      if (!driveData || !driveData.driveFileId) {
+        throw new Error("Phản hồi từ máy chủ không chứa mã tập tin Drive hợp lệ.");
+      }
+      
+      // Save metadata to Firestore
+      const fileId = `file_${Date.now()}`;
+      await handleAddToFirestore('file_storage', {
+        id: fileId,
+        fileId,
+        driveFileId: driveData.driveFileId,
+        fileName: metadata.fileName || file.name,
+        mimeType: file.type,
+        documentType: metadata.documentType,
+        documentNumber: metadata.documentNumber,
+        uploadDate: now.toISOString(),
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        driveLink: driveData.driveLink,
+      });
+
+      toast.success('Đã lưu trữ tài liệu vào Google Drive thành công!');
+    } catch (error: any) {
+      console.error('Upload to Drive error:', error);
+      toast.error(`Lỗi lưu trữ: ${error.message || error}`);
+    }
+  };
+
+
+  return (
+    <div className="flex h-screen bg-gray-50 text-gray-900 font-sans print:bg-white print:h-auto print:block">
+      <Toaster position="top-right" />
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/80 flex flex-col text-slate-300 shadow-2xl print:hidden relative z-20">
+        <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/40">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6] animate-pulse" />
+              <h1 className="text-lg font-black text-white tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">TSG BUSINESS OS</h1>
+            </div>
+            <p className="text-[11px] font-medium text-slate-400 mt-1 pl-4">Tâm Sen Group • ERP 2026</p>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar">
+          <div className="px-5 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng quan</div>
+          <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+          <NavItem icon={<TrendingUp size={18} />} label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
+          
+          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quy trình kinh doanh</div>
+          <NavItem icon={<Users size={18} />} label="Khách hàng" isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
+          <NavItem icon={<Package size={18} />} label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
+          <NavItem icon={<FileText size={18} />} label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
+          <NavItem icon={<FileText size={18} />} label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
+          <NavItem icon={<CheckCircle size={18} />} label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
+          <NavItem icon={<Truck size={18} />} label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
+          <NavItem icon={<TrendingUp size={18} />} label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
+          
+          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Dữ liệu nền tảng</div>
+          <NavItem icon={<Package size={18} />} label="Sản phẩm" isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
+          <NavItem icon={<ShieldCheck size={18} />} label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
+          <NavItem icon={<BookUser size={18} />} label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
+          <NavItem icon={<Users size={18} />} label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
+          
+          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Công cụ hỗ trợ</div>
+          <NavItem icon={<Bot size={18} />} label="Trợ lý AI" isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
+          <NavItem icon={<Camera size={18} />} label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
+          <NavItem icon={<CheckCircle size={18} />} label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
+          <NavItem icon={<HardDrive size={18} />} label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
+          
+          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hệ thống</div>
+          <NavItem icon={<Settings size={18} />} label="Cài đặt" isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible print:h-auto print:block">
+        {activeTab === "dashboard" && <DashboardView poData={poHeaderData} deliveryData={enrichedDeliveryData} poLinesData={enrichedPoLinesData} customersData={customerData} />}
+        {activeTab === "workflow" && (
+          <WorkflowView 
+            pricingData={pricingData}
+            poHeaderData={poHeaderData}
+            poLinesData={enrichedPoLinesData}
+            deliveryData={enrichedDeliveryData}
+            customerData={customerData}
+            supplierData={supplierData}
+            productData={productData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+          />
+        )}
+        {activeTab === "assistant" && <AssistantView />}
+        {activeTab === "tasks" && <TasksView deliveryPlanData={enrichedDeliveryPlanData} poLinesData={enrichedPoLinesData} contacts={contactData} />}
+        {activeTab === "ocr" && (
+          <OCRView 
+            pricingData={pricingData}
+            onAddPOHeader={async (row) => await handleAddToFirestore("po_headers", row)}
+            onAddPOLines={async (rows) => { await handleBatchAddToFirestore("po_lines", rows); }}
+            onAddDelivery={async (rows) => { await handleBatchAddToFirestore("deliveries", rows); }}
+            onUploadToDrive={handleUploadToDrive}
+            poHeaders={poHeaderData}
+          />
+        )}
+        {activeTab === "customers" && <CustomerView initialData={customerData} contacts={contactData} />}
+        {activeTab === "suppliers" && <SupplierView initialData={supplierData} contacts={contactData} />}
+        {activeTab === "contacts" && (
+          <ContactView 
+            contacts={contactData} 
+             
+            customers={customerData} 
+            suppliers={supplierData} 
+          />
+        )}
+        {activeTab === "pricing" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "po" && (
+          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
+            title="Đơn hàng (PO_Header)" 
+            data={enrichedPoHeaderData} 
+            showAddButton={true} 
+            onAdd={(row) => handleAddToFirestore("po_headers", row)} 
+            onEdit={(row) => handleUpdateToFirestore("po_headers", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("po_headers", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            customers={customerData}
+            poLines={poLinesData}
+           
+          />
+        )}
+        {activeTab === "polines" && (
+          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
+            title="Chi tiết đơn (PO_Lines)" 
+            data={enrichedPoLinesData} 
+            showAddButton={true} 
+            onAdd={(row) => handleAddToFirestore("po_lines", row)} 
+            onEdit={(row) => handleUpdateToFirestore("po_lines", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("po_lines", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            poLines={poLinesData}
+            customers={customerData}
+          />
+        )}
+        {activeTab === "profit_report" && (
+          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
+            title="Báo cáo Lợi nhuận (Profit lines)" 
+            data={enrichedPoLinesData} 
+            showAddButton={false} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            poLines={poLinesData}
+            customers={customerData}
+          />
+        )}
+        {activeTab === "delivery" && (
+          <DeliveryView 
+            deliveryData={enrichedDeliveryData} 
+            poLinesData={enrichedPoLinesData}
+            customerData={customerData}
+            supplierData={supplierData}
+            productData={productData}
+            onAdd={(row) => handleAddToFirestore("deliveries", row)} 
+            onEdit={(row) => handleUpdateToFirestore("deliveries", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("deliveries", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            onCreateCalendarEvent={handleCreateCalendarEvent}
+          />
+        )}
+        {activeTab === "delivery_plan" && (
+          <DeliveryPlanView 
+            deliveryPlans={enrichedDeliveryPlanData}
+            poLines={enrichedPoLinesData}
+            poHeaders={poHeaderData}
+            deliveries={enrichedDeliveryData}
+            products={productData}
+            onAddPlan={(row) => handleAddToFirestore("delivery_plans", row)}
+            onUpdatePlan={(row) => handleUpdateToFirestore("delivery_plans", row)}
+            onDeletePlan={(row) => handleDeleteFromFirestore("delivery_plans", row)}
+            onPoClick={(val) => setSelectedPoDetails(val)}
+            onProductClick={(val) => setSelectedProductDetails(val)}
+          />
+        )}
+        {activeTab === "products" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Sản phẩm" data={productData} showAddButton={true} onAdd={(row) => handleAddToFirestore("products", row)} onEdit={(row) => handleUpdateToFirestore("products", row)} onDelete={(row) => handleDeleteFromFirestore("products", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "specs" && (
+          <SpecsView 
+            specsData={specsData}
+            productData={productData}
+            customerData={customerData}
+            onAdd={(row) => handleAddToFirestore("specs", row)}
+            onEdit={(row) => handleUpdateToFirestore("specs", row)}
+            onDelete={(row) => handleDeleteFromFirestore("specs", row)}
+          />
+        )}
+        {activeTab === "storage" && (
+          <StorageView 
+            files={fileStorageData}
+            onUpload={handleUploadToDrive}
+            onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
+          />
+        )}
+        {activeTab === "settings" && <SettingsView />}
+      </div>
+
+      {selectedProductDetails && (
+        <ProductDetailModal 
+            pricingData={pricingData}
+            productNameOrId={selectedProductDetails} 
+            onClose={() => setSelectedProductDetails(null)} 
+            productData={productData}
+            poLinesData={enrichedPoLinesData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+            deliveryData={enrichedDeliveryData}
+            specsData={specsData}
+            onPoClick={(val) => setSelectedPoDetails(val)}
+        />
+      )}
+
+      {selectedPoDetails && (
+        <PODetailModal
+            poNumber={selectedPoDetails}
+            onClose={() => setSelectedPoDetails(null)}
+            poHeaderData={poHeaderData}
+            poLinesData={enrichedPoLinesData}
+            deliveryData={enrichedDeliveryData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+            productData={productData}
+            pricingData={pricingData}
+            onProductClick={(val) => setSelectedProductDetails(val)}
+            onAddPOLine={(row) => handleAddToFirestore("po_lines", row)}
+        />
+      )}
+    </div>
+  );
+}
+
+function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
+  return (
+    <motion.button
+      whileHover={{ x: 4, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={clsx(
+        "relative w-full flex items-center gap-3 px-5 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden group max-w-[calc(100%-16px)]",
+        isActive 
+          ? "bg-gradient-to-r from-blue-600/90 to-indigo-600/90 text-white shadow-lg shadow-blue-500/25 font-semibold" 
+          : "text-slate-300 hover:text-white hover:bg-slate-800/60"
+      )}
+    >
+      {isActive && (
+        <motion.div 
+          layoutId="activeNavIndicator"
+          className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl -z-10 shadow-[0_0_20px_rgba(59,130,246,0.4)]"
+          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+        />
+      )}
+      <span className={clsx(
+        "transition-transform duration-200 group-hover:scale-110",
+        isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"
+      )}>
+        {icon}
+      </span>
+      <span className="truncate tracking-wide">{label}</span>
+      {isActive && (
+        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse shadow-[0_0_8px_#ffffff]" />
+      )}
+    </motion.button>
+  );
+}
+
+
+function SortableColumnItem({ id, label, isVisible, onToggleVisibility }: { id: string; label: string; isVisible: boolean; onToggleVisibility: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2 hover:bg-gray-50 border-b border-gray-100 last:border-0 group">
+      <div className="flex items-center gap-3 flex-1 overflow-hidden">
+        <button type="button" {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1 rounded">
+          <GripVertical size={16} />
+        </button>
+        <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+          <input 
+            type="checkbox" 
+            checked={isVisible} 
+            onChange={() => onToggleVisibility(id)} 
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+          />
+          <span className="text-sm font-medium text-gray-700 select-none truncate" title={label}>{label}</span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function TableView({ 
+  title, 
+  data, 
+  showAddButton, 
+  onAdd, 
+  onEdit, 
+  onDelete, 
+  onProductClick, 
+  onPoClick,
+  customers = [],
+  categories = ["Nội địa", "Xuất khẩu", "Gia công", "FOC", "Khác"],
+  poLines = [],
+  pricingData = [],
+  specsData = [],
+  poHeaders = [],
+  suppliers = [],
+  products = []
+}: { 
+  title: string, 
+  data: any[], 
+  showAddButton?: boolean, 
+  onAdd?: (row: any) => Promise<void> | void, 
+  onEdit?: (row: any) => Promise<void> | void, 
+  onDelete?: (row: any) => Promise<void> | void, 
+  onProductClick?: (val: string) => void, 
+  onPoClick?: (val: string) => void,
+  customers?: any[],
+  categories?: string[],
+  poLines?: any[],
+  pricingData?: any[],
+  specsData?: any[],
+  poHeaders?: any[],
+  suppliers?: any[],
+  products?: any[]
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [formData, setFormData] = useState<any>({});
+  const [editingRow, setEditingRow] = useState<any>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+
+  const isPOHeaderTable = useMemo(() => title.includes("Đơn hàng (PO_Header)"), [title]);
+  const isPOLineTable = useMemo(() => title.includes("Chi tiết đơn (PO_Lines)") || title.includes("Báo cáo Lợi nhuận"), [title]);
+  const isPOTable = useMemo(() => isPOHeaderTable || isPOLineTable, [isPOHeaderTable, isPOLineTable]);
+
+  const isDuplicatePO = useMemo(() => {
+    if (!isPOHeaderTable) return false;
+    const poValue = String(formData['Đơn hàng'] || '').trim().toLowerCase();
+    if (!poValue) return false;
+    return data.some(row => String(row['Đơn hàng'] || '').trim().toLowerCase() === poValue);
+  }, [formData, data, isPOHeaderTable]);
+
+  const uniquePOs = useMemo(() => {
+    const pos = new Set<string>();
+    if (poHeaders && poHeaders.length > 0) {
+      poHeaders.forEach(r => {
+        if (r['Đơn hàng']) pos.add(r['Đơn hàng']);
+      });
+    } else {
+      data.forEach(r => {
+        if (r['Đơn hàng']) pos.add(r['Đơn hàng']);
+      });
+    }
+    return Array.from(pos).sort();
+  }, [data, poHeaders]);
+
+  const customerList = useMemo(() => {
+    const list = new Set<string>();
+    if (customers && customers.length > 0) {
+      customers.forEach(c => {
+        const val = c['Customer_ID'] || c['Tên khách hàng'] || c.name;
+        if (val) list.add(String(val).trim());
+      });
+    }
+    if (poHeaders && poHeaders.length > 0) {
+      poHeaders.forEach(r => {
+        const val = r['Khách hàng'];
+        if (val) list.add(String(val).trim());
+      });
+    }
+    if (pricingData && pricingData.length > 0) {
+      pricingData.forEach(p => {
+        const val = p['RP_Khách hàng'];
+        if (val) list.add(String(val).trim());
+      });
+    }
+    ["Thăng Long", "Thanh Hoá", "Bắc Sơn", "Ngân Sơn", "Sài Gòn", "Bến Tre"].forEach(val => {
+      list.add(val);
+    });
+    return Array.from(list).sort();
+  }, [customers, poHeaders, pricingData]);
+
+
+  const handleTextChange = (e: any, h: string) => {
+    const val = typeof e === 'string' ? e : e.target.value;
+    const updates: any = { [h]: val };
+
+    if (isPOLineTable) {
+        if (h === 'Số đơn hàng' || h === 'Đơn hàng') {
+            const poNum = val;
+            if (poNum && poHeaders && poHeaders.length > 0) {
+                const poHeader = poHeaders.find(r => (r['Đơn hàng'] === poNum) || (r['Số đơn hàng'] === poNum));
+                if (poHeader) {
+                    updates['Khách hàng'] = poHeader['Khách hàng'] || '';
+                    
+                    // Auto-update pricing for selected product based on new customer if product already exists in form
+                    const currentProductVal = formData['Tên sản phẩm'] || formData['Sản phẩm'] || '';
+                    if (currentProductVal) {
+                        const product = products.find(p => p['Mã hàng'] === currentProductVal || p['Mã sản phẩm'] === currentProductVal || p['Sản phẩm'] === currentProductVal || p['Tên sản phẩm'] === currentProductVal || p.id === currentProductVal);
+                        if (product) {
+                            const productVal = product['Mã hàng'] || product['Mã sản phẩm'] || product['Sản phẩm'] || product.id;
+                            const pricingList = pricingData.filter(p => p['Mã sản phẩm'] === productVal);
+                            if (pricingList.length > 0) {
+                                let pricing = pricingList.find(p => p['RP_Khách hàng'] === poHeader['Khách hàng']);
+                                if (!pricing) pricing = pricingList[0];
+                                if (pricing) {
+                                    updates['Mã của khách'] = product['Mã của khách'] || pricing['Mã sản phẩm'] || '';
+                                    updates['Mã giá bán'] = pricing['Mã giá bán'] || '';
+                                    updates['Đơn giá bán'] = pricing['Đơn giá bán'] || '';
+                                    updates['Đơn giá nhập'] = pricing['Đơn giá mua'] || pricing['Đơn giá nhập'] || '';
+                                    updates['Lợi nhuận'] = pricing['Lợi nhuận'] || '';
+                                    
+                                    const qty = parseNumber(formData['Số lượng'] || 0);
+                                    const price = parseNumber(pricing['Đơn giá bán'] || 0);
+                                    if (qty && price) {
+                                        updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (h === 'Mã giá bán') {
+           const pricing = pricingData.find(p => p['Mã giá bán'] === val);
+           if (pricing) {
+               updates['Mã của khách'] = pricing['Mã sản phẩm'] || '';
+               updates['Đơn giá bán'] = pricing['Đơn giá bán'] || '';
+               updates['Đơn giá nhập'] = pricing['Đơn giá mua'] || pricing['Đơn giá nhập'] || '';
+               updates['Lợi nhuận'] = pricing['Lợi nhuận'] || '';
+               
+               const product = products.find(p => p['Mã sản phẩm'] === pricing['Mã sản phẩm']);
+               if (product) {
+                   updates['ĐVT'] = product['ĐVT'] || product['Đơn vị tính'] || product['Đơn Vị Tính'] || 'Cái';
+                   updates['Nhóm hàng'] = product['Nhóm hàng'] || product['Phân loại'] || '';
+                   updates['Tên sản phẩm'] = product['Tên sản phẩm'] || product['Sản phẩm'] || pricing['Tên sản phẩm'] || '';
+               } else {
+                   updates['Tên sản phẩm'] = pricing['Tên sản phẩm'] || '';
+               }
+               
+               const qty = parseNumber(formData['Số lượng'] || 0);
+               const price = parseNumber(pricing['Đơn giá bán'] || 0);
+               if (qty && price) {
+                   updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
+               }
+           }
+        }
+        if (h === 'Số lượng') {
+           const price = parseNumber(formData['Đơn giá bán'] || 0);
+           const qty = parseNumber(val);
+           if (qty && price) {
+               updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
+           }
+        }
+    }
+    setFormData((prev: any) => ({ ...prev, ...updates }));
+  };
+
+  const handleProductChange = (e: any, h: string) => {
+    const val = typeof e === 'string' ? e : e.target.value;
+    const updates: any = { [h]: val };
+    
+    if (isPOLineTable) {
+      const searchStr = val.toLowerCase().trim();
+      let product = products.find(p => p['Mã hàng'] === val || p['Mã sản phẩm'] === val || p['Sản phẩm'] === val || p['Tên sản phẩm'] === val || p.id === val);
+      
+      // Look up with fuzzy matching
+      if (!product && searchStr) {
+          product = products.find(p => {
+              const code = (p['Mã hàng'] || p['Mã sản phẩm'] || p['Sản phẩm'] || p.id || '').toLowerCase();
+              const name = (p['Tên sản phẩm'] || '').toLowerCase();
+              return code.includes(searchStr) || name.includes(searchStr);
+          });
+      }
+
+      if (product) {
+        const productVal = product['Mã hàng'] || product['Mã sản phẩm'] || product['Sản phẩm'] || product.id;
+        if (h === 'Tên sản phẩm') {
+          updates['Tên sản phẩm'] = product['Tên sản phẩm'] || product['Sản phẩm'] || '';
+        } else {
+          updates[h] = productVal;
+        }
+        updates['ĐVT'] = product['ĐVT'] || product['Đơn vị tính'] || product['Đơn Vị Tính'] || 'Cái';
+        updates['Nhóm hàng'] = product['Nhóm hàng'] || product['Phân loại'] || '';
+        
+        // Find matching pricing lists for this product
+        const pricingList = pricingData.filter(p => p['Mã sản phẩm'] === productVal);
+        if (pricingList.length > 0) {
+           const poNum = formData['Số đơn hàng'] || formData['Đơn hàng'];
+           let customerName = '';
+           if (poNum && poHeaders && poHeaders.length > 0) {
+              const poHeader = poHeaders.find(r => (r['Đơn hàng'] === poNum) || (r['Số đơn hàng'] === poNum));
+              if (poHeader) customerName = poHeader['Khách hàng'] || '';
+           }
+           
+           let pricing = pricingList.find(p => p['RP_Khách hàng'] === customerName);
+           if (!pricing) pricing = pricingList[0];
+           
+           if (pricing) {
+               updates['Mã của khách'] = product['Mã của khách'] || pricing['Mã sản phẩm'] || '';
+               updates['Mã giá bán'] = pricing['Mã giá bán'] || '';
+               updates['Đơn giá bán'] = pricing['Đơn giá bán'] || '';
+               updates['Đơn giá nhập'] = pricing['Đơn giá mua'] || pricing['Đơn giá nhập'] || '';
+               updates['Lợi nhuận'] = pricing['Lợi nhuận'] || '';
+               
+               const qty = parseNumber(formData['Số lượng'] || 0);
+               const price = parseNumber(pricing['Đơn giá bán'] || 0);
+               if (qty && price) {
+                   updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
+               }
+           }
+        } else {
+           updates['Mã của khách'] = product['Mã của khách'] || '';
+        }
+      }
+    }
+    setFormData((prev: any) => ({ ...prev, ...updates }));
+  };
+  
+  useEffect(() => {
+    setSearchTerm("");
+  }, [title]);
+  
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex-1 p-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">{title}</h2>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+          Không có dữ liệu.
+        </div>
+      </div>
+    );
+  }
+  
+
+  const headers = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    let maxKeys = 0;
+    let bestHeaders: string[] = [];
+    for (let i = 0; i < Math.min(data.length, 50); i++) {
+        const keys = Object.keys(data[i]);
+        if (keys.length > maxKeys) {
+            maxKeys = keys.length;
+            bestHeaders = keys;
+        }
+    }
+    
+    // Filter out unnecessary columns
+    const excludeCols = ['Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng'];
+    if (isPOLineTable && title.includes("Chi tiết đơn")) {
+      excludeCols.push('Đơn giá nhập', 'Lợi nhuận', 'Lợi nhuận dòng');
+    }
+    return bestHeaders.filter(h => !excludeCols.includes(h));
+  }, [data, isPOLineTable, title]);
+
+
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [showColSettings, setShowColSettings] = useState(false);
+  const [columnFilters, setColumnFilters] = useState<Record<string, Set<string>>>({});
+
+
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+
+  const prevDataRef = useRef<any[]>(data);
+  const [highlightedRowIds, setHighlightedRowIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const prevData = prevDataRef.current;
+    if (prevData !== data) {
+      if (prevData && prevData.length > 0) {
+        const newHighlighted = new Set<string>();
+        const prevMap = new Map(prevData.map((r, i) => [r.id || JSON.stringify(r), r]));
+        
+        data.forEach((row, i) => {
+           const id = row.id || JSON.stringify(row);
+           const prevRow = prevMap.get(id);
+           
+           if (!prevRow) {
+              newHighlighted.add(id);
+           } else {
+              if (JSON.stringify(prevRow) !== JSON.stringify(row)) {
+                 newHighlighted.add(id);
+              }
+           }
+        });
+        
+        if (newHighlighted.size > 0) {
+           setHighlightedRowIds(prev => {
+              const next = new Set(prev);
+              newHighlighted.forEach(id => next.add(id));
+              return next;
+           });
+           setTimeout(() => {
+              setHighlightedRowIds(prev => {
+                 const next = new Set(prev);
+                 newHighlighted.forEach(id => next.delete(id));
+                 return next;
+              });
+           }, 10000);
+        }
+      }
+      prevDataRef.current = data;
+    }
+  }, [data]);
+
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Close filter dropdown when clicking outside
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setActiveFilterColumn(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleFilterValue = (column: string, value: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (!next[column]) {
+        next[column] = new Set([value]);
+      } else {
+        const nextSet = new Set(next[column]);
+        if (nextSet.has(value)) {
+          nextSet.delete(value);
+          if (nextSet.size === 0) {
+            delete next[column];
+          } else {
+            next[column] = nextSet;
+          }
+        } else {
+          nextSet.add(value);
+          next[column] = nextSet;
+        }
+      }
+      return next;
+    });
+  };
+
+  const clearColumnFilter = (column: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    });
+  };
+
+
+  useEffect(() => {
+    if (headers.length > 0) {
+      setColumnOrder(prev => {
+        const prevSet = new Set(prev);
+        const newCols = headers.filter(h => !prevSet.has(h));
+        // Remove columns that no longer exist in headers
+        const headerSet = new Set(headers);
+        const validPrev = prev.filter(h => headerSet.has(h));
+        return [...validPrev, ...newCols];
+      });
+    }
+  }, [headers]);
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const toggleColumnVisibility = (colId: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(colId)) {
+        next.delete(colId);
+      } else {
+        next.add(colId);
+      }
+      return next;
+    });
+  };
+
+  const visibleColumns = useMemo(() => {
+    return columnOrder.filter(col => !hiddenColumns.has(col) && headers.includes(col));
+  }, [columnOrder, hiddenColumns, headers]);
+
+  const filteredData = useMemo(() => {
+    return data.filter(row => {
+      // Column Filters match
+      for (const [col, activeFilters] of Object.entries(columnFilters)) {
+        if (activeFilters && activeFilters.size > 0) {
+          const cellValue = row[col] != null ? String(row[col]) : "";
+          if (!activeFilters.has(cellValue)) {
+            return false;
+          }
+        }
+      }
+
+      // Safe search match
+      const searchLower = searchTerm.trim().toLowerCase();
+      if (!searchLower) return true;
+      
+      return Object.values(row).some(val => 
+        val != null && String(val).toLowerCase().includes(searchLower)
+      );
+    });
+  }, [data, searchTerm, columnFilters]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+  // Reset to page 1 if filteredData length changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredData.length]);
+  
+  const getUniqueValuesForColumn = (column: string) => {
+    const values = new Set<string>();
+    data.forEach(row => {
+      if (row[column] != null) {
+        values.add(String(row[column]));
+      } else {
+        values.add(""); // handle empty/null
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  const summaries = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    
+    const moneyCols = headers.filter(h => h.includes('Tổng giá trị') || h.includes('Doanh thu') || h.includes('Thành tiền') || h.includes('Lợi nhuận dòng'));
+    const statusCols = headers.filter(h => h === 'Trạng Thái' || h === 'Status' || h === 'Trạng thái');
+
+    const metrics: { label: string; value: string | number }[] = [];
+    
+    metrics.push({ label: 'Tổng số bản ghi', value: filteredData.length });
+
+    moneyCols.forEach(col => {
+       const sum = filteredData.reduce((acc, row) => {
+         const val = row[col];
+         if (val != null) {
+            const num = parseFloat(String(val).replace(/,/g, ''));
+            if (!isNaN(num)) return acc + num;
+         }
+         return acc;
+       }, 0);
+       
+       if (sum > 0) {
+         metrics.push({ label: `Tổng ${col}`, value: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sum) });
+       }
+    });
+
+    statusCols.forEach(col => {
+       let completed = 0;
+       filteredData.forEach(row => {
+          const val = String(row[col] || '');
+          if (val === 'Hoàn thành' || val === 'Đã giao' || val === 'Hoàn tất') completed++;
+       });
+       if (completed > 0) {
+          metrics.push({ label: `Đã hoàn thành`, value: `${completed} / ${filteredData.length}` });
+       }
+    });
+
+    return metrics.slice(0, 4);
+  }, [data, headers, filteredData]);
+
+
+
+  const renderCell = (header: string, value: any, row: any) => {
+    if (value == null || value === '') return <span className="text-gray-400">-</span>;
+    const strVal = String(value);
+
+    // Clickable Product Link
+    if (header === 'Tên sản phẩm' || header === 'Mã sản phẩm' || header === 'Sản phẩm') {
+        return (
+            <ProductHoverCard 
+                productName={header === 'Tên sản phẩm' ? strVal : (row['Tên sản phẩm'] || strVal)}
+                productCode={header === 'Mã sản phẩm' ? strVal : (row['Mã sản phẩm'] || row['Mã giá bán'] || '')}
+                pricingData={pricingData}
+                specsData={specsData}
+            >
+                <span 
+                    className="text-blue-600 font-medium hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (onProductClick) onProductClick(strVal);
+                    }}
+                >
+                    {strVal}
+                </span>
+            </ProductHoverCard>
+        );
+    }
+
+    // Clickable PO Link or "Chi tiết đơn hàng"
+    if (header === 'Đơn hàng' || header === 'Số đơn hàng' || header === 'Số PO' || header === 'Đơn hàng liên kết' || header === 'Chi tiết đơn hàng') {
+        const poNum = (header === 'Chi tiết đơn hàng' && row['Đơn hàng']) ? row['Đơn hàng'] : strVal;
+        const displayVal = header === 'Chi tiết đơn hàng' ? 'Xem chi tiết' : strVal;
+        
+        return (
+            <span 
+                className="text-emerald-600 font-semibold hover:text-emerald-800 hover:underline cursor-pointer transition-colors"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onPoClick) onPoClick(String(poNum).trim());
+                }}
+            >
+                {displayVal}
+            </span>
+        );
+    }
+
+    // Status badges
+    if (header === 'Trạng Thái' || header === 'Status' || header === 'Trạng thái') {
+      if (strVal === 'Hoàn thành' || strVal === 'Đã giao' || strVal === 'Hoàn tất') {
+        return <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium border border-green-200">{strVal}</span>;
+      }
+      if (strVal === 'Đang tiến hành' || strVal === 'Đang xử lý') {
+        return <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium border border-blue-200">{strVal}</span>;
+      }
+      if (strVal === 'Hủy' || strVal === 'Đã hủy' || strVal.toLowerCase().includes('hư hỏng')) {
+        return <span className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium border border-red-200">{strVal}</span>;
+      }
+      return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium border border-gray-200">{strVal}</span>;
+    }
+
+    // Progress percentage
+    if (header === 'Tiến độ' || header === 'Tiến độ giao' || header === 'Tiến độ sản phẩm' || header.includes('% Lợi nhuận')) {
+      const isPercent = strVal.includes('%');
+      const num = parseFloat(strVal.replace(/,/g, '').replace(/%/g, ''));
+      if (!isNaN(num)) {
+         return (
+            <div className="flex items-center gap-2">
+              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                 <div className={`h-full ${num >= 100 ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(100, num)}%` }}></div>
+              </div>
+              <span className="text-xs font-medium text-gray-700">{strVal}</span>
+            </div>
+         );
+      }
+    }
+
+    // Files
+    if (header === 'Tệp đơn hàng' || header.includes('Tệp') || strVal.endsWith('.pdf') || strVal.endsWith('.jpg') || strVal.endsWith('.png')) {
+      return (
+         <div className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 cursor-pointer w-max">
+           <FileText size={14} />
+           <span className="truncate max-w-[150px] font-medium" title={strVal}>{strVal}</span>
+         </div>
+      );
+    }
+
+    // Bold identifiers
+    if (header === 'Đơn hàng' || header === 'Số đơn hàng' || header === 'Mã sản phẩm' || header === 'Chi tiết đơn hàng' || header === 'Số PXK') {
+       return <span className="font-semibold text-gray-900">{strVal}</span>;
+    }
+
+    // Currencies and numbers
+    if (header.includes('giá') || header.includes('tiền') || header.includes('Lợi nhuận') || header.includes('Doanh thu') || header.includes('Tổng') || header === 'Số lượng' || header === 'Số lượng giao' || header === 'Số lượng đặt' || header === 'Còn lại' || header === 'Đã giao') {
+       if (strVal.match(/^-?[0-9,.]+$/)) {
+         return <span className="font-medium text-gray-900">{strVal}</span>;
+       }
+    }
+
+    // Date
+    if (header.includes('Ngày') || header.includes('Thời gian')) {
+       return <span className="text-gray-600">{strVal}</span>;
+    }
+
+    // Default
+    return <span className="text-gray-600 truncate max-w-xs block" title={strVal}>{strVal}</span>;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (isPOTable && isDuplicatePO && !editingRow) {
+      // Proceed without confirmation since window.confirm is blocked in iframes
+    }
+
+    if (editingRow) {
+      if (onEdit) {
+        const toastId = toast.loading('Đang cập nhật...');
+        try {
+          await onEdit(formData);
+          toast.success('Đã cập nhật dữ liệu!', { id: toastId });
+          setIsEditModalOpen(false);
+          setEditingRow(null);
+          setFormData({});
+        } catch (err) {
+          toast.error('Có lỗi xảy ra khi cập nhật!', { id: toastId });
+        }
+      }
+    } else {
+      if (onAdd) {
+        const toastId = toast.loading('Đang thêm mới...');
+        try {
+          await onAdd(formData);
+          toast.success('Đã thêm mới dữ liệu!', { id: toastId });
+          setIsModalOpen(false);
+          setFormData({});
+        } catch (err) {
+          toast.error('Có lỗi xảy ra khi thêm mới!', { id: toastId });
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="flex-1 p-8 flex flex-col h-full overflow-hidden relative">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 relative">
+        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+        <div className="flex items-center gap-3 relative">
+          {title.includes("Báo cáo") && (
+            <button
+              onClick={() => {
+                alert("Vui lòng chọn khổ giấy A4 ngang (Landscape) và Tỷ lệ (Scale) phù hợp khi hộp thoại in hiện ra để báo cáo hiển thị đầy đủ nhất.");
+                window.print();
+              }}
+              className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+              title="In báo cáo"
+            >
+              <Printer size={16} /> In báo cáo
+            </button>
+          )}
+          <button 
+            onClick={() => setShowColSettings(!showColSettings)}
+            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            title="Tuỳ chỉnh cột"
+          >
+            <Columns size={16} />
+          </button>
+
+          {showColSettings && (
+            <div className="absolute top-12 right-0 z-50 w-72 bg-white border border-gray-200 shadow-xl rounded-xl max-h-[70vh] flex flex-col overflow-hidden">
+              <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-semibold text-gray-800 text-sm">Hiển thị cột</h3>
+                <button onClick={() => setShowColSettings(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                    {columnOrder.map(col => (
+                      <SortableColumnItem 
+                        key={col} 
+                        id={col} 
+                        label={col} 
+                        isVisible={!hiddenColumns.has(col)} 
+                        onToggleVisibility={toggleColumnVisibility} 
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </div>
+          )}
+
+          <button 
+            onClick={() => {
+              // Export visible columns only
+              const exportData = filteredData.map(row => {
+                const newRow: any = {};
+                visibleColumns.forEach(col => {
+                  newRow[col] = row[col];
+                });
+                return newRow;
+              });
+              const ws = XLSX.utils.json_to_sheet(exportData);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Data");
+              XLSX.writeFile(wb, `${title}.xlsx`);
+            }}
+            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            title="Xuất Bảng Excel"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline">Xuất Excel</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              try {
+                const exportData = filteredData.map(row => {
+                  const newRow: any = {};
+                  visibleColumns.forEach(col => {
+                    newRow[col] = row[col];
+                  });
+                  return newRow;
+                });
+                exportGenericTableToPDF({
+                  title: title || 'Báo Cáo Bảng Dữ Liệu',
+                  columns: visibleColumns,
+                  data: exportData,
+                  filename: `${title || 'Bao_Cao'}_${new Date().toISOString().slice(0, 10)}.pdf`
+                });
+                toast.success('Đã xuất file PDF thành công!');
+              } catch (err: any) {
+                toast.error('Lỗi xuất PDF: ' + (err?.message || err));
+              }
+            }}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            title="Xuất Bảng PDF Chuyên Nghiệp"
+          >
+            <FileText size={16} />
+            <span className="hidden sm:inline">Xuất PDF</span>
+          </button>
+          
+          {selectedRowIds.size > 0 && onDelete && (
+            <button 
+              onClick={() => {
+                if (window.confirm(`Bạn có chắc chắn muốn xoá ${selectedRowIds.size} bản ghi đã chọn?`)) {
+                  Array.from(selectedRowIds).forEach(id => {
+                    const row = data.find(r => (r.id || JSON.stringify(r)) === id);
+                    if (row) onDelete(row);
+                  });
+                  setSelectedRowIds(new Set());
+                }
+              }}
+              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">Xóa đã chọn ({selectedRowIds.size})</span>
+            </button>
+          )}
+
+          {showAddButton && (
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+              <PlusCircle size={16} />
+              <span className="hidden sm:inline">Thêm mới</span>
+            </button>
+          )}
+        </div>
+      </div>
+      
+      {/* Search */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-4">
+        <div className="flex bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex-1 max-w-md">
+          <input 
+            type="text"
+            placeholder="Tìm kiếm nhanh..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full"
+          />
+        </div>
+        
+        {summaries && summaries.length > 0 && (
+          <div className="flex gap-4 overflow-x-auto pb-1 flex-1">
+            {summaries.map((s) => (
+              <div key={s.label} className="bg-white border border-gray-200 shadow-sm rounded-lg p-3 min-w-[150px] flex-1">
+                <p className="text-xs text-gray-500 font-medium mb-1 truncate" title={s.label}>{s.label}</p>
+                <p className="text-lg font-bold text-gray-900 truncate" title={String(s.value)}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col min-h-[400px]">
+        <div className="overflow-auto flex-1">
+          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+            <thead className="bg-gray-50 text-gray-700 sticky top-0 shadow-[0_1px_0_0_#e5e7eb] z-10">
+              <tr>
+                {onDelete && (
+                  <th className="px-4 py-3 font-semibold border-b border-gray-200 bg-gray-50 w-10 text-center">
+                    <input 
+                      type="checkbox"
+                      checked={paginatedData.length > 0 && paginatedData.every(r => selectedRowIds.has(r.id || JSON.stringify(r)))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const newSet = new Set(selectedRowIds);
+                          paginatedData.forEach(r => newSet.add(r.id || JSON.stringify(r)));
+                          setSelectedRowIds(newSet);
+                        } else {
+                          const newSet = new Set(selectedRowIds);
+                          paginatedData.forEach(r => newSet.delete(r.id || JSON.stringify(r)));
+                          setSelectedRowIds(newSet);
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                    />
+                  </th>
+                )}
+                {visibleColumns.map((h, idx) => (
+                  <th key={h} className={`px-4 py-3 font-semibold border-b border-gray-200 bg-gray-50 ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_#e5e7eb] z-[15]' : ''}`}>
+                    <div className="flex items-center justify-between relative gap-2">
+                      <span className="truncate">{h}</span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setActiveFilterColumn(activeFilterColumn === h ? null : h); }}
+                        className={`p-1.5 rounded-md transition-colors flex-shrink-0 ${columnFilters[h] && columnFilters[h].size > 0 ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'}`}
+                        title="Lọc dữ liệu"
+                      >
+                        <Filter size={14} className={columnFilters[h] && columnFilters[h].size > 0 ? "fill-blue-100" : ""} />
+                      </button>
+                      
+                      {activeFilterColumn === h && (
+                        <div ref={filterRef} className="absolute top-full right-0 mt-1 z-50 w-64 bg-white border border-gray-200 shadow-xl rounded-lg p-3 max-h-72 flex flex-col font-normal text-sm">
+                          <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100">
+                            <span className="font-semibold text-gray-800">Lọc: {h}</span>
+                            <button onClick={() => clearColumnFilter(h)} className="text-xs text-blue-600 hover:text-blue-800">Xoá lọc</button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5">
+                            {getUniqueValuesForColumn(h).map(val => (
+                              <label key={val} className="flex items-start gap-2 cursor-pointer group/label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={columnFilters[h]?.has(val) || false}
+                                  onChange={() => toggleFilterValue(h, val)}
+                                  className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 flex-shrink-0"
+                                />
+                                <span className="text-gray-700 break-words group-hover/label:text-blue-600 transition-colors">{val || "(Trống)"}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((row, i) => {
+                const rowId = row.id || JSON.stringify(row);
+                const isHighlighted = highlightedRowIds.has(rowId);
+                
+                // Overdue check
+                let isOverdue = false;
+                if (row['Ngày giao']) {
+                    try {
+                        const dateStr = String(row['Ngày giao']);
+                        // Parse dd/MM/yyyy
+                        const parsedDate = parse(dateStr.split(' ')[0], 'dd/MM/yyyy', new Date());
+                        if (!isNaN(parsedDate.getTime())) {
+                            if (isBefore(parsedDate, startOfDay(new Date()))) {
+                                const status = String(row['Trạng Thái'] || row['Status'] || row['Trạng thái'] || '');
+                                const completedStatuses = ['Hoàn thành', 'Đã giao', 'Hoàn tất', 'Hủy', 'Đã hủy'];
+                                if (!completedStatuses.includes(status)) {
+                                    isOverdue = true;
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }
+                
+                const rowClass = isOverdue 
+                    ? 'bg-red-50 hover:bg-red-100' 
+                    : (isHighlighted ? 'bg-amber-100/50 hover:bg-amber-100/70' : 'hover:bg-gray-50');
+
+                return (
+                  <tr 
+                    key={rowId} 
+                    onClick={() => {
+                      setEditingRow(row);
+                      setFormData({ ...row });
+                      setIsEditModalOpen(true);
+                      setConfirmDelete(false);
+                    }}
+                    className={`transition-all duration-200 border-b border-gray-100 last:border-0 group/tr cursor-pointer ${rowClass}`}
+                  >
+                    {onDelete && (
+                      <td className="px-4 py-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox"
+                          checked={selectedRowIds.has(rowId)}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedRowIds);
+                            if (e.target.checked) newSet.add(rowId);
+                            else newSet.delete(rowId);
+                            setSelectedRowIds(newSet);
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    {visibleColumns.map((h, idx) => (
+                      <td 
+                        key={h} 
+                        className={`px-4 py-3 align-middle ${idx === 0 ? `sticky left-0 shadow-[1px_0_0_0_#f3f4f6] z-[5] transition-colors ${isOverdue ? 'bg-red-50 group-hover/tr:bg-red-100' : isHighlighted ? 'bg-[#fef3c7]/50 group-hover/tr:bg-[#fef3c7]/70' : 'bg-white group-hover/tr:bg-gray-50'}` : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                           {renderCell(h, row[h], row)}
+                           {h === 'Ngày giao' && isOverdue && (
+                               <span title="Quá hạn giao hàng"><AlertTriangle size={16} className="text-red-500" /></span>
+                           )}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white px-4 py-3 border border-gray-200 border-t-0 rounded-b-lg flex-shrink-0">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Trang trước
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Trang sau
+            </button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Hiển thị <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> đến <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> trong số <span className="font-medium">{filteredData.length}</span> kết quả
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                >
+                  <span className="sr-only">Previous</span>
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                >
+                  <span className="sr-only">Next</span>
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Thêm mới {title}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {headers.filter(h => {
+                  if (h === 'STT' || h === 'id') return false;
+                  if (isPOLineTable) {
+                    const allowedFields = [
+                      'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
+                      'Số lượng', 'Ngày đặt hàng', 'Ngày giao', 'Thời gian xử lý', 'Khách hàng'
+                    ];
+                    return allowedFields.includes(h);
+                  }
+                  return true;
+                }).map(h => {
+                  // Common inputs based on field names
+                  if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <input 
+                          type="date" 
+                          required
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          value={formData[h] || ''}
+                          onChange={(e) => handleTextChange(e, h)}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Khách hàng') {
+                    if (isPOLineTable) {
+                      return (
+                        <div key={h} className="flex flex-col gap-1.5 opacity-80">
+                          <label className="text-sm font-medium text-gray-700">{h} (Tự động)</label>
+                          <input 
+                            type="text" 
+                            readOnly
+                            required
+                            placeholder="Chọn Số đơn hàng để tự động điền"
+                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 cursor-not-allowed outline-none"
+                            value={formData[h] || ''}
+                          />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <select
+                          required
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          value={formData[h] || ''}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn khách hàng</option>
+                          {customerList.map(custName => (
+                            <option key={custName} value={custName}>
+                              {custName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp') {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <select
+                          required
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          value={formData[h] || ''}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn nhà cung cấp</option>
+                          {suppliers.map(s => {
+                            const val = s['Supplier_ID'] || s['Nhà Cung Cấp'] || s['Mã NCC'] || s.name;
+                            return (
+                              <option key={s.id || val} value={val}>
+                                {val}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Sản phẩm' || h === 'Mã sản phẩm' || h === 'Mã hàng' || (isPOLineTable && h === 'Tên sản phẩm')) {
+                    return (
+                      <ProductCombobox 
+                        key={h}
+                        label={h}
+                        value={formData[h] || ''}
+                        onChange={(val) => handleProductChange(val, h)}
+                        products={products}
+                      />
+                    );
+                  }
+
+                  if (isPOLineTable && h === 'Mã giá bán') {
+                    return (
+                      <PricingCombobox 
+                        key={h}
+                        label={h}
+                        value={formData[h] || ''}
+                        onChange={(val) => handleTextChange(val, h)}
+                        pricingData={pricingData}
+                      />
+                    );
+                  }
+
+                  if (h === 'Phân loại') {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <select
+                          required
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          value={formData[h] || ''}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn phân loại</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Trạng Thái' && isPOHeaderTable) {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5 opacity-60">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <input 
+                          type="text" 
+                          readOnly
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 cursor-not-allowed"
+                          value={formData[h] || 'Mới'}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Tổng giá trị đơn hàng' && isPOHeaderTable) {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5 opacity-60">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <input 
+                          type="text" 
+                          readOnly
+                          placeholder="Tự động tính từ PO Lines"
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 cursor-not-allowed"
+                          value={formData[h] || '0'}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Tệp đơn hàng') {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">{h}</label>
+                        <div className="relative group">
+                          <input 
+                            type="text" 
+                            placeholder="Tên tệp đính kèm..."
+                            className="border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all w-full"
+                            value={formData[h] || ''}
+                            onChange={(e) => handleTextChange(e, h)}
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
+                             <Upload size={16} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if ((h === 'Số đơn hàng' || h === 'Đơn hàng') && isPOLineTable) {
+                    return (
+                      <div key={h} className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-gray-700">Số đơn hàng (PO) *</label>
+                        <select
+                          required
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                          value={formData[h] || ''}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn PO liên kết</option>
+                          {uniquePOs.map(po => (
+                            <option key={po} value={po}>{po}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={h} className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-gray-700">{h}</label>
+                      <input 
+                        type="text" 
+                        required={h === 'Đơn hàng'}
+                        className={`border rounded-lg px-3 py-2 text-sm focus:ring-2 outline-none transition-all ${
+                          h === 'Đơn hàng' && isDuplicatePO 
+                            ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50 text-red-900' 
+                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        value={formData[h] || ''}
+                        onChange={(e) => handleTextChange(e, h)}
+                      />
+                      {h === 'Đơn hàng' && isDuplicatePO && (
+                        <span className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
+                          <AlertTriangle size={12} className="shrink-0" /> Số đơn hàng này đã tồn tại!
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </form>
+
+              {isPOLineTable && (formData['Tên sản phẩm'] || formData['Mã giá bán']) && (
+                <div className="mt-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg p-4 text-sm animate-in fade-in duration-200">
+                  <div className="font-semibold text-blue-800 mb-2.5 flex items-center gap-1.5">
+                    <CheckCircle size={16} className="text-blue-600" /> Thông tin đối chiếu sản phẩm & đơn giá
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                    <div className="col-span-2 border-b border-blue-100 pb-1.5 mb-1">
+                      <strong>Tên sản phẩm:</strong> <span className="text-gray-900 font-medium block mt-0.5">{formData['Tên sản phẩm'] || 'N/A'}</span>
+                    </div>
+                    <div><strong>Mã giá bán:</strong> <span className="text-gray-900 font-medium">{formData['Mã giá bán'] || 'N/A'}</span></div>
+                    <div><strong>Đơn vị tính:</strong> <span className="text-gray-900 font-medium">{formData['ĐVT'] || 'Cái'}</span></div>
+                    <div><strong>Nhóm hàng:</strong> <span className="text-gray-900 font-medium">{formData['Nhóm hàng'] || 'N/A'}</span></div>
+                    <div><strong>Mã của khách:</strong> <span className="text-gray-900 font-medium">{formData['Mã của khách'] || 'N/A'}</span></div>
+                    <div><strong>Đơn giá bán:</strong> <span className="text-green-600 font-semibold">{formData['Đơn giá bán'] ? `${Number(parseNumber(formData['Đơn giá bán'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Đơn giá nhập:</strong> <span className="text-amber-600 font-semibold">{formData['Đơn giá nhập'] ? `${Number(parseNumber(formData['Đơn giá nhập'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Lợi nhuận dự kiến:</strong> <span className="text-blue-600 font-semibold">{formData['Lợi nhuận'] ? `${Number(parseNumber(formData['Lợi nhuận'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Số lượng đặt:</strong> <span className="text-gray-950 font-bold">{formData['Số lượng'] || 0}</span></div>
+                    <div className="col-span-2 border-t border-blue-100 pt-2 mt-1">
+                      <div className="text-sm font-bold text-blue-900 flex justify-between">
+                        <span>Thành tiền dòng dự kiến:</span>
+                        <span>{formData['Thành tiền dòng'] ? `${formData['Thành tiền dòng']}đ` : '0đ'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isDuplicatePO && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-sm">Cảnh báo trùng lặp đơn hàng</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Mã đơn hàng <strong className="font-bold">"{formData['Đơn hàng']}"</strong> đã tồn tại trong danh sách. Hệ thống vẫn cho phép lưu nhưng hãy kiểm tra kỹ để tránh nhầm lẫn dữ liệu.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <button onClick={() => setIsModalOpen(false)} type="button" className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Hủy
+              </button>
+              <button type="submit" form="add-form" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md">
+                Lưu dữ liệu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-end">
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col"
+          >
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Edit size={24} className="text-blue-600" />
+                  Chi tiết & Chỉnh sửa
+                </h3>
+                <p className="text-sm text-gray-500">Cập nhật thông tin cho bản ghi này</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingRow(null);
+                  setFormData({});
+                }} 
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 space-y-4">
+              <form id="edit-form-side" onSubmit={handleSubmit} className="space-y-4">
+                {headers.filter(h => {
+                  if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT') return false;
+                  if (isPOLineTable) {
+                    const allowedFields = [
+                      'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
+                      'Số lượng', 'Ngày đặt hàng', 'Ngày giao', 'Thời gian xử lý', 'Khách hàng'
+                    ];
+                    return allowedFields.includes(h);
+                  }
+                  return true;
+                }).map(h => {
+                  // Reuse logic for edit form
+                  if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {
+                    return (
+                      <div key={h} className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <input 
+                          type="date" 
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                          value={formData[h] || ""}
+                          onChange={(e) => handleTextChange(e, h)}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Khách hàng') {
+                    if (isPOLineTable) {
+                      return (
+                        <div key={h} className="space-y-1.5 opacity-80">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h} (Tự động)</label>
+                          <input 
+                            type="text" 
+                            readOnly
+                            className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm cursor-not-allowed outline-none"
+                            value={formData[h] || ""}
+                            placeholder="Chọn Số đơn hàng để tự động điền"
+                          />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={h} className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <select
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                          value={formData[h] || ""}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn khách hàng</option>
+                          {customerList.map(custName => (
+                            <option key={custName} value={custName}>
+                              {custName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp') {
+                    return (
+                      <div key={h} className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <select
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                          value={formData[h] || ""}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn nhà cung cấp</option>
+                          {suppliers.map(s => {
+                            const val = s['Supplier_ID'] || s['Nhà Cung Cấp'] || s['Mã NCC'] || s.name;
+                            return (
+                              <option key={s.id || val} value={val}>
+                                {val}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Sản phẩm' || h === 'Mã sản phẩm' || h === 'Mã hàng' || (isPOLineTable && h === 'Tên sản phẩm')) {
+                    return (
+                      <ProductCombobox 
+                        key={h}
+                        label={h}
+                        value={formData[h] || ''}
+                        onChange={(val) => handleProductChange(val, h)}
+                        products={products}
+                        labelClassName="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all w-full"
+                      />
+                    );
+                  }
+
+                  if (isPOLineTable && h === 'Mã giá bán') {
+                    return (
+                      <PricingCombobox 
+                        key={h}
+                        label={h}
+                        value={formData[h] || ''}
+                        onChange={(val) => handleTextChange(val, h)}
+                        pricingData={pricingData}
+                        labelClassName="text-xs font-bold text-gray-500 uppercase tracking-wide"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all w-full"
+                      />
+                    );
+                  }
+
+                  if ((h === 'Số đơn hàng' || h === 'Đơn hàng') && isPOLineTable) {
+                    return (
+                      <div key={h} className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Số đơn hàng (PO)</label>
+                        <select
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                          value={formData[h] || ""}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn PO liên kết</option>
+                          {uniquePOs.map(po => (
+                            <option key={po} value={po}>{po}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Phân loại') {
+                    return (
+                      <div key={h} className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <select
+                          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                          value={formData[h] || ""}
+                          onChange={(e) => handleTextChange(e, h)}
+                        >
+                          <option value="">Chọn phân loại</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Trạng Thái' && isPOHeaderTable) {
+                    return (
+                      <div key={h} className="space-y-1.5 opacity-60">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <input 
+                          type="text" 
+                          readOnly
+                          className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm cursor-not-allowed"
+                          value={formData[h] || ""}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Tổng giá trị đơn hàng' && isPOHeaderTable) {
+                    return (
+                      <div key={h} className="space-y-1.5 opacity-60">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                        <input 
+                          type="text" 
+                          readOnly
+                          className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm cursor-not-allowed"
+                          value={formData[h] || ""}
+                        />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={h} className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                        value={formData[h] || ""}
+                        onChange={(e) => handleTextChange(e, h)}
+                        disabled={h === 'STT'}
+                      />
+                    </div>
+                  );
+                })}
+              </form>
+
+              {isPOLineTable && (formData['Tên sản phẩm'] || formData['Mã giá bán']) && (
+                <div className="mt-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl p-4 text-sm animate-in fade-in duration-200">
+                  <div className="font-semibold text-blue-800 mb-2.5 flex items-center gap-1.5">
+                    <CheckCircle size={16} className="text-blue-600" /> Thông tin đối chiếu sản phẩm & đơn giá
+                  </div>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                    <div className="col-span-2 border-b border-blue-100 pb-1.5 mb-1">
+                      <strong>Tên sản phẩm:</strong> <span className="text-gray-900 font-medium block mt-0.5">{formData['Tên sản phẩm'] || 'N/A'}</span>
+                    </div>
+                    <div><strong>Mã giá bán:</strong> <span className="text-gray-900 font-medium">{formData['Mã giá bán'] || 'N/A'}</span></div>
+                    <div><strong>Đơn vị tính:</strong> <span className="text-gray-900 font-medium">{formData['ĐVT'] || 'Cái'}</span></div>
+                    <div><strong>Nhóm hàng:</strong> <span className="text-gray-900 font-medium">{formData['Nhóm hàng'] || 'N/A'}</span></div>
+                    <div><strong>Mã của khách:</strong> <span className="text-gray-900 font-medium">{formData['Mã của khách'] || 'N/A'}</span></div>
+                    <div><strong>Đơn giá bán:</strong> <span className="text-green-600 font-semibold">{formData['Đơn giá bán'] ? `${Number(parseNumber(formData['Đơn giá bán'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Đơn giá nhập:</strong> <span className="text-amber-600 font-semibold">{formData['Đơn giá nhập'] ? `${Number(parseNumber(formData['Đơn giá nhập'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Lợi nhuận dự kiến:</strong> <span className="text-blue-600 font-semibold">{formData['Lợi nhuận'] ? `${Number(parseNumber(formData['Lợi nhuận'])).toLocaleString('vi-VN')}đ` : '0đ'}</span></div>
+                    <div><strong>Số lượng đặt:</strong> <span className="text-gray-950 font-bold">{formData['Số lượng'] || 0}</span></div>
+                    <div className="col-span-2 border-t border-blue-100 pt-2 mt-1">
+                      <div className="text-sm font-bold text-blue-900 flex justify-between">
+                        <span>Thành tiền dòng dự kiến:</span>
+                        <span>{formData['Thành tiền dòng'] ? `${formData['Thành tiền dòng']}đ` : '0đ'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button 
+                  type="submit"
+                  form="edit-form-side"
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2"
+                >
+                  <Check size={18} />
+                  Lưu thay đổi
+                </button>
+                <button 
+                  onClick={() => { setIsEditModalOpen(false); setEditingRow(null); }}
+                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssistantView() {
+  const INITIAL_MESSAGE = { role: "model", content: "Xin chào! Tôi là TSG Business Assistant. Bạn có thể tra cứu giá, xem báo cáo tổng quan, phân tích lợi nhuận hoặc gửi ảnh/PDF Đơn hàng PO, Phiếu xuất kho để tôi xử lý giúp bạn." };
+  
+  const [messages, setMessages] = useState<{role: string, content: string, file?: File}[]>([
+    INITIAL_MESSAGE
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  const handleSendPrompt = async (promptText: string, fileAttachment?: File) => {
+    if ((!promptText.trim() && !fileAttachment) || isLoading) return;
+
+    const newMessages = [...messages, { role: "user", content: promptText, file: fileAttachment || undefined }];
+    setMessages(newMessages);
+    setInput("");
+    const fileToSend = fileAttachment || selectedFile;
+    setSelectedFile(null);
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("model", "gemini-3.6-flash");
+      formData.append("systemInstruction", FULL_SYSTEM_PROMPT);
+      formData.append("messages", JSON.stringify(newMessages.map(m => ({ role: m.role, content: m.content }))));
+      
+      if (fileToSend) {
+        formData.append("files", fileToSend);
+      }
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        body: formData,
+      });
+
+      const textRes = await res.text();
+
+      if (!res.ok) {
+        let errorMsg = `Lỗi kết nối máy chủ (${res.status})`;
+        try {
+          const errData = JSON.parse(textRes);
+          if (errData && errData.error) {
+            errorMsg = errData.error;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(textRes);
+      } catch (jsonErr) {
+        console.error("Chat JSON parse error:", jsonErr, "Raw response:", textRes);
+        throw new Error(`Phản hồi từ máy chủ không đúng định dạng JSON. ${textRes ? 'Nội dung: ' + textRes.substring(0, 100) : ''}`);
+      }
+      
+      if (!data || !data.text) {
+        throw new Error("Trợ lý không trả về văn bản phản hồi nào.");
+      }
+      setMessages(prev => [...prev, { role: "model", content: data.text }]);
+    } catch (err: any) {
+      setMessages(prev => [...prev, { role: "model", content: `❌ Lỗi xử lý Trợ lý AI: ${err.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSendPrompt(input, selectedFile || undefined);
+  };
+
+  const handleClearChat = () => {
+    setMessages([INITIAL_MESSAGE]);
+    setSelectedFile(null);
+    setInput("");
+  };
+
+  const quickPrompts = [
+    "📊 Báo cáo tổng quan",
+    "💰 Tra giá TH130/07 cho Thăng Long",
+    "📦 Trạng thái đơn 26/KHVT/0600",
+    "⚠️ Sự cố giao hàng",
+    "💰 Phân tích lợi nhuận theo NCC"
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 relative">
+      {/* Header */}
+      <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+            <Bot size={20} />
+          </div>
+          <div>
+            <h2 className="font-semibold text-slate-800 text-base leading-tight">Trợ lý Vận hành TSG</h2>
+            <p className="text-xs text-slate-500">Được hỗ trợ bởi Gemini 3.6 Flash</p>
+          </div>
+        </div>
+        <button
+          onClick={handleClearChat}
+          className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-all font-medium"
+          title="Xóa lịch sử trò chuyện"
+        >
+          Xóa trò chuyện
+        </button>
+      </div>
+      
+      {/* Messages Feed */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={clsx("flex gap-3 md:gap-4 max-w-4xl mx-auto", msg.role === "user" ? "flex-row-reverse" : "")}>
+            <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold shadow-xs", msg.role === "user" ? "bg-blue-600 text-white" : "bg-slate-800 text-white")}>
+              {msg.role === "user" ? "BẠN" : <Bot size={18} />}
+            </div>
+            <div className={clsx("flex flex-col gap-2 max-w-[85%] md:max-w-[80%]", msg.role === "user" ? "items-end" : "items-start")}>
+              {msg.file && (
+                <div className="bg-slate-100 text-slate-700 rounded-lg p-2.5 text-xs flex items-center gap-2 border border-slate-200 shadow-2xs">
+                  <FileText size={15} className="text-blue-600" />
+                  <span className="truncate max-w-xs font-medium">{msg.file.name}</span>
+                </div>
+              )}
+              {msg.content && (
+                <div className={clsx("rounded-2xl px-5 py-3.5 text-[14.5px] leading-relaxed shadow-xs transition-all duration-200", msg.role === "user" ? "bg-blue-600 text-white rounded-tr-xs" : "bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs")}>
+                  {msg.role === "user" ? (
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  ) : (
+                    <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-strong:text-slate-900 prose-table:text-xs">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="flex gap-4 max-w-4xl mx-auto">
+            <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+              <Bot size={18} />
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-600 flex items-center gap-2.5 shadow-2xs text-sm">
+              <Loader2 size={16} className="animate-spin text-blue-600" />
+              <span>Đang truy xuất dữ liệu & suy luận...</span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick Action Chips & Input Area */}
+      <div className="p-3 md:p-4 bg-white border-t border-slate-200 space-y-3">
+        {/* Quick Prompts */}
+        <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
+          <span className="text-slate-400 font-medium flex-shrink-0">Gợi ý nhanh:</span>
+          {quickPrompts.map((qp, qpIdx) => (
+            <button
+              key={qpIdx}
+              type="button"
+              onClick={() => handleSendPrompt(qp)}
+              disabled={isLoading}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border border-slate-200 rounded-full font-medium transition-all whitespace-nowrap flex-shrink-0 disabled:opacity-50 cursor-pointer"
+            >
+              {qp}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex items-end gap-2.5 relative">
+          <label className="cursor-pointer p-3 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors flex-shrink-0 border border-slate-200 bg-slate-50" title="Tải lên tài liệu (PO, PXK, Ảnh/PDF)">
+            <input type="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} accept="image/*,application/pdf" />
+            <Upload size={18} />
+          </label>
+          <div className="flex-1 relative">
+             {selectedFile && (
+               <div className="absolute bottom-full mb-2 left-0 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 border border-blue-200 shadow-xs">
+                 <FileText size={14} />
+                 <span className="truncate max-w-[200px]">{selectedFile.name}</span>
+                 <button type="button" onClick={() => setSelectedFile(null)} className="ml-1 hover:text-blue-900 text-sm font-bold">&times;</button>
+               </div>
+             )}
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Nhập câu hỏi hoặc yêu cầu cho Trợ lý TSG (VD: Báo cáo tổng quan, Tra giá...)..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[48px] max-h-32 text-slate-800 placeholder-slate-400"
+              rows={input.split('\n').length > 1 ? Math.min(input.split('\n').length, 4) : 1}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={(!input.trim() && !selectedFile) || isLoading}
+            className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0 shadow-xs flex items-center justify-center cursor-pointer"
+          >
+            <Send size={18} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

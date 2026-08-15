@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  body {
+    font-size: 11px;
+  }
+
+  /* UN-CONSTRAIN LAYOUT WRAPPERS WHILE PRESERVING GRIDS */
+  #root,
+  #dashboard-content,
+  .h-screen,
+  .h-full {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    width: 100% !important;
+  }
+
+  /* PRESERVE GRID & FLEX STRUCTURES IN PRINT */
+  .grid {
+    display: grid !important;
+  }
+  .grid-cols-1.lg\:grid-cols-2,
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  /* Force background colors to show up in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent page breaks inside cards & chart wrappers */
+  .print\:break-inside-avoid,
+  .recharts-wrapper,
+  .recharts-surface,
+  .bg-white,
+  .bg-slate-50,
+  .rounded-xl {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+  
+  /* Make sure charts stay bounded inside cards */
+  .recharts-responsive-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+
+  /* Force elements meant to be hidden to hide */
+  .print\:hidden {
+    display: none !important;
+  }
+}
+
+.markdown-body table {
+  @apply w-full border-collapse mb-4;
+}
+.markdown-body th,
+.markdown-body td {
+  @apply border border-gray-200 px-4 py-2 text-left text-sm;
+}
+.markdown-body th {
+  @apply bg-gray-50 font-semibold text-gray-700;
+}
+.markdown-body tr:nth-child(even) {
+  @apply bg-gray-50/50;
+}
+.markdown-body p {
+  @apply mb-4 last:mb-0;
+}
+.markdown-body ul {
+  @apply list-disc list-inside mb-4;
+}
+.markdown-body ol {
+  @apply list-decimal list-inside mb-4;
+}
+.markdown-body strong {
+  @apply font-semibold;
+}
+

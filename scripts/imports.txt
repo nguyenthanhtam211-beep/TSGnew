@@ -1,0 +1,4 @@
+1:import React, { useState, useEffect } from 'react';
+2:import { auth } from '../firebase';
+3:import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+4:import { CheckSquare, Calendar as CalendarIcon, Plus, Loader2, LogOut, Trash2 } from 'lucide-react';

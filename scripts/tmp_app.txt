@@ -1,0 +1,131 @@
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {activeTab === "dashboard" && <DashboardView poData={poHeaderData} deliveryData={enrichedDeliveryData} poLinesData={enrichedPoLinesData} />}
+        {activeTab === "workflow" && (
+          <WorkflowView 
+            poHeaderData={poHeaderData}
+            poLinesData={enrichedPoLinesData}
+            deliveryData={enrichedDeliveryData}
+            customerData={customerData}
+            supplierData={supplierData}
+            productData={productData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+          />
+        )}
+        {activeTab === "assistant" && <AssistantView />}
+        {activeTab === "tasks" && <TasksView deliveryPlanData={enrichedDeliveryPlanData} poLinesData={enrichedPoLinesData} contacts={contactData} />}
+        {activeTab === "ocr" && (
+          <OCRView 
+            onAddPOHeader={async (row) => await handleAddToFirestore("po_headers", row)}
+            onAddPOLines={async (rows) => { await Promise.all(rows.map(row => handleAddToFirestore("po_lines", row))); }}
+            onAddDelivery={async (rows) => { await Promise.all(rows.map(row => handleAddToFirestore("deliveries", row))); }}
+            onUploadToDrive={handleUploadToDrive}
+            poHeaders={poHeaderData}
+          />
+        )}
+        {activeTab === "customers" && <CustomerView initialData={customerData} contacts={contactData} />}
+        {activeTab === "suppliers" && <SupplierView initialData={supplierData} contacts={contactData} />}
+        {activeTab === "contacts" && (
+          <ContactView 
+            contacts={contactData} 
+             
+            customers={customerData} 
+            suppliers={supplierData} 
+          />
+        )}
+        {activeTab === "pricing" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "po" && (
+          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
+            title="Đơn hàng (PO_Header)" 
+            data={enrichedPoHeaderData} 
+            showAddButton={true} 
+            onAdd={(row) => handleAddToFirestore("po_headers", row)} 
+            onEdit={(row) => handleUpdateToFirestore("po_headers", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("po_headers", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            customers={customerData}
+            poLines={poLinesData}
+           
+          />
+        )}
+        {activeTab === "polines" && (
+          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
+            title="Chi tiết đơn (PO_Lines)" 
+            data={enrichedPoLinesData} 
+            showAddButton={true} 
+            onAdd={(row) => handleAddToFirestore("po_lines", row)} 
+            onEdit={(row) => handleUpdateToFirestore("po_lines", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("po_lines", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            poLines={poLinesData}
+           
+          />
+        )}
+        {activeTab === "delivery" && (
+          <DeliveryView 
+            deliveryData={enrichedDeliveryData} 
+            poLinesData={enrichedPoLinesData}
+            customerData={customerData}
+            supplierData={supplierData}
+            productData={productData}
+            onAdd={(row) => handleAddToFirestore("deliveries", row)} 
+            onEdit={(row) => handleUpdateToFirestore("deliveries", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("deliveries", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            onCreateCalendarEvent={handleCreateCalendarEvent}
+          />
+        )}
+        {activeTab === "delivery_plan" && (
+          <DeliveryPlanView 
+            deliveryPlans={enrichedDeliveryPlanData}
+            poLines={enrichedPoLinesData}
+            poHeaders={poHeaderData}
+            deliveries={enrichedDeliveryData}
+            products={productData}
+            onAddPlan={(row) => handleAddToFirestore("delivery_plans", row)}
+            onUpdatePlan={(row) => handleUpdateToFirestore("delivery_plans", row)}
+            onDeletePlan={(row) => handleDeleteFromFirestore("delivery_plans", row)}
+            onPoClick={(val) => setSelectedPoDetails(val)}
+            onProductClick={(val) => setSelectedProductDetails(val)}
+          />
+        )}
+        {activeTab === "products" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Sản phẩm" data={productData} showAddButton={true} onAdd={(row) => handleAddToFirestore("products", row)} onEdit={(row) => handleUpdateToFirestore("products", row)} onDelete={(row) => handleDeleteFromFirestore("products", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "specs" && (
+          <SpecsView 
+            specsData={specsData}
+            productData={productData}
+            customerData={customerData}
+            onAdd={(row) => handleAddToFirestore("specs", row)}
+            onEdit={(row) => handleUpdateToFirestore("specs", row)}
+            onDelete={(row) => handleDeleteFromFirestore("specs", row)}
+          />
+        )}
+        {activeTab === "reconciliation" && (
+          <ReconciliationView 
+            deliveryData={deliveryData} 
+            poLinesData={poLinesData} 
+            productData={productData} 
+          />
+        )}
+        {activeTab === "storage" && (
+          <StorageView 
+            files={fileStorageData}
+            onUpload={handleUploadToDrive}
+            onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
+          />
+        )}
+        {activeTab === "settings" && <SettingsView />}
+      </div>
+
+      {selectedProductDetails && (
+        <ProductDetailModal 
+            productNameOrId={selectedProductDetails} 
+            onClose={() => setSelectedProductDetails(null)} 
+            productData={productData}
+            poLinesData={enrichedPoLinesData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+            deliveryData={enrichedDeliveryData}
