@@ -18,7 +18,7 @@ import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
 import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
 import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances } from './lib/business-logic';
 import { SYSTEM_PROMPT } from "./prompt";
-import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA } from "./data";
+import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
@@ -72,7 +72,7 @@ export default function App() {
   const contactData = useFirestoreCollection('contacts', initialContact);
   const productData = useFirestoreCollection('products', initialProducts);
   const deliveryPlanData = useFirestoreCollection('delivery_plans', initialDeliveryPlan);
-  const specsData = useFirestoreCollection('specs', []);
+  const specsData = useFirestoreCollection('specs', INITIAL_SPECS_DATA);
   const fileStorageData = useFirestoreCollection('file_storage', []);
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
     return localStorage.getItem('google_access_token');

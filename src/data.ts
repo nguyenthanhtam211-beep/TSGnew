@@ -408,3 +408,87 @@ KP-001,26/KHVT/0082,Lưỡi gà trắng 95mm x 800m x 210gsm,Thăng Long,20/01/2
 KP-002,26/KHVT/0082,Lưỡi gà trắng 71mm x 800m x 210gsm,Thăng Long,21/01/2026,1800,Đang xử lý
 KP-003,26/KHVT/0128,Lưỡi gà trắng 95mm x 800m x 210gsm,Thăng Long,12/02/2026,60,Mới
 KP-004,26/KHVT/0128,Lưỡi gà trắng 71mm x 800m x 210gsm,Thăng Long,12/02/2026,1440,Mới`;
+export const INITIAL_SPECS_DATA = [
+  {
+    "Mã Spec": "SPEC-2026-001",
+    "Tên tiêu chuẩn": "Thùng Carton 5 Lớp Johnnie Walker JGI-427",
+    "Loại sản phẩm": "Carton",
+    "Khách hàng": "Công Ty TNHH Diageo Việt Nam",
+    "Sản phẩm liên kết": "Thùng carton John JGI - TH427",
+    "Mã sản phẩm": "TH427",
+    "Phiên bản": "1.0",
+    "Ngày lập": "2026-01-15",
+    "Người lập": "Nguyễn Thanh Tâm (QA/QC)",
+    "Người phê duyệt": "Ban Giám Đốc TSG",
+    "Trạng thái": "Đã phê duyệt",
+    "Quy cách đóng gói": "Đóng kiện 25 cái/xấp, bọc màng co PE, lót pallet gỗ hun trùng xuất khẩu.",
+    "Hình ảnh thiết kế": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format&fit=crop&q=60",
+    "Thông số kỹ thuật": [
+      { "criterion": "Định lượng giấy sóng BC (5 lớp)", "unit": "gsm", "standard": "250 - 150 - 150 - 150 - 250", "tolerance": "± 5%", "testMethod": "Cân điện tử ISO 536" },
+      { "criterion": "Độ chịu nén thùng (BCT)", "unit": "KgF", "standard": "≥ 420", "tolerance": "- 5%", "testMethod": "Máy nén thùng ISO 12048" },
+      { "criterion": "Độ bục carton (Bursting)", "unit": "kPa", "standard": "≥ 1450", "tolerance": "± 50", "testMethod": "Máy đo độ bục ISO 2759" },
+      { "criterion": "Kích thước ngoài (LxWxH)", "unit": "mm", "standard": "580 x 380 x 320", "tolerance": "± 2mm", "testMethod": "Thước cuộn chuẩn" },
+      { "criterion": "Độ ẩm vật liệu", "unit": "%", "standard": "8 - 12", "tolerance": "± 1%", "testMethod": "Máy đo độ ẩm sấy" }
+    ]
+  },
+  {
+    "Mã Spec": "SPEC-2026-002",
+    "Tên tiêu chuẩn": "Thùng Carton Thăng Long Bao Cứng TH130/07",
+    "Loại sản phẩm": "Carton",
+    "Khách hàng": "Công Ty Thuốc Lá Thăng Long",
+    "Sản phẩm liên kết": "Thùng Thăng Long Bao cứng TH130/07",
+    "Mã sản phẩm": "TH130/07",
+    "Phiên bản": "2.1",
+    "Ngày lập": "2026-02-10",
+    "Người lập": "Phòng Kỹ Thuật TSG",
+    "Người phê duyệt": "Trưởng Ban QA",
+    "Trạng thái": "Đã phê duyệt",
+    "Quy cách đóng gói": "Đai nẹp nhựa PP, 20 thùng/bó, lót góc carton cứng.",
+    "Hình ảnh thiết kế": "https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=800&auto=format&fit=crop&q=60",
+    "Thông số kỹ thuật": [
+      { "criterion": "Định lượng tổng", "unit": "gsm", "standard": "680", "tolerance": "± 5%", "testMethod": "Cân phân tích" },
+      { "criterion": "Độ chịu nén BCT", "unit": "KgF", "standard": "≥ 360", "tolerance": "- 5%", "testMethod": "Máy nén ISO 12048" },
+      { "criterion": "Độ chịu bục", "unit": "kPa", "standard": "≥ 1100", "tolerance": "± 30", "testMethod": "Máy đo bục" }
+    ]
+  },
+  {
+    "Mã Spec": "SPEC-2026-003",
+    "Tên tiêu chuẩn": "Nhãn Bao Blue Seal Slim Cao Cấp",
+    "Loại sản phẩm": "Label",
+    "Khách hàng": "Công Ty Thuốc Lá Thăng Long",
+    "Sản phẩm liên kết": "Nhãn bao Blue Seal Slim bao cứng (NH118/08)",
+    "Mã sản phẩm": "NH118/08",
+    "Phiên bản": "1.0",
+    "Ngày lập": "2026-03-01",
+    "Người lập": "Bộ Phận Thiết Kế In Ấn",
+    "Người phê duyệt": "Giám Đốc Kỹ Thuật",
+    "Trạng thái": "Đã phê duyệt",
+    "Quy cách đóng gói": "Đóng gói 500 tờ/xấp, bọc giấy kraft chống ẩm.",
+    "Hình ảnh thiết kế": "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=800&auto=format&fit=crop&q=60",
+    "Thông số kỹ thuật": [
+      { "criterion": "Loại mực in", "unit": "-", "standard": "Mực UV chống phai", "tolerance": "-", "testMethod": "Test cọ xát màu" },
+      { "criterion": "Độ bóng màng bóng BOPP", "unit": "%", "standard": "≥ 90", "tolerance": "± 5%", "testMethod": "Máy đo độ bóng 60°" },
+      { "criterion": "Định lượng giấy Ivory", "unit": "gsm", "standard": "230", "tolerance": "± 5g", "testMethod": "Cân điện tử" }
+    ]
+  },
+  {
+    "Mã Spec": "SPEC-2026-004",
+    "Tên tiêu chuẩn": "Lưỡi Gà Trắng 71mm x 800m x 210gsm",
+    "Loại sản phẩm": "Material",
+    "Khách hàng": "Nhà Máy Thuốc Lá Thanh Hóa",
+    "Sản phẩm liên kết": "Lưỡi gà trắng 71mm x 800m x 210gsm",
+    "Mã sản phẩm": "LGTPS - 002-71",
+    "Phiên bản": "1.2",
+    "Ngày lập": "2026-03-15",
+    "Người lập": "Kỹ sư vật liệu",
+    "Người phê duyệt": "Trưởng Phòng QC",
+    "Trạng thái": "Nháp",
+    "Quy cách đóng gói": "Đóng cuộn có màng bọc PE, 6 cuộn/thùng.",
+    "Hình ảnh thiết kế": "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=800&auto=format&fit=crop&q=60",
+    "Thông số kỹ thuật": [
+      { "criterion": "Khổ rộng cuộn", "unit": "mm", "standard": "71", "tolerance": "± 0.5mm", "testMethod": "Thước panme" },
+      { "criterion": "Độ bền kéo dọc", "unit": "kN/m", "standard": "≥ 8.5", "tolerance": "± 0.5", "testMethod": "Máy thử kéo" },
+      { "criterion": "Định lượng", "unit": "gsm", "standard": "210", "tolerance": "± 5gsm", "testMethod": "Cân phân tích" }
+    ]
+  }
+];
