@@ -3,10 +3,12 @@ import {
   FileText, Plus, Search, Filter, Edit3, Trash2, ChevronRight, 
   Settings, Layers, Ruler, Palette, ShieldCheck, Download, MoreVertical,
   Save, Package, Eye, LayoutGrid, Table as TableIcon, Printer, FileSpreadsheet,
-  CheckCircle2, AlertCircle, Clock, Copy, Sparkles, Building2, Check, X
+  CheckCircle2, AlertCircle, Clock, Copy, Sparkles, Building2, Check, X,
+  FileDown, ArrowUpRight, Share2, Tag, ChevronDown, CheckSquare
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
+import * as XLSX from 'xlsx';
 
 interface SpecParameter {
   criterion: string;
@@ -71,34 +73,17 @@ export default function SpecsView({
   onDelete: (row: any) => Promise<void> 
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [selectedStatus, setSelectedStatus] = useState<string>("All");
+  const [activeTab, setActiveTab] = useState<string>("ALL");
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [viewingSpec, setViewingSpec] = useState<any>(null);
+  const [selectedDetailSpec, setSelectedDetailSpec] = useState<any>(null);
+  const [isPreviewImageOpen, setIsPreviewImageOpen] = useState(false);
   
   const [editingRow, setEditingRow] = useState<any>(null);
   const [formData, setFormData] = useState<Partial<SpecRecord>>({
     'Thông số kỹ thuật': []
   });
-
-  // Filtered dataset
-  const filteredData = useMemo(() => {
-    return specsData.filter(s => {
-      const matchSearch = 
-        (s['Tên tiêu chuẩn'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s['Mã Spec'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s['Khách hàng'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s['Sản phẩm liên kết'] || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchCategory = selectedCategory === "All" || s['Loại sản phẩm'] === selectedCategory;
-      const matchStatus = selectedStatus === "All" || s['Trạng thái'] === selectedStatus;
-
-      return matchSearch && matchCategory && matchStatus;
-    });
-  }, [specsData, searchTerm, selectedCategory, selectedStatus]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -109,6 +94,25 @@ export default function SpecsView({
     const draft = specsData.filter(s => s['Trạng thái'] === 'Nháp').length;
     return { total, carton, label, approved, draft };
   }, [specsData]);
+
+  // Filtered dataset based on search and active tab
+  const filteredData = useMemo(() => {
+    return specsData.filter(s => {
+      const matchSearch = 
+        (s['Tên tiêu chuẩn'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s['Mã Spec'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s['Khách hàng'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s['Sản phẩm liên kết'] || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchTab = true;
+      if (activeTab === 'CARTON') matchTab = s['Loại sản phẩm'] === 'Carton';
+      else if (activeTab === 'LABEL') matchTab = s['Loại sản phẩm'] === 'Label';
+      else if (activeTab === 'APPROVED') matchTab = s['Trạng thái'] === 'Đã phê duyệt';
+      else if (activeTab === 'DRAFT') matchTab = s['Trạng thái'] === 'Nháp';
+
+      return matchSearch && matchTab;
+    });
+  }, [specsData, searchTerm, activeTab]);
 
   const addParameter = () => {
     const params = [...(formData['Thông số kỹ thuật'] || [])];
@@ -123,7 +127,7 @@ export default function SpecsView({
         'Loại sản phẩm': cat as any,
         'Thông số kỹ thuật': JSON.parse(JSON.stringify(PRESET_TEMPLATES[cat]))
       });
-      toast.success(`Đã áp dụng bộ chỉ tiêu mẫu ISO cho ${cat}`);
+      toast.success(`Đã nạp bộ chỉ tiêu ISO mẫu cho ${cat}`);
     }
   };
 
@@ -142,7 +146,7 @@ export default function SpecsView({
   const handleOpenModal = (row: any = null) => {
     if (row) {
       setEditingRow(row);
-      setFormData(row);
+      setFormData(JSON.parse(JSON.stringify(row)));
     } else {
       setEditingRow(null);
       setFormData({
@@ -159,6 +163,21 @@ export default function SpecsView({
     setIsModalOpen(true);
   };
 
+  const handleCloneSpec = (spec: any) => {
+    const cloned = JSON.parse(JSON.stringify(spec));
+    delete cloned.id;
+    cloned['Mã Spec'] = `SPEC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    cloned['Tên tiêu chuẩn'] = `${cloned['Tên tiêu chuẩn']} (Bản sao)`;
+    cloned['Phiên bản'] = '1.0';
+    cloned['Trạng thái'] = 'Nháp';
+    cloned['Ngày lập'] = new Date().toISOString().split('T')[0];
+
+    setEditingRow(null);
+    setFormData(cloned);
+    setIsModalOpen(true);
+    toast.success("Đã nhân bản tiêu chuẩn! Vui lòng chỉnh sửa và lưu.");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -172,6 +191,34 @@ export default function SpecsView({
       setIsModalOpen(false);
     } catch (error) {
       toast.error("Lỗi khi lưu dữ liệu tiêu chuẩn");
+    }
+  };
+
+  const handleExportAllToExcel = () => {
+    try {
+      const exportRows = specsData.map(s => ({
+        'Mã Spec': s['Mã Spec'],
+        'Tên tiêu chuẩn': s['Tên tiêu chuẩn'],
+        'Loại sản phẩm': s['Loại sản phẩm'],
+        'Khách hàng': s['Khách hàng'],
+        'Sản phẩm liên kết': s['Sản phẩm liên kết'],
+        'Phiên bản': s['Phiên bản'],
+        'Trạng thái': s['Trạng thái'],
+        'Ngày lập': s['Ngày lập'],
+        'Người lập': s['Người lập'],
+        'Người phê duyệt': s['Người phê duyệt'] || '',
+        'Số chỉ tiêu kỹ thuật': (s['Thông số kỹ thuật'] || []).length,
+        'Quy cách đóng gói': s['Quy cách đóng gói'] || '',
+        'Ghi chú': s['Ghi chú'] || ''
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Danh_Muc_Specs_ISO");
+      XLSX.writeFile(wb, `TSG_Specs_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success("Đã xuất tệp Excel Danh mục Specs ISO thành công!");
+    } catch (e: any) {
+      toast.error(`Lỗi xuất Excel: ${e.message}`);
     }
   };
 
@@ -295,7 +342,7 @@ export default function SpecsView({
 
   return (
     <div className="space-y-6">
-      {/* 1. Modern Hero Section */}
+      {/* 1. Header & Hero Section */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
@@ -318,33 +365,45 @@ export default function SpecsView({
 
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => handleOpenModal()}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+              onClick={handleExportAllToExcel}
+              className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 text-xs"
+              title="Xuất toàn bộ Specs ra Excel"
             >
-              <Plus size={20} />
-              Thêm Tiêu Chuẩn ISO
+              <FileSpreadsheet size={16} className="text-emerald-400" />
+              Xuất Excel
+            </button>
+            <button 
+              onClick={() => handleOpenModal()}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2 text-xs hover:scale-[1.02] active:scale-95"
+            >
+              <Plus size={18} />
+              Thêm Tiêu Chuẩn Mới
             </button>
           </div>
         </div>
 
-        {/* Quick Stats inside Hero */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800/80">
-          <div className="bg-slate-800/60 backdrop-blur p-3.5 rounded-2xl border border-slate-700/50">
-            <p className="text-slate-400 text-[11px] font-bold uppercase">Tổng số Spec ISO</p>
-            <p className="text-xl md:text-2xl font-black text-white mt-0.5">{stats.total}</p>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur p-3.5 rounded-2xl border border-slate-700/50">
-            <p className="text-blue-300 text-[11px] font-bold uppercase">Specs Thùng Carton</p>
-            <p className="text-xl md:text-2xl font-black text-blue-400 mt-0.5">{stats.carton}</p>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur p-3.5 rounded-2xl border border-slate-700/50">
-            <p className="text-purple-300 text-[11px] font-bold uppercase">Specs Nhãn & In</p>
-            <p className="text-xl md:text-2xl font-black text-purple-400 mt-0.5">{stats.label}</p>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur p-3.5 rounded-2xl border border-slate-700/50">
-            <p className="text-emerald-300 text-[11px] font-bold uppercase">Đã Phê Duyệt QA</p>
-            <p className="text-xl md:text-2xl font-black text-emerald-400 mt-0.5">{stats.approved}</p>
-          </div>
+        {/* Quick Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mt-6 pt-6 border-t border-slate-800/80">
+          {[
+            { key: 'ALL', label: `Tất cả Specs (${stats.total})` },
+            { key: 'CARTON', label: `Thùng Carton (${stats.carton})` },
+            { key: 'LABEL', label: `Tem Nhãn (${stats.label})` },
+            { key: 'APPROVED', label: `Đã Phê Duyệt (${stats.approved})` },
+            { key: 'DRAFT', label: `Bản Nháp (${stats.draft})` },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={clsx(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border",
+                activeTab === tab.key
+                  ? "bg-blue-600 border-blue-400 text-white shadow-md shadow-blue-600/30"
+                  : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-800"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -362,30 +421,11 @@ export default function SpecsView({
           />
         </div>
 
-        {/* Filters & View Mode Toggle */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          <select
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-3 py-2.5 rounded-xl outline-none"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-          >
-            <option value="All">Tất cả phân loại</option>
-            <option value="Carton">Thùng Carton</option>
-            <option value="Label">Nhãn in ấn</option>
-            <option value="Material">Nguyên vật liệu</option>
-            <option value="Other">Khác</option>
-          </select>
-
-          <select
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-3 py-2.5 rounded-xl outline-none"
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-          >
-            <option value="All">Tất cả trạng thái</option>
-            <option value="Đã phê duyệt">Đã phê duyệt</option>
-            <option value="Nháp">Bản nháp</option>
-            <option value="Hết hiệu lực">Hết hiệu lực</option>
-          </select>
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          <span className="text-xs text-slate-500 font-medium">
+            Hiển thị <strong>{filteredData.length}</strong> tiêu chuẩn
+          </span>
 
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button
@@ -431,16 +471,16 @@ export default function SpecsView({
           {filteredData.map((row, idx) => (
             <div 
               key={idx}
-              className="bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group hover:border-blue-300"
+              className="bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group hover:border-blue-400/80"
             >
               <div className="p-5 space-y-4">
                 {/* Header Badge */}
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="flex items-center gap-2">
                     <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-[11px] font-mono font-bold tracking-wider">
                       {row['Mã Spec']}
                     </span>
-                    <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
                       v{row['Phiên bản'] || '1.0'}
                     </span>
                   </div>
@@ -454,7 +494,10 @@ export default function SpecsView({
                 </div>
 
                 {/* Title & Product */}
-                <div>
+                <div 
+                  className="cursor-pointer"
+                  onClick={() => setSelectedDetailSpec(row)}
+                >
                   <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition-colors line-clamp-1">
                     {row['Tên tiêu chuẩn']}
                   </h3>
@@ -465,8 +508,16 @@ export default function SpecsView({
                 </div>
 
                 {/* Technical Parameters Quick Pills */}
-                <div className="space-y-1.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Thông số cốt lõi:</p>
+                <div 
+                  className="space-y-1.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100 cursor-pointer hover:bg-blue-50/50 transition-colors"
+                  onClick={() => setSelectedDetailSpec(row)}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Thông số cốt lõi:</p>
+                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-0.5">
+                      Chi tiết <ChevronRight size={12} />
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {(row['Thông số kỹ thuật'] || []).slice(0, 3).map((p: any, pidx: number) => (
                       <span key={pidx} className="px-2 py-0.5 bg-white text-slate-700 border border-slate-200 rounded-md text-[11px] font-medium">
@@ -474,8 +525,8 @@ export default function SpecsView({
                       </span>
                     ))}
                     {(row['Thông số kỹ thuật'] || []).length > 3 && (
-                      <span className="px-2 py-0.5 bg-slate-200/60 text-slate-600 rounded-md text-[10px] font-bold">
-                        +{(row['Thông số kỹ thuật'] || []).length - 3} thông số khác
+                      <span className="px-2 py-0.5 bg-blue-100/60 text-blue-700 rounded-md text-[10px] font-bold">
+                        +{(row['Thông số kỹ thuật'] || []).length - 3} thông số
                       </span>
                     )}
                   </div>
@@ -485,8 +536,8 @@ export default function SpecsView({
                 {row['Hình ảnh thiết kế'] && (
                   <div 
                     onClick={() => {
-                      setViewingSpec(row);
-                      setIsPreviewOpen(true);
+                      setSelectedDetailSpec(row);
+                      setIsPreviewImageOpen(true);
                     }}
                     className="h-24 rounded-xl bg-slate-100 overflow-hidden relative cursor-pointer border border-slate-200 group/img"
                   >
@@ -501,22 +552,29 @@ export default function SpecsView({
               {/* Card Footer Actions */}
               <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 font-medium">
-                  Ngày lập: {row['Ngày lập']}
+                  {row['Ngày lập']}
                 </span>
                 <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => handleCloneSpec(row)}
+                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Nhân bản Spec (Clone)"
+                  >
+                    <Copy size={15} />
+                  </button>
                   <button 
                     onClick={() => handlePrintSpec(row)}
                     className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="In Phiếu Spec ISO (TDS)"
                   >
-                    <Printer size={16} />
+                    <Printer size={15} />
                   </button>
                   <button 
                     onClick={() => handleOpenModal(row)}
                     className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Sửa tiêu chuẩn"
                   >
-                    <Edit3 size={16} />
+                    <Edit3 size={15} />
                   </button>
                   <button 
                     onClick={() => {
@@ -527,7 +585,7 @@ export default function SpecsView({
                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     title="Xóa tiêu chuẩn"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
@@ -553,7 +611,10 @@ export default function SpecsView({
                 {filteredData.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
+                      <div 
+                        className="flex flex-col cursor-pointer"
+                        onClick={() => setSelectedDetailSpec(row)}
+                      >
                         <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{row['Tên tiêu chuẩn']}</span>
                         <span className="text-[11px] font-mono font-bold text-blue-500">{row['Mã Spec']}</span>
                       </div>
@@ -583,18 +644,25 @@ export default function SpecsView({
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button 
+                          onClick={() => handleCloneSpec(row)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Nhân bản Spec"
+                        >
+                          <Copy size={15} />
+                        </button>
+                        <button 
                           onClick={() => handlePrintSpec(row)}
                           className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="In Spec ISO"
                         >
-                          <Printer size={16} />
+                          <Printer size={15} />
                         </button>
                         <button 
                           onClick={() => handleOpenModal(row)}
                           className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Sửa"
                         >
-                          <Edit3 size={16} />
+                          <Edit3 size={15} />
                         </button>
                         <button 
                           onClick={() => {
@@ -605,7 +673,7 @@ export default function SpecsView({
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Xóa"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
@@ -617,7 +685,95 @@ export default function SpecsView({
         </div>
       )}
 
-      {/* 4. MODAL THIẾT LẬP SPECS CHUYÊN SÂU ISO */}
+      {/* 4. MODAL XEM CHI TIẾT SPEC & BẢNG THÔNG SỐ NHANH */}
+      {selectedDetailSpec && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="px-2.5 py-0.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded text-[10px] font-mono font-bold">
+                  {selectedDetailSpec['Mã Spec']} - v{selectedDetailSpec['Phiên bản']}
+                </span>
+                <h3 className="font-bold text-lg text-white mt-1">{selectedDetailSpec['Tên tiêu chuẩn']}</h3>
+                <p className="text-xs text-slate-300">Khách hàng: {selectedDetailSpec['Khách hàng']} | SP: {selectedDetailSpec['Sản phẩm liên kết']}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedDetailSpec(null)}
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              <div>
+                <h4 className="font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5 text-sm">
+                  <Layers size={16} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Chi Tiết
+                </h4>
+                <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase">
+                        <th className="p-2.5">Chỉ tiêu</th>
+                        <th className="p-2.5 text-center">ĐVT</th>
+                        <th className="p-2.5">Tiêu chuẩn mẫu</th>
+                        <th className="p-2.5">Dung sai</th>
+                        <th className="p-2.5">Phương pháp thử</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-medium">
+                      {(selectedDetailSpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-white">
+                          <td className="p-2.5 font-bold text-slate-800">{p.criterion}</td>
+                          <td className="p-2.5 text-center font-mono">{p.unit}</td>
+                          <td className="p-2.5 font-bold text-blue-700">{p.standard}</td>
+                          <td className="p-2.5 text-slate-600">{p.tolerance || '-'}</td>
+                          <td className="p-2.5 text-slate-500">{p.testMethod || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {selectedDetailSpec['Quy cách đóng gói'] && (
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                  <h5 className="font-bold text-blue-900 mb-1">Quy cách đóng gói & Bảo quản:</h5>
+                  <p className="text-slate-700 leading-relaxed">{selectedDetailSpec['Quy cách đóng gói']}</p>
+                </div>
+              )}
+
+              {selectedDetailSpec['Hình ảnh thiết kế'] && (
+                <div>
+                  <h5 className="font-bold text-slate-900 mb-2">Bản vẽ CAD / Thiết kế đính kèm:</h5>
+                  <div className="h-48 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                    <img src={selectedDetailSpec['Hình ảnh thiết kế']} className="h-full object-contain" alt="CAD" referrerPolicy="no-referrer" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+              <span className="text-xs text-slate-500">
+                Người duyệt: <strong>{selectedDetailSpec['Người phê duyệt'] || 'Ban Giám Đốc'}</strong>
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    handlePrintSpec(selectedDetailSpec);
+                    setSelectedDetailSpec(null);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                >
+                  <Printer size={14} /> In Phiếu Kỹ Thuật (TDS)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL THIẾT LẬP / SỬA SPECS CHUYÊN SÂU ISO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 my-auto">
@@ -895,31 +1051,6 @@ export default function SpecsView({
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* 5. MODAL XEM HÌNH ẢNH BẢN VẼ BẢN QUYỀN */}
-      {isPreviewOpen && viewingSpec && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl max-w-4xl w-full p-6 text-white space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="font-bold text-lg text-white">{viewingSpec['Tên tiêu chuẩn']}</h3>
-                <p className="text-xs text-blue-400 font-mono">{viewingSpec['Mã Spec']} | Khách hàng: {viewingSpec['Khách hàng']}</p>
-              </div>
-              <button onClick={() => setIsPreviewOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-hidden rounded-2xl bg-black flex items-center justify-center border border-slate-800 p-2">
-              <img src={viewingSpec['Hình ảnh thiết kế']} className="max-h-[65vh] object-contain mx-auto" alt="CAD Specs" referrerPolicy="no-referrer" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => handlePrintSpec(viewingSpec)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 flex items-center gap-1.5">
-                <Printer size={16} /> In Phân Tích Kỹ Thuật (TDS)
-              </button>
-            </div>
           </div>
         </div>
       )}
