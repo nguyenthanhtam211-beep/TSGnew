@@ -53,6 +53,26 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // 2-Way Deep Linking Cross-Module Navigation States
+  const [targetCustomerId, setTargetCustomerId] = useState<string | null>(null);
+  const [targetSupplierId, setTargetSupplierId] = useState<string | null>(null);
+  const [targetContactId, setTargetContactId] = useState<string | null>(null);
+
+  const handleNavigateToCustomer = (customerId: string) => {
+    setTargetCustomerId(customerId);
+    setActiveTab("customers");
+  };
+
+  const handleNavigateToSupplier = (supplierId: string) => {
+    setTargetSupplierId(supplierId);
+    setActiveTab("suppliers");
+  };
+
+  const handleNavigateToContact = (contactId: string) => {
+    setTargetContactId(contactId);
+    setActiveTab("contacts");
+  };
+  
   
   const initialPricing = useMemo(() => parseCSV(PRICING_DATA), []);
   const initialPOHeader = useMemo(() => parseCSV(PO_HEADER_DATA), []);
@@ -727,14 +747,35 @@ export default function App() {
             poHeaders={poHeaderData}
           />
         )}
-        {activeTab === "customers" && <CustomerView initialData={customerData} contacts={contactData} />}
-        {activeTab === "suppliers" && <SupplierView initialData={supplierData} contacts={contactData} />}
+        {activeTab === "customers" && (
+          <CustomerView 
+            initialData={customerData} 
+            contacts={contactData} 
+            targetCustomerId={targetCustomerId}
+            onClearTargetCustomer={() => setTargetCustomerId(null)}
+            onNavigateToSupplier={handleNavigateToSupplier}
+            onNavigateToContact={handleNavigateToContact}
+          />
+        )}
+        {activeTab === "suppliers" && (
+          <SupplierView 
+            initialData={supplierData} 
+            contacts={contactData} 
+            targetSupplierId={targetSupplierId}
+            onClearTargetSupplier={() => setTargetSupplierId(null)}
+            onNavigateToCustomer={handleNavigateToCustomer}
+            onNavigateToContact={handleNavigateToContact}
+          />
+        )}
         {activeTab === "contacts" && (
           <ContactView 
             contacts={contactData} 
-             
             customers={customerData} 
             suppliers={supplierData} 
+            targetContactId={targetContactId}
+            onClearTargetContact={() => setTargetContactId(null)}
+            onNavigateToCustomer={handleNavigateToCustomer}
+            onNavigateToSupplier={handleNavigateToSupplier}
           />
         )}
         {activeTab === "pricing" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}

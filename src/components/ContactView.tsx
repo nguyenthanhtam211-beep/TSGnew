@@ -19,6 +19,10 @@ interface ContactViewProps {
   contacts: any[];
   customers?: any[];
   suppliers?: any[];
+  targetContactId?: string | null;
+  onClearTargetContact?: () => void;
+  onNavigateToCustomer?: (customerId: string) => void;
+  onNavigateToSupplier?: (supplierId: string) => void;
 }
 
 interface Task {
@@ -59,7 +63,15 @@ export const isExecutive = (role: string) => {
   return lower.includes('chủ tịch') || lower.includes('giám đốc') || lower.includes('hội đồng') || lower.includes('tổng giám đốc') || lower.includes('phó giám đốc');
 };
 
-export default function ContactView({ contacts = [], customers = [], suppliers = [] }: ContactViewProps) {
+export default function ContactView({ 
+  contacts = [], 
+  customers = [], 
+  suppliers = [],
+  targetContactId = null,
+  onClearTargetContact,
+  onNavigateToCustomer,
+  onNavigateToSupplier
+}: ContactViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // all, customers, suppliers, executives
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -67,6 +79,22 @@ export default function ContactView({ contacts = [], customers = [], suppliers =
   // Selected contact for detail drawer/modal
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [detailTab, setDetailTab] = useState<'tasks' | 'projects' | 'activities' | 'company'>('tasks');
+
+  // Handle deep linking to contact
+  useEffect(() => {
+    if (targetContactId) {
+      const found = contacts.find(c => 
+        c.id === targetContactId || 
+        c.ID === targetContactId || 
+        c["Tên"]?.toLowerCase().includes(targetContactId.toLowerCase())
+      );
+      if (found) {
+        setSelectedContact(found);
+        setDetailTab('tasks');
+      }
+      if (onClearTargetContact) onClearTargetContact();
+    }
+  }, [targetContactId, contacts, onClearTargetContact]);
 
   // Local storage based state for tasks, projects, and activities per contact ID
   const [tasks, setTasks] = useState<{ [contactId: string]: Task[] }>({});
@@ -689,11 +717,21 @@ export default function ContactView({ contacts = [], customers = [], suppliers =
                             </div>
                           </td>
 
-                          {/* Company */}
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
+                          {/* Company with 2-way cross navigation */}
+                          <td className="px-5 py-3" onClick={(e) => {
+                            e.stopPropagation();
+                            if (isCustomer && onNavigateToCustomer) {
+                              onNavigateToCustomer(contact["Công ty"]);
+                            } else if (!isCustomer && onNavigateToSupplier) {
+                              onNavigateToSupplier(contact["Công ty"]);
+                            }
+                          }}>
+                            <div className="flex items-center gap-2 group/comp cursor-pointer" title={`Mở hồ sơ ${companyType}`}>
                               <CompanyLogo name={contact["Công ty"]} size="sm" className="rounded shadow-2xs" />
-                              <span className="font-medium text-slate-800">{contact["Công ty"]}</span>
+                              <span className="font-medium text-slate-800 group-hover/comp:text-[#0071E3] group-hover/comp:underline flex items-center gap-1">
+                                {contact["Công ty"]}
+                                <ArrowUpRight size={11} className="text-slate-400 group-hover/comp:text-[#0071E3]" />
+                              </span>
                             </div>
                           </td>
 
@@ -1231,7 +1269,7 @@ export default function ContactView({ contacts = [], customers = [], suppliers =
                   </div>
                 </div>
 
-                {/* Company Linkage */}
+                {/* Company Linkage with Direct 2-Way Navigation */}
                 {(() => {
                   const comp = getCompanyDetails(selectedContact["Công ty"]);
                   if (!comp) return null;
@@ -1248,6 +1286,24 @@ export default function ContactView({ contacts = [], customers = [], suppliers =
                         {comp.taxId && <div><strong>MST:</strong> {comp.taxId}</div>}
                         <div className="line-clamp-2"><strong>Địa chỉ:</strong> {comp.address}</div>
                       </div>
+
+                      {/* 2-Way Deep Linking Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetName = comp.code || comp.name;
+                          setSelectedContact(null);
+                          if (comp.type === 'Khách hàng' && onNavigateToCustomer) {
+                            onNavigateToCustomer(targetName);
+                          } else if (comp.type === 'Nhà cung cấp' && onNavigateToSupplier) {
+                            onNavigateToSupplier(targetName);
+                          }
+                        }}
+                        className="w-full mt-2 py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#0071E3] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+                      >
+                        <span>Mở hồ sơ {comp.type}</span>
+                        <ArrowUpRight size={13} />
+                      </button>
                     </div>
                   );
                 })()}

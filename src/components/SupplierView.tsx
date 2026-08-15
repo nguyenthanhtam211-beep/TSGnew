@@ -8,7 +8,7 @@ import {
   Trash2, X, LayoutGrid, List, Award, Factory, AlertCircle, 
   CheckCircle2, ShieldAlert, ExternalLink, Phone, FileText, 
   UserCheck, FileSpreadsheet, Sparkles, Eye, Copy, Users,
-  Folder, CheckSquare, Clock
+  Folder, CheckSquare, Clock, Mail, CreditCard, Landmark, ArrowUpRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import CompanyLogo from './CompanyLogo';
@@ -22,7 +22,23 @@ export const getSupplierLogo = (s: any) => {
   return s.logoUrl || s.LogoUrl || s.Logo || s.logo || s.Logo_URL || s.logo_url || '';
 };
 
-export default function SupplierView({ initialData: suppliers = [], contacts = [] }: { initialData?: any[], contacts?: any[] }) {
+interface SupplierViewProps {
+  initialData?: any[];
+  contacts?: any[];
+  targetSupplierId?: string | null;
+  onClearTargetSupplier?: () => void;
+  onNavigateToCustomer?: (customerId: string) => void;
+  onNavigateToContact?: (contactId: string) => void;
+}
+
+export default function SupplierView({ 
+  initialData: suppliers = [], 
+  contacts = [],
+  targetSupplierId = null,
+  onClearTargetSupplier,
+  onNavigateToCustomer,
+  onNavigateToContact
+}: SupplierViewProps) {
   // Main Sub-Tab: 'companies' | 'contacts'
   const [activeSubTab, setActiveSubTab] = useState<'companies' | 'contacts'>('companies');
 
@@ -60,6 +76,22 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
 
   const [showAddActivityForm, setShowAddActivityForm] = useState(false);
   const [activityForm, setActivityForm] = useState({ type: 'call', content: '', user: 'Quản trị viên' });
+
+  // Handle Target Supplier Deep Linking
+  useEffect(() => {
+    if (targetSupplierId) {
+      const found = suppliers.find(s => 
+        s["Mã nhà cung cấp"]?.toLowerCase() === targetSupplierId.toLowerCase() ||
+        s.id?.toLowerCase() === targetSupplierId.toLowerCase() ||
+        s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(targetSupplierId.toLowerCase())
+      );
+      if (found) {
+        setSelectedSupplierDetail(found);
+        setActiveSubTab('companies');
+      }
+      if (onClearTargetSupplier) onClearTargetSupplier();
+    }
+  }, [targetSupplierId, suppliers, onClearTargetSupplier]);
 
   // Load shared tasks & projects
   useEffect(() => {
@@ -155,13 +187,18 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
   const [formData, setFormData] = useState({
     "Mã nhà cung cấp": "",
     "Tên Nhà Cung Cấp": "",
+    "Loại hình": "Nhà sản xuất trực tiếp",
     "Nhóm hàng": "",
     "Tình trạng": "Đang hoạt động",
     "Đánh giá": "5",
     "Địa chỉ": "",
     "Nhà máy": "",
     "Số điện thoại": "",
+    "Email": "",
     "Mã số thuế": "",
+    "Điều khoản thanh toán": "Công nợ 30 ngày",
+    "Tài khoản ngân hàng": "",
+    "Đại diện pháp luật": "",
     "logoUrl": "",
     "Liên hệ liên kết": "",
     "Website": "",
@@ -188,13 +225,18 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
       setFormData({
         "Mã nhà cung cấp": supplier["Mã nhà cung cấp"] || "",
         "Tên Nhà Cung Cấp": supplier["Tên Nhà Cung Cấp"] || "",
+        "Loại hình": supplier["Loại hình"] || "Nhà sản xuất trực tiếp",
         "Nhóm hàng": supplier["Nhóm hàng"] || "",
         "Tình trạng": supplier["Tình trạng"] || "Đang hoạt động",
         "Đánh giá": supplier["Đánh giá"] || "5",
         "Địa chỉ": supplier["Địa chỉ"] || "",
         "Nhà máy": supplier["Nhà máy"] || "",
         "Số điện thoại": supplier["Số điện thoại"] || "",
+        "Email": supplier["Email"] || "",
         "Mã số thuế": supplier["Mã số thuế"] || "",
+        "Điều khoản thanh toán": supplier["Điều khoản thanh toán"] || "Công nợ 30 ngày",
+        "Tài khoản ngân hàng": supplier["Tài khoản ngân hàng"] || "",
+        "Đại diện pháp luật": supplier["Đại diện pháp luật"] || "",
         "logoUrl": existingLogo,
         "Liên hệ liên kết": supplier["Liên hệ liên kết"] || "",
         "Website": supplier["Website"] || "",
@@ -206,13 +248,18 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
       setFormData({
         "Mã nhà cung cấp": `SUPP_${Date.now().toString().slice(-4)}`,
         "Tên Nhà Cung Cấp": "",
+        "Loại hình": "Nhà sản xuất trực tiếp",
         "Nhóm hàng": "",
         "Tình trạng": "Đang hoạt động",
         "Đánh giá": "5",
         "Địa chỉ": "",
         "Nhà máy": "",
         "Số điện thoại": "",
+        "Email": "",
         "Mã số thuế": "",
+        "Điều khoản thanh toán": "Công nợ 30 ngày",
+        "Tài khoản ngân hàng": "",
+        "Đại diện pháp luật": "",
         "logoUrl": "",
         "Liên hệ liên kết": "",
         "Website": "",
@@ -375,6 +422,8 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
         s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s["Nhóm hàng"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s["Địa chỉ"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s["Email"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s["Loại hình"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s["Mã số thuế"]?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchStatus = statusFilter === 'all' 
@@ -395,13 +444,18 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
           return {
             "Mã NCC": s["Mã nhà cung cấp"] || "",
             "Tên Nhà Cung Cấp": cleanCompanyName(s["Tên Nhà Cung Cấp"] || ""),
+            "Loại hình": s["Loại hình"] || "Nhà sản xuất trực tiếp",
             "Nhóm hàng": s["Nhóm hàng"] || "",
             "Tình trạng": s["Tình trạng"] || "Đang hoạt động",
             "Đánh giá (Sao)": s["Đánh giá"] || "5",
             "Mã số thuế": s["Mã số thuế"] || "",
             "Số điện thoại": s["Số điện thoại"] || "",
+            "Email": s["Email"] || "",
             "Địa chỉ": s["Địa chỉ"] || "",
             "Nhà máy": s["Nhà máy"] || "",
+            "Điều khoản thanh toán": s["Điều khoản thanh toán"] || "Công nợ 30 ngày",
+            "Tài khoản ngân hàng": s["Tài khoản ngân hàng"] || "",
+            "Đại diện pháp luật": s["Đại diện pháp luật"] || "",
             "Số đầu mối liên hệ": getLinkedContacts(s).length,
             "Dự án": totalProjects,
             "Công việc": totalTasks
@@ -582,7 +636,7 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
               {activeSubTab === 'companies'
-                ? 'Quản lý đối tác cung ứng nguyên vật liệu, đánh giá năng lực và mạng lưới đầu mối.'
+                ? 'Quản lý đối tác cung ứng, nhóm hàng, hạn mức thanh toán, ngân hàng và đầu mối.'
                 : 'Tra cứu danh bạ nhân sự, phòng kinh doanh, kỹ thuật và quản lý của nhà cung cấp.'}
             </p>
           </div>
@@ -669,7 +723,7 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Tìm theo mã, tên NCC, nhóm hàng, MST..."
+                  placeholder="Tìm theo mã, tên NCC, nhóm hàng, MST, email, loại hình..."
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] text-xs sm:text-sm transition-all placeholder:text-slate-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -730,11 +784,12 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                       <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
                         <tr>
                           <th className="px-5 py-3.5">Mã & Nhà cung cấp</th>
-                          <th className="px-5 py-3.5">Nhóm hàng</th>
+                          <th className="px-5 py-3.5">Loại hình & Nhóm hàng</th>
+                          <th className="px-5 py-3.5">Mã số thuế & Email</th>
                           <th className="px-5 py-3.5">Địa chỉ</th>
-                          <th className="px-5 py-3.5">Mã số thuế</th>
+                          <th className="px-5 py-3.5">Điều khoản TT</th>
                           <th className="px-5 py-3.5">Đánh giá</th>
-                          <th className="px-5 py-3.5">Đầu mối liên hệ</th>
+                          <th className="px-5 py-3.5">Đầu mối</th>
                           <th className="px-5 py-3.5 text-right">Thao tác</th>
                         </tr>
                       </thead>
@@ -772,9 +827,33 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                               </td>
 
                               <td className="px-5 py-3">
-                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-md">
-                                  {supplier["Nhóm hàng"] || "Chưa phân loại"}
-                                </span>
+                                <div className="space-y-0.5">
+                                  <span className="text-[11px] font-medium text-slate-700 block">
+                                    {supplier["Loại hình"] || "Nhà sản xuất"}
+                                  </span>
+                                  <span className="inline-block text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-medium">
+                                    {supplier["Nhóm hàng"] || "Cung ứng"}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="px-5 py-3 font-mono text-xs text-slate-700" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-0.5">
+                                  {supplier["Mã số thuế"] ? (
+                                    <button 
+                                      onClick={(e) => copyToClipboard(supplier["Mã số thuế"], "Mã số thuế", e)}
+                                      className="hover:text-blue-600 transition-colors font-medium block"
+                                      title="Sao chép MST"
+                                    >
+                                      {supplier["Mã số thuế"]}
+                                    </button>
+                                  ) : <span className="text-slate-300">—</span>}
+                                  {supplier["Email"] && (
+                                    <a href={`mailto:${supplier["Email"]}`} className="text-[11px] text-blue-600 font-sans hover:underline block truncate max-w-[150px]">
+                                      {supplier["Email"]}
+                                    </a>
+                                  )}
+                                </div>
                               </td>
 
                               <td className="px-5 py-3 text-slate-600 max-w-xs">
@@ -783,16 +862,10 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                                 </span>
                               </td>
 
-                              <td className="px-5 py-3 font-mono text-xs text-slate-700" onClick={(e) => e.stopPropagation()}>
-                                {supplier["Mã số thuế"] ? (
-                                  <button 
-                                    onClick={(e) => copyToClipboard(supplier["Mã số thuế"], "Mã số thuế", e)}
-                                    className="hover:text-blue-600 transition-colors"
-                                    title="Sao chép MST"
-                                  >
-                                    {supplier["Mã số thuế"]}
-                                  </button>
-                                ) : "—"}
+                              <td className="px-5 py-3">
+                                <span className="text-xs text-slate-700 font-medium">
+                                  {supplier["Điều khoản thanh toán"] || "Công nợ 30 ngày"}
+                                </span>
                               </td>
 
                               <td className="px-5 py-3">
@@ -882,9 +955,14 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                                 <h3 className="font-semibold text-slate-900 text-sm truncate mt-0.5" title={cleanName}>
                                   {cleanName}
                                 </h3>
-                                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium mt-1 inline-block">
-                                  {supplier["Nhóm hàng"] || "Cung ứng"}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
+                                    {supplier["Loại hình"] || "Nhà sản xuất"}
+                                  </span>
+                                  <span className="text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded font-medium">
+                                    {supplier["Nhóm hàng"] || "Cung ứng"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
@@ -895,18 +973,24 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                           </div>
 
                           <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
+                            {supplier["Mã số thuế"] && (
+                              <div className="flex items-center gap-2 font-mono text-slate-500">
+                                <FileText size={13} className="text-slate-400 shrink-0" />
+                                <span>MST: {supplier["Mã số thuế"]}</span>
+                              </div>
+                            )}
+                            {supplier["Email"] && (
+                              <div className="flex items-center gap-2 text-blue-600">
+                                <Mail size={13} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{supplier["Email"]}</span>
+                              </div>
+                            )}
                             {supplier["Địa chỉ"] && (
                               <div className="flex items-start gap-2">
                                 <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
                                 <span className="line-clamp-1 text-slate-700" title={supplier["Địa chỉ"]}>
                                   {supplier["Địa chỉ"]}
                                 </span>
-                              </div>
-                            )}
-                            {supplier["Mã số thuế"] && (
-                              <div className="flex items-center gap-2 font-mono text-slate-500">
-                                <FileText size={13} className="text-slate-400 shrink-0" />
-                                <span>MST: {supplier["Mã số thuế"]}</span>
                               </div>
                             )}
                           </div>
@@ -1163,8 +1247,8 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
       {/* Supplier Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
                 {editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
               </h3>
@@ -1173,10 +1257,10 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã nhà cung cấp</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã nhà cung cấp *</label>
                   <input
                     type="text"
                     required
@@ -1188,7 +1272,21 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Nhóm hàng</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Loại hình</label>
+                  <select
+                    value={formData["Loại hình"]}
+                    onChange={(e) => setFormData({ ...formData, "Loại hình": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  >
+                    <option value="Nhà sản xuất trực tiếp">Nhà sản xuất trực tiếp</option>
+                    <option value="Đại lý nhập khẩu cấp 1">Đại lý nhập khẩu cấp 1</option>
+                    <option value="Doanh nghiệp FDI">Doanh nghiệp FDI</option>
+                    <option value="Thương mại tổng hợp">Thương mại tổng hợp</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Nhóm hàng cung ứng</label>
                   <input
                     type="text"
                     value={formData["Nhóm hàng"]}
@@ -1200,7 +1298,7 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Tên Nhà Cung Cấp</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Tên Nhà Cung Cấp (Tên pháp lý) *</label>
                 <input
                   type="text"
                   required
@@ -1208,17 +1306,6 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                   onChange={(e) => setFormData({ ...formData, "Tên Nhà Cung Cấp": e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
                   placeholder="Công ty TNHH..."
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Địa chỉ</label>
-                <input
-                  type="text"
-                  value={formData["Địa chỉ"]}
-                  onChange={(e) => setFormData({ ...formData, "Địa chỉ": e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                  placeholder="Số nhà, đường, tỉnh thành"
                 />
               </div>
 
@@ -1235,7 +1322,69 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Đánh giá (1-5 Sao)</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Đại diện pháp luật / Giám đốc</label>
+                  <input
+                    type="text"
+                    value={formData["Đại diện pháp luật"]}
+                    onChange={(e) => setFormData({ ...formData, "Đại diện pháp luật": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                    placeholder="Ông Trần Văn B"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Email đặt hàng / Báo giá</label>
+                  <input
+                    type="email"
+                    value={formData["Email"]}
+                    onChange={(e) => setFormData({ ...formData, "Email": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                    placeholder="sales@supplier.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Số điện thoại Hotline</label>
+                  <input
+                    type="text"
+                    value={formData["Số điện thoại"]}
+                    onChange={(e) => setFormData({ ...formData, "Số điện thoại": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
+                    placeholder="0243..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Địa chỉ văn phòng / Nhà máy</label>
+                <input
+                  type="text"
+                  value={formData["Địa chỉ"]}
+                  onChange={(e) => setFormData({ ...formData, "Địa chỉ": e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  placeholder="Số nhà, đường, tỉnh thành"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Điều khoản thanh toán</label>
+                  <select
+                    value={formData["Điều khoản thanh toán"]}
+                    onChange={(e) => setFormData({ ...formData, "Điều khoản thanh toán": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  >
+                    <option value="Công nợ 30 ngày">Công nợ 30 ngày</option>
+                    <option value="Công nợ 45 ngày">Công nợ 45 ngày</option>
+                    <option value="Thanh toán ngay khi giao hàng">Thanh toán khi nhận hàng</option>
+                    <option value="Đặt cọc 30% - Còn lại 70%">Đặt cọc 30%</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Đánh giá năng lực (Sao)</label>
                   <select
                     value={formData["Đánh giá"]}
                     onChange={(e) => setFormData({ ...formData, "Đánh giá": e.target.value })}
@@ -1248,6 +1397,30 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                     <option value="1">1 Sao - Kém</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Trạng thái</label>
+                  <select
+                    value={formData["Tình trạng"]}
+                    onChange={(e) => setFormData({ ...formData, "Tình trạng": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  >
+                    <option value="Đang hoạt động">Đang hoạt động</option>
+                    <option value="Tạm dừng">Tạm dừng</option>
+                    <option value="Nhà cung cấp dự phòng">Dự phòng</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Tài khoản ngân hàng thụ hưởng</label>
+                <input
+                  type="text"
+                  value={formData["Tài khoản ngân hàng"]}
+                  onChange={(e) => setFormData({ ...formData, "Tài khoản ngân hàng": e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
+                  placeholder="STK: 987654321 - BIDV - CN Hà Nội"
+                />
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
@@ -1412,7 +1585,7 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                     {cleanCompanyName(selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"])}
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
-                    {selectedSupplierDetail["Mã nhà cung cấp"]} • {selectedSupplierDetail["Nhóm hàng"] || "Nhà cung cấp"}
+                    {selectedSupplierDetail["Mã nhà cung cấp"]} • {selectedSupplierDetail["Loại hình"] || "Nhà sản xuất"} • {selectedSupplierDetail["Nhóm hàng"] || "Cung ứng"}
                   </p>
                 </div>
               </div>
@@ -1430,18 +1603,61 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
                   </div>
                 </div>
                 <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-                  <span className="text-[11px] text-slate-400 font-medium block">Mã số thuế</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Mã số thuế</span>
+                    {selectedSupplierDetail["Mã số thuế"] && (
+                      <button 
+                        onClick={(e) => copyToClipboard(selectedSupplierDetail["Mã số thuế"], "Mã số thuế", e)}
+                        className="text-[11px] text-blue-600 hover:underline"
+                      >
+                        Sao chép
+                      </button>
+                    )}
+                  </div>
                   <div className="font-mono font-bold text-slate-800 mt-1">
                     {selectedSupplierDetail["Mã số thuế"] || "Chưa cập nhật"}
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100">
-                <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ</span>
-                <div className="text-slate-700 font-medium mt-0.5">
-                  {selectedSupplierDetail["Địa chỉ"] || "Chưa cập nhật địa chỉ"}
+              {/* Financial & Terms */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Điều khoản thanh toán</span>
+                  <div className="font-semibold text-slate-800 mt-1">
+                    {selectedSupplierDetail["Điều khoản thanh toán"] || "Công nợ 30 ngày"}
+                  </div>
                 </div>
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Email đặt hàng</span>
+                  <div className="text-blue-600 truncate mt-1">
+                    {selectedSupplierDetail["Email"] || "Chưa cập nhật"}
+                  </div>
+                </div>
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Đánh giá năng lực</span>
+                  <div className="flex items-center gap-1 text-amber-500 font-bold mt-1">
+                    <span>{selectedSupplierDetail["Đánh giá"] || "5"} Sao</span>
+                    <Star size={12} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
+                <div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ</span>
+                  <div className="text-slate-700 font-medium mt-0.5">
+                    {selectedSupplierDetail["Địa chỉ"] || "Chưa cập nhật địa chỉ"}
+                  </div>
+                </div>
+                {selectedSupplierDetail["Tài khoản ngân hàng"] && (
+                  <div className="pt-2.5 border-t border-slate-200/60">
+                    <span className="text-[11px] text-slate-400 font-medium block">Tài khoản ngân hàng thụ hưởng</span>
+                    <div className="text-slate-700 font-medium mt-0.5 font-mono">
+                      {selectedSupplierDetail["Tài khoản ngân hàng"]}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

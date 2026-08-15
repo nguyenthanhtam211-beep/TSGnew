@@ -5,7 +5,8 @@ import {
   Clock, AlertCircle, Phone, FileText, Factory, Globe, Copy, 
   ExternalLink, ChevronRight, Eye, Columns, Cloud, 
   DownloadCloud, FileSpreadsheet, PhoneCall, Send, Sparkles,
-  Folder, CheckSquare, MessageCircle, Star, UserCheck, Check
+  Folder, CheckSquare, MessageCircle, Star, UserCheck, Check,
+  CreditCard, Landmark, Mail, ArrowUpRight, ShieldCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, storage } from '../firebase';
@@ -24,7 +25,23 @@ export const getCustomerLogo = (c: any) => {
   return c.logoUrl || c.LogoUrl || c.Logo || c.logo || c.Logo_URL || c.logo_url || '';
 };
 
-export default function CustomerView({ initialData: customers = [], contacts = [] }: { initialData?: any[], contacts?: any[] }) {
+interface CustomerViewProps {
+  initialData?: any[];
+  contacts?: any[];
+  targetCustomerId?: string | null;
+  onClearTargetCustomer?: () => void;
+  onNavigateToSupplier?: (supplierId: string) => void;
+  onNavigateToContact?: (contactId: string) => void;
+}
+
+export default function CustomerView({ 
+  initialData: customers = [], 
+  contacts = [],
+  targetCustomerId = null,
+  onClearTargetCustomer,
+  onNavigateToSupplier,
+  onNavigateToContact
+}: CustomerViewProps) {
   // Main Sub-Tab: 'companies' | 'contacts'
   const [activeSubTab, setActiveSubTab] = useState<'companies' | 'contacts'>('companies');
   
@@ -36,7 +53,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
 
   // Search & Filter for Contacts
   const [contactSearchTerm, setContactSearchTerm] = useState('');
-  const [contactRoleFilter, setContactRoleFilter] = useState('all'); // all, exec, sales, other
+  const [contactRoleFilter, setContactRoleFilter] = useState('all');
 
   // Customer Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,6 +81,22 @@ export default function CustomerView({ initialData: customers = [], contacts = [
 
   const [showAddActivityForm, setShowAddActivityForm] = useState(false);
   const [activityForm, setActivityForm] = useState({ type: 'call', content: '', user: 'Quản trị viên' });
+
+  // Handle Target Customer Deep Linking from other modules
+  useEffect(() => {
+    if (targetCustomerId) {
+      const found = customers.find(c => 
+        c["Customer_ID"]?.toLowerCase() === targetCustomerId.toLowerCase() ||
+        c.id?.toLowerCase() === targetCustomerId.toLowerCase() ||
+        c["Tên đầy đủ"]?.toLowerCase().includes(targetCustomerId.toLowerCase())
+      );
+      if (found) {
+        setSelectedCustomerDetail(found);
+        setActiveSubTab('companies');
+      }
+      if (onClearTargetCustomer) onClearTargetCustomer();
+    }
+  }, [targetCustomerId, customers, onClearTargetCustomer]);
 
   // Load shared tasks & projects
   useEffect(() => {
@@ -142,7 +175,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
     });
   }, [customerContacts, contactSearchTerm, contactRoleFilter]);
 
-  // Helper to get total tasks and projects across all contacts for a customer
+  // Total tasks and projects across all contacts for a customer
   const getCustomerTasksAndProjects = (customer: any) => {
     const linked = getLinkedContacts(customer);
     let allTasks: any[] = [];
@@ -215,13 +248,19 @@ export default function CustomerView({ initialData: customers = [], contacts = [
   const [formData, setFormData] = useState({
     Customer_ID: '',
     "Tên đầy đủ": '',
+    "Loại hình": 'Công ty Cổ phần',
     "Địa chỉ": '',
     "Nhà máy": '',
     "Mã số thuế": '',
     "Số điện thoại": '',
+    "Email": '',
     "Website": '',
-    "Phân loại": '',
+    "Phân loại": 'Bao bì Carton',
     "Tình trạng": 'Đang mua',
+    "Hạn thanh toán": '30 ngày',
+    "Hạn mức nợ": '500,000,000 đ',
+    "Tài khoản ngân hàng": '',
+    "Đại diện pháp luật": '',
     "Liên hệ liên kết": '',
     "Ghi chú": '',
     logoUrl: '',
@@ -247,13 +286,19 @@ export default function CustomerView({ initialData: customers = [], contacts = [
       setFormData({
         Customer_ID: customer.Customer_ID || '',
         "Tên đầy đủ": customer["Tên đầy đủ"] || '',
+        "Loại hình": customer["Loại hình"] || 'Công ty Cổ phần',
         "Địa chỉ": customer["Địa chỉ"] || '',
         "Nhà máy": customer["Nhà máy"] || '',
         "Mã số thuế": customer["Mã số thuế"] || '',
         "Số điện thoại": customer["Số điện thoại"] || '',
+        "Email": customer["Email"] || '',
         "Website": customer["Website"] || '',
-        "Phân loại": customer["Phân loại"] || '',
+        "Phân loại": customer["Phân loại"] || 'Bao bì Carton',
         "Tình trạng": customer["Tình trạng"] || 'Đang mua',
+        "Hạn thanh toán": customer["Hạn thanh toán"] || '30 ngày',
+        "Hạn mức nợ": customer["Hạn mức nợ"] || '500,000,000 đ',
+        "Tài khoản ngân hàng": customer["Tài khoản ngân hàng"] || '',
+        "Đại diện pháp luật": customer["Đại diện pháp luật"] || '',
         "Liên hệ liên kết": customer["Liên hệ liên kết"] || '',
         "Ghi chú": customer["Ghi chú"] || '',
         logoUrl: getCustomerLogo(customer),
@@ -265,13 +310,19 @@ export default function CustomerView({ initialData: customers = [], contacts = [
       setFormData({
         Customer_ID: `CUST_${Date.now().toString().slice(-4)}`,
         "Tên đầy đủ": '',
+        "Loại hình": 'Công ty Cổ phần',
         "Địa chỉ": '',
         "Nhà máy": '',
         "Mã số thuế": '',
         "Số điện thoại": '',
+        "Email": '',
         "Website": '',
-        "Phân loại": '',
+        "Phân loại": 'Bao bì Carton',
         "Tình trạng": 'Đang mua',
+        "Hạn thanh toán": '30 ngày',
+        "Hạn mức nợ": '500,000,000 đ',
+        "Tài khoản ngân hàng": '',
+        "Đại diện pháp luật": '',
         "Liên hệ liên kết": '',
         "Ghi chú": '',
         logoUrl: '',
@@ -417,6 +468,108 @@ export default function CustomerView({ initialData: customers = [], contacts = [
     toast.success(`Đã sao chép ${label}: ${text}`);
   };
 
+  // Task & Project handlers for contact inspector modal
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.title || !selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newTask = {
+      id: `task_${Date.now()}`,
+      title: taskForm.title,
+      dueDate: taskForm.dueDate || new Date().toISOString().slice(0, 10),
+      priority: taskForm.priority,
+      status: taskForm.status
+    };
+    const newTasks = { ...tasks, [contactId]: [...(tasks[contactId] || []), newTask] };
+    saveTasks(newTasks);
+    setTaskForm({ title: '', dueDate: '', priority: 'medium', status: 'todo' });
+    setShowAddTaskForm(false);
+    toast.success("Đã thêm công việc!");
+  };
+
+  const handleToggleTaskStatus = (taskId: string) => {
+    if (!selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newTasks = { ...tasks };
+    if (newTasks[contactId]) {
+      newTasks[contactId] = newTasks[contactId].map(t => {
+        if (t.id === taskId) {
+          return { ...t, status: t.status === 'done' ? 'todo' : 'done' };
+        }
+        return t;
+      });
+      saveTasks(newTasks);
+    }
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (!selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newTasks = { ...tasks };
+    if (newTasks[contactId]) {
+      newTasks[contactId] = newTasks[contactId].filter(t => t.id !== taskId);
+      saveTasks(newTasks);
+      toast.success("Đã xóa việc!");
+    }
+  };
+
+  const handleAddProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.name || !selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newProject = {
+      id: `proj_${Date.now()}`,
+      name: projectForm.name,
+      code: projectForm.code || `PRJ-${Date.now().toString().slice(-4)}`,
+      description: projectForm.description,
+      status: projectForm.status
+    };
+    const newProjects = { ...projects, [contactId]: [...(projects[contactId] || []), newProject] };
+    saveProjects(newProjects);
+    setProjectForm({ name: '', code: '', description: '', status: 'active' });
+    setShowAddProjectForm(false);
+    toast.success("Đã tạo dự án!");
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    if (!selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newProjects = { ...projects };
+    if (newProjects[contactId]) {
+      newProjects[contactId] = newProjects[contactId].filter(p => p.id !== projectId);
+      saveProjects(newProjects);
+      toast.success("Đã xóa dự án!");
+    }
+  };
+
+  const handleAddActivity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activityForm.content || !selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newAct = {
+      id: `act_${Date.now()}`,
+      type: activityForm.type,
+      content: activityForm.content,
+      timestamp: new Date().toLocaleString('vi-VN'),
+      user: activityForm.user
+    };
+    const newActs = { ...activities, [contactId]: [newAct, ...(activities[contactId] || [])] };
+    saveActivities(newActs);
+    setActivityForm({ type: 'call', content: '', user: 'Quản trị viên' });
+    setShowAddActivityForm(false);
+    toast.success("Đã ghi nhật ký!");
+  };
+
+  const handleDeleteActivity = (actId: string) => {
+    if (!selectedContactDetail) return;
+    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
+    const newActs = { ...activities };
+    if (newActs[contactId]) {
+      newActs[contactId] = newActs[contactId].filter(a => a.id !== actId);
+      saveActivities(newActs);
+    }
+  };
+
   // KPIs
   const stats = useMemo(() => {
     const total = customers.length;
@@ -435,7 +588,9 @@ export default function CustomerView({ initialData: customers = [], contacts = [
         c["Tên đầy đủ"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c["Địa chỉ"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c["Mã số thuế"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c["Số điện thoại"]?.toLowerCase().includes(searchTerm.toLowerCase());
+        c["Số điện thoại"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c["Email"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c["Loại hình"]?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchStatus = statusFilter === 'all' || c["Tình trạng"] === statusFilter;
       const matchCategory = categoryFilter === 'all' || c["Phân loại"] === categoryFilter;
@@ -453,12 +608,18 @@ export default function CustomerView({ initialData: customers = [], contacts = [
             "Mã KH": c["Customer_ID"] || "",
             "Tên doanh nghiệp": cleanCompanyName(c["Tên đầy đủ"] || ""),
             "Tên pháp lý": c["Tên đầy đủ"] || "",
+            "Loại hình doanh nghiệp": c["Loại hình"] || "Công ty Cổ phần",
             "Phân loại": c["Phân loại"] || "",
             "Tình trạng": c["Tình trạng"] || "Đang mua",
             "Mã số thuế": c["Mã số thuế"] || "",
             "Số điện thoại": c["Số điện thoại"] || "",
+            "Email": c["Email"] || "",
             "Địa chỉ trụ sở": c["Địa chỉ"] || "",
             "Địa chỉ nhà máy": c["Nhà máy"] || "",
+            "Hạn thanh toán": c["Hạn thanh toán"] || "30 ngày",
+            "Hạn mức nợ": c["Hạn mức nợ"] || "",
+            "Tài khoản ngân hàng": c["Tài khoản ngân hàng"] || "",
+            "Đại diện pháp luật": c["Đại diện pháp luật"] || "",
             "Website": c["Website"] || "",
             "Số nhân sự liên hệ": getLinkedContacts(c).length,
             "Dự án liên kết": totalProjects,
@@ -503,104 +664,6 @@ export default function CustomerView({ initialData: customers = [], contacts = [
     }
   };
 
-  // Task / Project Actions inside Contact Detail
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskForm.title) return;
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newTask = {
-      id: `task_${Date.now()}`,
-      title: taskForm.title,
-      dueDate: taskForm.dueDate || new Date().toISOString().slice(0, 10),
-      priority: taskForm.priority,
-      status: taskForm.status
-    };
-    const newTasks = { ...tasks, [contactId]: [...(tasks[contactId] || []), newTask] };
-    saveTasks(newTasks);
-    setTaskForm({ title: '', dueDate: '', priority: 'medium', status: 'todo' });
-    setShowAddTaskForm(false);
-    toast.success("Đã thêm công việc!");
-  };
-
-  const handleToggleTaskStatus = (taskId: string) => {
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newTasks = { ...tasks };
-    if (newTasks[contactId]) {
-      newTasks[contactId] = newTasks[contactId].map(t => {
-        if (t.id === taskId) {
-          return { ...t, status: t.status === 'done' ? 'todo' : 'done' };
-        }
-        return t;
-      });
-      saveTasks(newTasks);
-    }
-  };
-
-  const handleDeleteTask = (taskId: string) => {
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newTasks = { ...tasks };
-    if (newTasks[contactId]) {
-      newTasks[contactId] = newTasks[contactId].filter(t => t.id !== taskId);
-      saveTasks(newTasks);
-      toast.success("Đã xóa việc!");
-    }
-  };
-
-  const handleAddProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectForm.name) return;
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newProject = {
-      id: `proj_${Date.now()}`,
-      name: projectForm.name,
-      code: projectForm.code || `PRJ-${Date.now().toString().slice(-4)}`,
-      description: projectForm.description,
-      status: projectForm.status
-    };
-    const newProjects = { ...projects, [contactId]: [...(projects[contactId] || []), newProject] };
-    saveProjects(newProjects);
-    setProjectForm({ name: '', code: '', description: '', status: 'active' });
-    setShowAddProjectForm(false);
-    toast.success("Đã tạo dự án!");
-  };
-
-  const handleDeleteProject = (projectId: string) => {
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newProjects = { ...projects };
-    if (newProjects[contactId]) {
-      newProjects[contactId] = newProjects[contactId].filter(p => p.id !== projectId);
-      saveProjects(newProjects);
-      toast.success("Đã xóa dự án!");
-    }
-  };
-
-  const handleAddActivity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activityForm.content) return;
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newAct = {
-      id: `act_${Date.now()}`,
-      type: activityForm.type,
-      content: activityForm.content,
-      timestamp: new Date().toLocaleString('vi-VN'),
-      user: activityForm.user
-    };
-    const newActs = { ...activities, [contactId]: [newAct, ...(activities[contactId] || [])] };
-    saveActivities(newActs);
-    setActivityForm({ type: 'call', content: '', user: 'Quản trị viên' });
-    setShowAddActivityForm(false);
-    toast.success("Đã ghi nhật ký!");
-  };
-
-  const handleDeleteActivity = (actId: string) => {
-    const contactId = selectedContactDetail.ID || `${selectedContactDetail["Tên"]}-${selectedContactDetail["Công ty"]}`;
-    const newActs = { ...activities };
-    if (newActs[contactId]) {
-      newActs[contactId] = newActs[contactId].filter(a => a.id !== actId);
-      saveActivities(newActs);
-    }
-  };
-
   return (
     <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
@@ -641,7 +704,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
               {activeSubTab === 'companies' 
-                ? 'Quản lý hồ sơ pháp lý, địa chỉ nhà máy, mạng lưới nhân sự và dự án triển khai.'
+                ? 'Quản lý hồ sơ pháp lý, loại hình, hạn mức công nợ, ngân hàng và dự án khách hàng.'
                 : 'Tra cứu danh bạ đầu mối liên hệ trực tiếp của các khách hàng, kèm theo dõi công việc và dự án.'}
             </p>
           </div>
@@ -742,7 +805,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Tìm theo mã, tên doanh nghiệp, địa chỉ, MST..."
+                  placeholder="Tìm theo mã, tên, địa chỉ, MST, email, loại hình..."
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] text-xs sm:text-sm transition-all placeholder:text-slate-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -811,11 +874,12 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                       <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
                         <tr>
                           <th className="px-5 py-3.5">Mã & Doanh nghiệp</th>
-                          <th className="px-5 py-3.5">Địa chỉ trụ sở</th>
-                          <th className="px-5 py-3.5">Nhà máy</th>
-                          <th className="px-5 py-3.5">Mã số thuế</th>
+                          <th className="px-5 py-3.5">Loại hình & Phân loại</th>
+                          <th className="px-5 py-3.5">Mã số thuế & Email</th>
+                          <th className="px-5 py-3.5">Địa chỉ & Nhà máy</th>
+                          <th className="px-5 py-3.5">Công nợ & Hạn trả</th>
                           <th className="px-5 py-3.5">Trạng thái</th>
-                          <th className="px-5 py-3.5">Nhân sự & Dự án</th>
+                          <th className="px-5 py-3.5">Nhân sự</th>
                           <th className="px-5 py-3.5 text-right">Thao tác</th>
                         </tr>
                       </thead>
@@ -848,11 +912,6 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                                       <span className="text-[10px] font-mono font-semibold text-slate-400 uppercase">
                                         {customer["Customer_ID"]}
                                       </span>
-                                      {customer["Phân loại"] && (
-                                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
-                                          {customer["Phân loại"]}
-                                        </span>
-                                      )}
                                     </div>
                                     <div className="font-semibold text-slate-900 group-hover:text-[#0071E3] transition-colors truncate mt-0.5">
                                       {cleanName}
@@ -861,31 +920,67 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                                 </div>
                               </td>
 
+                              {/* Business Type & Category */}
+                              <td className="px-5 py-3">
+                                <div className="space-y-0.5">
+                                  <span className="inline-block text-[11px] font-medium text-slate-700">
+                                    {customer["Loại hình"] || "Công ty Cổ phần"}
+                                  </span>
+                                  {customer["Phân loại"] && (
+                                    <span className="block text-[10px] text-slate-400 font-medium truncate max-w-[150px]">
+                                      {customer["Phân loại"]}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Tax Code & Email */}
+                              <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-0.5 text-xs">
+                                  {customer["Mã số thuế"] ? (
+                                    <button 
+                                      onClick={(e) => copyToClipboard(customer["Mã số thuế"], "Mã số thuế", e)}
+                                      className="font-mono text-slate-700 hover:text-blue-600 font-medium block"
+                                      title="Sao chép MST"
+                                    >
+                                      {customer["Mã số thuế"]}
+                                    </button>
+                                  ) : <span className="text-slate-300">—</span>}
+                                  {customer["Email"] && (
+                                    <a 
+                                      href={`mailto:${customer["Email"]}`} 
+                                      className="text-[11px] text-blue-600 hover:underline truncate block max-w-[160px]"
+                                    >
+                                      {customer["Email"]}
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+
                               {/* Address */}
                               <td className="px-5 py-3 text-slate-600 max-w-xs">
                                 <span className="line-clamp-1 text-xs" title={customer["Địa chỉ"]}>
                                   {customer["Địa chỉ"] || "—"}
                                 </span>
+                                {customer["Nhà máy"] && (
+                                  <span className="line-clamp-1 text-[10px] text-slate-400 mt-0.5" title={customer["Nhà máy"]}>
+                                    NM: {customer["Nhà máy"]}
+                                  </span>
+                                )}
                               </td>
 
-                              {/* Factory */}
-                              <td className="px-5 py-3 text-slate-600 max-w-xs">
-                                <span className="line-clamp-1 text-xs" title={customer["Nhà máy"]}>
-                                  {customer["Nhà máy"] || "—"}
-                                </span>
-                              </td>
-
-                              {/* Tax Code */}
-                              <td className="px-5 py-3 font-mono text-xs text-slate-700" onClick={(e) => e.stopPropagation()}>
-                                {customer["Mã số thuế"] ? (
-                                  <button 
-                                    onClick={(e) => copyToClipboard(customer["Mã số thuế"], "Mã số thuế", e)}
-                                    className="hover:text-blue-600 transition-colors"
-                                    title="Sao chép MST"
-                                  >
-                                    {customer["Mã số thuế"]}
-                                  </button>
-                                ) : "—"}
+                              {/* Credit & Terms */}
+                              <td className="px-5 py-3">
+                                <div className="text-xs">
+                                  <span className="font-medium text-slate-800 block">
+                                    {customer["Hạn thanh toán"] || "30 ngày"}
+                                  </span>
+                                  {customer["Hạn mức nợ"] && (
+                                    <span className="text-[10px] text-slate-400 block font-mono">
+                                      HM: {customer["Hạn mức nợ"]}
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               {/* Status */}
@@ -994,11 +1089,16 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                                 <h3 className="font-semibold text-slate-900 text-sm truncate mt-0.5" title={cleanName}>
                                   {cleanName}
                                 </h3>
-                                {customer["Phân loại"] && (
-                                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium mt-1 inline-block">
-                                    {customer["Phân loại"]}
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
+                                    {customer["Loại hình"] || "Công ty Cổ phần"}
                                   </span>
-                                )}
+                                  {customer["Phân loại"] && (
+                                    <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">
+                                      {customer["Phân loại"]}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -1014,26 +1114,24 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                           </div>
 
                           <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
+                            {customer["Mã số thuế"] && (
+                              <div className="flex items-center gap-2 font-mono text-slate-600">
+                                <FileText size={13} className="text-slate-400 shrink-0" />
+                                <span>MST: {customer["Mã số thuế"]}</span>
+                              </div>
+                            )}
+                            {customer["Email"] && (
+                              <div className="flex items-center gap-2 text-blue-600">
+                                <Mail size={13} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{customer["Email"]}</span>
+                              </div>
+                            )}
                             {customer["Địa chỉ"] && (
                               <div className="flex items-start gap-2">
                                 <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
                                 <span className="line-clamp-1 text-slate-700" title={customer["Địa chỉ"]}>
                                   {customer["Địa chỉ"]}
                                 </span>
-                              </div>
-                            )}
-                            {customer["Nhà máy"] && (
-                              <div className="flex items-start gap-2">
-                                <Factory size={13} className="text-slate-400 shrink-0 mt-0.5" />
-                                <span className="line-clamp-1 text-slate-500" title={customer["Nhà máy"]}>
-                                  {customer["Nhà máy"]}
-                                </span>
-                              </div>
-                            )}
-                            {customer["Mã số thuế"] && (
-                              <div className="flex items-center gap-2 font-mono text-slate-500">
-                                <FileText size={13} className="text-slate-400 shrink-0" />
-                                <span>MST: {customer["Mã số thuế"]}</span>
                               </div>
                             )}
                           </div>
@@ -1306,8 +1404,8 @@ export default function CustomerView({ initialData: customers = [], contacts = [
       {/* Customer Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
                 {editingCustomer ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng mới'}
               </h3>
@@ -1316,10 +1414,10 @@ export default function CustomerView({ initialData: customers = [], contacts = [
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã khách hàng</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã khách hàng *</label>
                   <input
                     type="text"
                     required
@@ -1331,19 +1429,34 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Phân loại</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Loại hình doanh nghiệp</label>
+                  <select
+                    value={formData["Loại hình"]}
+                    onChange={(e) => setFormData({ ...formData, "Loại hình": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  >
+                    <option value="Công ty Cổ phần">Công ty Cổ phần</option>
+                    <option value="Công ty TNHH">Công ty TNHH</option>
+                    <option value="Doanh nghiệp FDI">Doanh nghiệp FDI</option>
+                    <option value="Tập đoàn">Tập đoàn</option>
+                    <option value="Hộ kinh doanh">Hộ kinh doanh</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Phân loại hàng hóa</label>
                   <input
                     type="text"
                     value={formData["Phân loại"]}
                     onChange={(e) => setFormData({ ...formData, "Phân loại": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="VD: Carton / Tem nhãn"
+                    placeholder="VD: Carton 5 lớp / Decal"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Tên đầy đủ (Tên pháp lý)</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Tên pháp lý đầy đủ *</label>
                 <input
                   type="text"
                   required
@@ -1354,8 +1467,56 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã số thuế</label>
+                  <input
+                    type="text"
+                    value={formData["Mã số thuế"]}
+                    onChange={(e) => setFormData({ ...formData, "Mã số thuế": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
+                    placeholder="0101..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Người đại diện pháp luật</label>
+                  <input
+                    type="text"
+                    value={formData["Đại diện pháp luật"]}
+                    onChange={(e) => setFormData({ ...formData, "Đại diện pháp luật": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                    placeholder="Ông Nguyễn Văn A - Tổng Giám đốc"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Email giao dịch / Kế toán</label>
+                  <input
+                    type="email"
+                    value={formData["Email"]}
+                    onChange={(e) => setFormData({ ...formData, "Email": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                    placeholder="ketoan@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Số điện thoại Hotline</label>
+                  <input
+                    type="text"
+                    value={formData["Số điện thoại"]}
+                    onChange={(e) => setFormData({ ...formData, "Số điện thoại": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
+                    placeholder="0243..."
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Địa chỉ trụ sở</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Địa chỉ trụ sở pháp lý</label>
                 <input
                   type="text"
                   value={formData["Địa chỉ"]}
@@ -1376,15 +1537,30 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Mã số thuế</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Hạn thanh toán</label>
+                  <select
+                    value={formData["Hạn thanh toán"]}
+                    onChange={(e) => setFormData({ ...formData, "Hạn thanh toán": e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
+                  >
+                    <option value="Thanh toán ngay">Thanh toán ngay</option>
+                    <option value="15 ngày">15 ngày</option>
+                    <option value="30 ngày">30 ngày</option>
+                    <option value="45 ngày">45 ngày</option>
+                    <option value="60 ngày">60 ngày</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Hạn mức công nợ</label>
                   <input
                     type="text"
-                    value={formData["Mã số thuế"]}
-                    onChange={(e) => setFormData({ ...formData, "Mã số thuế": e.target.value })}
+                    value={formData["Hạn mức nợ"]}
+                    onChange={(e) => setFormData({ ...formData, "Hạn mức nợ": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
-                    placeholder="0101..."
+                    placeholder="VD: 500,000,000 đ"
                   />
                 </div>
 
@@ -1403,13 +1579,13 @@ export default function CustomerView({ initialData: customers = [], contacts = [
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Ghi chú</label>
-                <textarea
-                  rows={2}
-                  value={formData["Ghi chú"]}
-                  onChange={(e) => setFormData({ ...formData, "Ghi chú": e.target.value })}
+                <label className="text-xs font-medium text-slate-600 block mb-1">Tài khoản ngân hàng thanh toán</label>
+                <input
+                  type="text"
+                  value={formData["Tài khoản ngân hàng"]}
+                  onChange={(e) => setFormData({ ...formData, "Tài khoản ngân hàng": e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                  placeholder="Thông tin thêm..."
+                  placeholder="STK: 123456789 - Vietcombank - CN Thăng Long"
                 />
               </div>
 
@@ -1605,7 +1781,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                     {cleanCompanyName(selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"])}
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
-                    {selectedCustomerDetail["Customer_ID"]} • {selectedCustomerDetail["Phân loại"] || "Khách hàng"}
+                    {selectedCustomerDetail["Customer_ID"]} • {selectedCustomerDetail["Loại hình"] || "Công ty Cổ phần"} • {selectedCustomerDetail["Phân loại"] || "Bao bì"}
                   </p>
                 </div>
               </div>
@@ -1643,6 +1819,28 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 </div>
               </div>
 
+              {/* Financial & Terms */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Hạn thanh toán</span>
+                  <div className="font-semibold text-slate-800 mt-1">
+                    {selectedCustomerDetail["Hạn thanh toán"] || "30 ngày"}
+                  </div>
+                </div>
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Hạn mức công nợ</span>
+                  <div className="font-mono font-semibold text-slate-800 mt-1">
+                    {selectedCustomerDetail["Hạn mức nợ"] || "500,000,000 đ"}
+                  </div>
+                </div>
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Email kế toán</span>
+                  <div className="text-blue-600 truncate mt-1">
+                    {selectedCustomerDetail["Email"] || "Chưa cập nhật"}
+                  </div>
+                </div>
+              </div>
+
               {/* Addresses */}
               <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
                 <div>
@@ -1656,6 +1854,14 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                     <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ nhà máy giao hàng</span>
                     <div className="text-slate-700 font-medium mt-0.5">
                       {selectedCustomerDetail["Nhà máy"]}
+                    </div>
+                  </div>
+                )}
+                {selectedCustomerDetail["Tài khoản ngân hàng"] && (
+                  <div className="pt-2.5 border-t border-slate-200/60">
+                    <span className="text-[11px] text-slate-400 font-medium block">Tài khoản ngân hàng thanh toán</span>
+                    <div className="text-slate-700 font-medium mt-0.5 font-mono">
+                      {selectedCustomerDetail["Tài khoản ngân hàng"]}
                     </div>
                   </div>
                 )}
@@ -1751,7 +1957,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
         </div>
       )}
 
-      {/* Contact Detail Inspector Modal with Tasks, Projects, and Activities */}
+      {/* Contact Detail Inspector Modal */}
       {selectedContactDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
