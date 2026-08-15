@@ -20,6 +20,7 @@ import CompanyLogo from './CompanyLogo';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, formatShortCompanyName } from '../utils/formatters';
+import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 
 export const getCustomerLogo = (c: any) => {
   if (!c) return '';
@@ -63,6 +64,7 @@ export default function CustomerView({
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
 
   // Contact Modal & Tasks / Projects States
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
@@ -744,17 +746,14 @@ export default function CustomerView({
               <span>Xuất Excel</span>
             </button>
 
-            {activeSubTab === 'companies' && (
-              <button
-                onClick={handleSyncGoogle}
-                disabled={isSyncingGoogle}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-xs disabled:opacity-50"
-                title="Đồng bộ Google Sheets"
-              >
-                <Cloud size={15} className={`text-blue-600 ${isSyncingGoogle ? "animate-spin" : ""}`} />
-                <span>{isSyncingGoogle ? "Đang đồng bộ..." : "Đồng bộ Sheets"}</span>
-              </button>
-            )}
+            <button
+              onClick={() => setIsDriveModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-blue-800 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs"
+              title="Kho Dữ Liệu Đồng Bộ Google Drive 2 Chiều"
+            >
+              <Cloud size={15} className="text-blue-600" />
+              <span>Kho Google Drive</span>
+            </button>
 
             {activeSubTab === 'companies' ? (
               <button 
@@ -2245,6 +2244,16 @@ export default function CustomerView({
           </div>
         </div>
       )}
+
+      {/* Google Drive Master Sync Modal */}
+      <GoogleDriveSyncModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        data={{
+          contacts,
+          customers
+        }}
+      />
 
     </div>
   );

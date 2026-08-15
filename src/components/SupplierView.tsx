@@ -8,7 +8,7 @@ import {
   Trash2, X, LayoutGrid, List, Award, Factory, AlertCircle, 
   CheckCircle2, ShieldAlert, ExternalLink, Phone, FileText, 
   UserCheck, FileSpreadsheet, Sparkles, Eye, Copy, Users,
-  Folder, CheckSquare, Clock, Mail, CreditCard, Landmark, ArrowUpRight
+  Folder, CheckSquare, Clock, Mail, CreditCard, Landmark, ArrowUpRight, Cloud
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import CompanyLogo from './CompanyLogo';
@@ -17,6 +17,7 @@ import { toast } from 'react-hot-toast';
 import { cleanCompanyName, isNameRepetitive } from '../lib/companyUtils';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
+import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 
 export const getSupplierLogo = (s: any) => {
   if (!s) return '';
@@ -58,6 +59,7 @@ export default function SupplierView({
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<any>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
 
   // Contact Modal & Tasks / Projects States
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
@@ -674,6 +676,15 @@ export default function SupplierView({
             >
               <FileSpreadsheet size={15} className="text-emerald-600" />
               <span>Xuất Excel</span>
+            </button>
+
+            <button
+              onClick={() => setIsDriveModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-blue-800 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs"
+              title="Kho Dữ Liệu Đồng Bộ Google Drive 2 Chiều"
+            >
+              <Cloud size={15} className="text-blue-600" />
+              <span>Kho Google Drive</span>
             </button>
 
             {activeSubTab === 'companies' ? (
@@ -2003,6 +2014,16 @@ export default function SupplierView({
           </div>
         </div>
       )}
+
+      {/* Google Drive Master Sync Modal */}
+      <GoogleDriveSyncModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        data={{
+          contacts,
+          suppliers
+        }}
+      />
 
     </div>
   );

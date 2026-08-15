@@ -772,6 +772,9 @@ export default function App() {
             contacts={contactData} 
             customers={customerData} 
             suppliers={supplierData} 
+            products={productData}
+            poHeaders={poHeaderData}
+            deliveries={deliveryData}
             targetContactId={targetContactId}
             onClearTargetContact={() => setTargetContactId(null)}
             onNavigateToCustomer={handleNavigateToCustomer}

@@ -7,7 +7,7 @@ import {
   Download, MessageSquare, ClipboardList, Copy, Check,
   LayoutGrid, List, Users, Shield, Star, ExternalLink,
   PhoneCall, Send, FileSpreadsheet, Layers, MessageCircle,
-  FileText, ArrowUpRight
+  FileText, ArrowUpRight, Cloud, CloudUpload, Sparkles, Filter, ChevronLeft
 } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import { db } from '../firebase';
@@ -15,12 +15,16 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
+import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import { toast } from 'react-hot-toast';
 
 interface ContactViewProps {
   contacts: any[];
   customers?: any[];
   suppliers?: any[];
+  products?: any[];
+  poHeaders?: any[];
+  deliveries?: any[];
   targetContactId?: string | null;
   onClearTargetContact?: () => void;
   onNavigateToCustomer?: (customerId: string) => void;
@@ -51,7 +55,7 @@ interface ActivityLog {
   user: string;
 }
 
-// Minimalist Avatar Initials
+// Apple Avatar Initials
 export const getAvatarInitials = (name: string) => {
   if (!name) return 'TS';
   const clean = name.replace(/^(Mr|Mrs|Ms|Anh|Chị|Bác|Cô|Chú)\s+/i, '').trim();
@@ -65,22 +69,33 @@ export const isExecutive = (role: string) => {
   return lower.includes('chủ tịch') || lower.includes('giám đốc') || lower.includes('hội đồng') || lower.includes('tổng giám đốc') || lower.includes('phó giám đốc');
 };
 
+function getContactSortKey(name: string): string {
+  const clean = formatContactFullName(name);
+  const parts = clean.split(' ').filter(Boolean);
+  const primaryName = parts[parts.length - 1] || clean;
+  return primaryName.charAt(0).toUpperCase();
+}
+
 export default function ContactView({ 
   contacts = [], 
   customers = [], 
   suppliers = [],
+  products = [],
+  poHeaders = [],
+  deliveries = [],
   targetContactId = null,
   onClearTargetContact,
   onNavigateToCustomer,
   onNavigateToSupplier
 }: ContactViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all'); // all, customers, suppliers, executives
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-  
-  // Selected contact for detail drawer/modal
+  const [selectedGroup, setSelectedGroup] = useState<'all' | 'customers' | 'suppliers' | 'executives' | 'starred'>('all');
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
-  const [detailTab, setDetailTab] = useState<'tasks' | 'projects' | 'activities' | 'company'>('tasks');
+  const [detailTab, setDetailTab] = useState<'dossier' | 'tasks' | 'projects' | 'activities'>('dossier');
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
+
+  // Google Drive 2-Way Sync Modal State
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
 
   // Handle deep linking to contact
   useEffect(() => {
@@ -92,11 +107,18 @@ export default function ContactView({
       );
       if (found) {
         setSelectedContact(found);
-        setDetailTab('tasks');
+        setShowMobileDetail(true);
       }
       if (onClearTargetContact) onClearTargetContact();
     }
   }, [targetContactId, contacts, onClearTargetContact]);
+
+  // Set default selected contact on desktop if none selected
+  useEffect(() => {
+    if (!selectedContact && contacts.length > 0) {
+      setSelectedContact(contacts[0]);
+    }
+  }, [contacts]);
 
   // Local storage based state for tasks, projects, and activities per contact ID
   const [tasks, setTasks] = useState<{ [contactId: string]: Task[] }>({});
@@ -144,17 +166,17 @@ export default function ContactView({
     user: 'Quản trị viên'
   });
 
-  // Load tasks, projects, and activities from localStorage on mount
+  // Load from local storage
   useEffect(() => {
     try {
-      const storedTasks = localStorage.getItem('tsg_contact_tasks');
-      const storedProjects = localStorage.getItem('tsg_contact_projects');
-      const storedActivities = localStorage.getItem('tsg_contact_activities');
-      if (storedTasks) setTasks(JSON.parse(storedTasks));
-      if (storedProjects) setProjects(JSON.parse(storedProjects));
-      if (storedActivities) setActivities(JSON.parse(storedActivities));
+      const savedTasks = localStorage.getItem('tsg_contact_tasks');
+      const savedProjects = localStorage.getItem('tsg_contact_projects');
+      const savedActivities = localStorage.getItem('tsg_contact_activities');
+      if (savedTasks) setTasks(JSON.parse(savedTasks));
+      if (savedProjects) setProjects(JSON.parse(savedProjects));
+      if (savedActivities) setActivities(JSON.parse(savedActivities));
     } catch (e) {
-      console.error('Error reading tasks/projects/activities from local storage:', e);
+      console.warn("Could not load contact extra data from localStorage", e);
     }
   }, []);
 
@@ -173,152 +195,80 @@ export default function ContactView({
     localStorage.setItem('tsg_contact_activities', JSON.stringify(newActivities));
   };
 
-  // Helper to determine company type
+  // Helper to determine if company is Customer or Supplier
   const getCompanyType = (companyName: string) => {
-    if (!companyName) return 'Khác';
-    const isCust = customers.some(c => 
-      c["Customer_ID"]?.toLowerCase() === companyName.toLowerCase() ||
-      c["Tên đầy đủ"]?.toLowerCase().includes(companyName.toLowerCase())
-    );
-    if (isCust) return 'Khách hàng';
-
+    if (!companyName) return 'Khách hàng';
+    const compLower = companyName.toLowerCase();
     const isSupp = suppliers.some(s => 
-      s["Mã nhà cung cấp"]?.toLowerCase() === companyName.toLowerCase() ||
-      s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(companyName.toLowerCase())
+      s["Mã nhà cung cấp"]?.toLowerCase() === compLower || 
+      s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(compLower)
     );
     if (isSupp) return 'Nhà cung cấp';
 
-    if (companyName.includes('Thăng Long') || companyName.includes('Thanh Hoá') || companyName.includes('Bắc Sơn') || companyName.includes('Tân Á Đại Thành')) {
-      return 'Khách hàng';
+    const isCust = customers.some(c => 
+      c["Customer_ID"]?.toLowerCase() === compLower || 
+      c["Tên đầy đủ"]?.toLowerCase().includes(compLower)
+    );
+    if (isCust) return 'Khách hàng';
+
+    if (compLower.includes('giấy') || compLower.includes('mực') || compLower.includes('nhựa') || compLower.includes('in ấn') || compLower.includes('vật tư')) {
+      return 'Nhà cung cấp';
     }
-    return 'Nhà cung cấp';
+    return 'Khách hàng';
   };
 
-  // Helper to look up full company details
-  const getCompanyDetails = (companyName: string) => {
-    if (!companyName) return null;
-    const type = getCompanyType(companyName);
-    if (type === 'Khách hàng') {
-      const matched = customers.find(c => 
-        c["Customer_ID"]?.toLowerCase() === companyName.toLowerCase() ||
-        c["Tên đầy đủ"]?.toLowerCase().includes(companyName.toLowerCase())
-      );
-      if (matched) {
-        return {
-          type: 'Khách hàng',
-          name: matched["Tên đầy đủ"] || matched["Customer_ID"],
-          code: matched["Customer_ID"],
-          status: matched["Tình trạng"] || 'Đang mua',
-          address: matched["Địa chỉ"] || 'Chưa cập nhật địa chỉ',
-          factory: matched["Nhà máy"] || '',
-          taxId: matched["Mã số thuế"] || '',
-          category: matched["Phân loại"] || 'Bao bì'
-        };
-      }
-    } else {
-      const matched = suppliers.find(s => 
-        s["Mã nhà cung cấp"]?.toLowerCase() === companyName.toLowerCase() ||
-        s["Tên Nhà Cung Cấp"]?.toLowerCase().includes(companyName.toLowerCase())
-      );
-      if (matched) {
-        return {
-          type: 'Nhà cung cấp',
-          name: matched["Tên Nhà Cung Cấp"] || matched["Mã nhà cung cấp"],
-          code: matched["Mã nhà cung cấp"],
-          status: matched["Tình trạng"] || 'Đang hoạt động',
-          address: matched["Địa chỉ"] || 'Chưa cập nhật địa chỉ',
-          factory: matched["Nhà máy"] || '',
-          taxId: matched["Mã số thuế"] || '',
-          category: matched["Nhóm hàng"] || 'Cung ứng'
-        };
-      }
-    }
-
-    return {
-      type,
-      name: companyName,
-      code: companyName,
-      status: 'Đang hoạt động',
-      address: 'Chưa cập nhật địa chỉ đối tác',
-      factory: '',
-      taxId: '',
-      category: 'Liên kết'
-    };
-  };
-
-  // Filter Contacts
+  // Filtered Contacts
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
-      const matchesSearch = 
-        c["Tên"]?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c["Công ty"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c["Chức vụ"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c["Điện thoại"]?.includes(searchTerm) ||
-        c["Email"]?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      if (!matchesSearch) return false;
-      
-      if (filterType === 'all') return true;
-      if (filterType === 'executives') return isExecutive(c["Chức vụ"]);
-      
       const type = getCompanyType(c["Công ty"]);
-      if (filterType === 'customers' && type === 'Khách hàng') return true;
-      if (filterType === 'suppliers' && type === 'Nhà cung cấp') return true;
-      
-      return false;
+      const isCust = type === 'Khách hàng';
+      const isSupp = type === 'Nhà cung cấp';
+      const exec = isExecutive(c["Chức vụ"]);
+      const isStarred = Number(c["Mức độ quan hệ"] || 0) >= 4;
+
+      if (selectedGroup === 'customers' && !isCust) return false;
+      if (selectedGroup === 'suppliers' && !isSupp) return false;
+      if (selectedGroup === 'executives' && !exec) return false;
+      if (selectedGroup === 'starred' && !isStarred) return false;
+
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        const matchName = c["Tên"]?.toLowerCase().includes(search);
+        const matchComp = c["Công ty"]?.toLowerCase().includes(search);
+        const matchRole = c["Chức vụ"]?.toLowerCase().includes(search);
+        const matchPhone = c["Điện thoại"]?.includes(search);
+        const matchEmail = c["Email"]?.toLowerCase().includes(search);
+        return matchName || matchComp || matchRole || matchPhone || matchEmail;
+      }
+
+      return true;
     });
-  }, [contacts, searchTerm, filterType, customers, suppliers]);
+  }, [contacts, selectedGroup, searchTerm, suppliers, customers]);
 
-  // Statistics
-  const stats = useMemo(() => {
-    const total = contacts.length;
-    const custContacts = contacts.filter(c => getCompanyType(c["Công ty"]) === 'Khách hàng').length;
-    const suppContacts = contacts.filter(c => getCompanyType(c["Công ty"]) === 'Nhà cung cấp').length;
-    const execContacts = contacts.filter(c => isExecutive(c["Chức vụ"])).length;
-    return { total, custContacts, suppContacts, execContacts };
-  }, [contacts, customers, suppliers]);
+  // Group contacts alphabetically A-Z
+  const groupedContacts = useMemo(() => {
+    const groups: { [letter: string]: any[] } = {};
+    const sorted = [...filteredContacts].sort((a, b) => {
+      const nameA = formatContactFullName(a["Tên"] || "");
+      const nameB = formatContactFullName(b["Tên"] || "");
+      const lastA = nameA.split(' ').pop() || nameA;
+      const lastB = nameB.split(' ').pop() || nameB;
+      return lastA.localeCompare(lastB, 'vi');
+    });
 
-  // Excel Export
-  const handleExportToExcel = () => {
-    try {
-      const exportData = filteredContacts.map(c => {
-        const contactId = c.ID || `${c["Tên"]}-${c["Công ty"]}`;
-        const contactTasks = tasks[contactId] || [];
-        const contactProjects = projects[contactId] || [];
-        return {
-          "Danh xưng": c["Danh xưng"] || "",
-          "Họ và Tên": c["Tên"] || "",
-          "Chức vụ": c["Chức vụ"] || "",
-          "Phòng ban": c["Phòng ban"] || "",
-          "Công ty": c["Công ty"] || "",
-          "Phân loại đối tác": getCompanyType(c["Công ty"]),
-          "Số điện thoại": c["Điện thoại"] || "",
-          "Email": c["Email"] || "",
-          "Mức độ quan hệ (1-5)": `${c["Mức độ quan hệ"] || "3"} sao`,
-          "Phụ trách": c["Phụ trách"] || "",
-          "Số lượng dự án": contactProjects.length,
-          "Số lượng công việc": contactTasks.length,
-          "Công việc hoàn thành": contactTasks.filter(t => t.status === 'done').length
-        };
-      });
+    sorted.forEach(c => {
+      const letter = getContactSortKey(c["Tên"] || "") || '#';
+      if (!groups[letter]) groups[letter] = [];
+      groups[letter].push(c);
+    });
 
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Danh_Ba_TSG");
-      XLSX.writeFile(wb, `Danh_Ba_Nhan_Su_TSG_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success("Đã xuất danh bạ ra file Excel thành công!");
-    } catch (err: any) {
-      toast.error("Lỗi xuất Excel: " + (err?.message || err));
-    }
-  };
+    return groups;
+  }, [filteredContacts]);
 
-  const copyToClipboard = (text: string, label: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    toast.success(`Đã sao chép ${label}: ${text}`);
-  };
+  // Letters array
+  const letters = useMemo(() => Object.keys(groupedContacts).sort(), [groupedContacts]);
 
-  // CRUD Contact
+  // Modal handlers
   const handleOpenContactModal = (contact: any = null) => {
     if (contact) {
       setEditingContact(contact);
@@ -390,9 +340,9 @@ export default function ContactView({
     }
   };
 
-  const handleDeleteContact = async (contact: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`Bạn có chắc chắn muốn xóa liên hệ "${contact["Tên"]}"?`)) return;
+  const handleDeleteContact = async (contact: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!confirm(`Bạn có chắc chắn muốn xóa liên hệ "${contact["Tên"]}" khỏi danh bạ?`)) return;
     const loadingToast = toast.loading("Đang xóa liên hệ...");
     try {
       const targetId = contact.id || getItemKey(contact, 'contacts') || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
@@ -405,8 +355,9 @@ export default function ContactView({
       
       if (selectedContact && (selectedContact.id === docId || selectedContact.ID === contact.ID)) {
         setSelectedContact(null);
+        setShowMobileDetail(false);
       }
-      toast.success("Đã xóa liên hệ!", { id: loadingToast });
+      toast.success("Đã xóa liên hệ thành công!", { id: loadingToast });
     } catch (error) {
       console.warn("Contact delete error:", error);
       toast.error("Không thể xóa liên hệ! Vui lòng thử lại.", { id: loadingToast });
@@ -416,7 +367,7 @@ export default function ContactView({
   // Task Actions
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskForm.title) return;
+    if (!taskForm.title || !selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
     const newTask: Task = {
       id: `task_${Date.now()}`,
@@ -429,25 +380,23 @@ export default function ContactView({
     saveTasks(newTasks);
     setTaskForm({ title: '', dueDate: '', priority: 'medium', status: 'todo' });
     setShowAddTaskForm(false);
-    toast.success("Đã thêm công việc!");
+    toast.success("Đã tạo công việc theo dõi!");
   };
 
-  const handleToggleTaskStatus = (taskId: string) => {
+  const handleToggleTask = (taskId: string) => {
+    if (!selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
     const newTasks = { ...tasks };
     if (newTasks[contactId]) {
-      newTasks[contactId] = newTasks[contactId].map(t => {
-        if (t.id === taskId) {
-          const nextStatus: 'todo' | 'doing' | 'done' = t.status === 'todo' ? 'doing' : t.status === 'doing' ? 'done' : 'todo';
-          return { ...t, status: nextStatus };
-        }
-        return t;
-      });
+      newTasks[contactId] = newTasks[contactId].map(t => 
+        t.id === taskId ? { ...t, status: t.status === 'done' ? 'todo' : 'done' } : t
+      );
       saveTasks(newTasks);
     }
   };
 
   const handleDeleteTask = (taskId: string) => {
+    if (!selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
     const newTasks = { ...tasks };
     if (newTasks[contactId]) {
@@ -460,7 +409,7 @@ export default function ContactView({
   // Project Actions
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectForm.name) return;
+    if (!projectForm.name || !selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
     const newProject: Project = {
       id: `proj_${Date.now()}`,
@@ -473,10 +422,11 @@ export default function ContactView({
     saveProjects(newProjects);
     setProjectForm({ name: '', code: '', description: '', status: 'active' });
     setShowAddProjectForm(false);
-    toast.success("Đã tạo dự án mới!");
+    toast.success("Đã thêm dự án!");
   };
 
   const handleDeleteProject = (projectId: string) => {
+    if (!selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
     const newProjects = { ...projects };
     if (newProjects[contactId]) {
@@ -489,537 +439,791 @@ export default function ContactView({
   // Activity Actions
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activityForm.content) return;
+    if (!activityForm.content || !selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
-    const newActivity: ActivityLog = {
+    const newAct: ActivityLog = {
       id: `act_${Date.now()}`,
       type: activityForm.type,
       content: activityForm.content,
       timestamp: new Date().toLocaleString('vi-VN'),
       user: activityForm.user
     };
-    const newActivities = { ...activities, [contactId]: [newActivity, ...(activities[contactId] || [])] };
-    saveActivities(newActivities);
+    const newActs = { ...activities, [contactId]: [newAct, ...(activities[contactId] || [])] };
+    saveActivities(newActs);
     setActivityForm({ type: 'call', content: '', user: 'Quản trị viên' });
     setShowAddActivityForm(false);
-    toast.success("Đã ghi nhận nhật ký trao đổi!");
+    toast.success("Đã ghi nhật ký gặp gỡ!");
   };
 
-  const handleDeleteActivity = (activityId: string) => {
+  const handleDeleteActivity = (actId: string) => {
+    if (!selectedContact) return;
     const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
-    const newActivities = { ...activities };
-    if (newActivities[contactId]) {
-      newActivities[contactId] = newActivities[contactId].filter(a => a.id !== activityId);
-      saveActivities(newActivities);
+    const newActs = { ...activities };
+    if (newActs[contactId]) {
+      newActs[contactId] = newActs[contactId].filter(a => a.id !== actId);
+      saveActivities(newActs);
     }
   };
 
+  const handleExportExcel = () => {
+    try {
+      const exportData = filteredContacts.map(c => {
+        const cleanName = formatContactFullName(c["Tên"] || "");
+        const formattedPhone = formatVietnamesePhone(c["Điện thoại"]);
+        return {
+          "Danh xưng": c["Danh xưng"] || "Mr",
+          "Họ và Tên": cleanName,
+          "Chức vụ": c["Chức vụ"] || "",
+          "Phòng ban": c["Phòng ban"] || "",
+          "Công ty": c["Công ty"] || "",
+          "Phân loại": getCompanyType(c["Công ty"]),
+          "Số điện thoại": formattedPhone,
+          "Email": c["Email"] || "",
+          "Mức độ quan hệ": c["Mức độ quan hệ"] ? `${c["Mức độ quan hệ"]} sao` : "3 sao",
+          "Phụ trách": c["Phụ trách"] || ""
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Danh_Ba_Apple");
+      XLSX.writeFile(wb, `TSG_Danh_Ba_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success("Đã xuất danh bạ thành công!");
+    } catch (e: any) {
+      toast.error("Lỗi xuất Excel: " + e.message);
+    }
+  };
+
+  // Selected contact details
+  const selectedContactId = selectedContact ? (selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`) : null;
+  const currentTasks = selectedContactId ? (tasks[selectedContactId] || []) : [];
+  const currentProjects = selectedContactId ? (projects[selectedContactId] || []) : [];
+  const currentActivities = selectedContactId ? (activities[selectedContactId] || []) : [];
+
+  const selectedCleanName = selectedContact ? formatContactFullName(selectedContact["Tên"] || "") : '';
+  const selectedFullName = selectedContact ? `${selectedContact["Danh xưng"] ? selectedContact["Danh xưng"] + " " : ""}${selectedCleanName}` : '';
+  const selectedInitials = selectedContact ? getAvatarInitials(selectedCleanName) : 'TS';
+  const selectedCleanPhone = selectedContact ? getRawCallablePhone(selectedContact["Điện thoại"]) : '';
+  const selectedFormattedPhone = selectedContact ? formatVietnamesePhone(selectedContact["Điện thoại"]) : '';
+  const selectedCompType = selectedContact ? getCompanyType(selectedContact["Công ty"]) : 'Khách hàng';
+  const selectedIsCustomer = selectedCompType === 'Khách hàng';
+  const selectedIsExec = selectedContact ? isExecutive(selectedContact["Chức vụ"]) : false;
+
   return (
-    <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
-        
-        {/* Apple macOS Clean Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                Danh bạ Đối tác & Trực thuộc
+    <div className="space-y-4 max-w-[1400px] mx-auto animate-fade-in pb-12">
+      
+      {/* Top Header - Apple macOS Toolbar Style */}
+      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0071E3] to-blue-700 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+              <UserCircle size={22} />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                Danh Bạ Liên Hệ
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full font-mono">
+                  {contacts.length} nhân sự
+                </span>
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                {contacts.length} nhân sự
-              </span>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Quản trị mạng lưới liên hệ doanh nghiệp chuẩn Apple Contacts • Đồng bộ Google Drive 2 chiều
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Quản lý hồ sơ nhân sự, kênh liên lạc, dự án triển khai và công việc kết nối đối tác.
+          </div>
+        </div>
+
+        {/* Toolbar Action Buttons */}
+        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap">
+          {/* Google Drive Master Sync Button */}
+          <button
+            onClick={() => setIsDriveModalOpen(true)}
+            className="flex-1 sm:flex-none px-3.5 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 hover:border-blue-300 text-blue-900 font-semibold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-98"
+            title="Kho Dữ Liệu Lưu Trữ & Đồng Bộ 2 Chiều Google Drive"
+          >
+            <Cloud size={15} className="text-[#0071E3]" />
+            <span>Kho Google Drive</span>
+          </button>
+
+          {/* Export Excel */}
+          <button
+            onClick={handleExportExcel}
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl text-xs flex items-center gap-1.5 transition-all shadow-2xs"
+            title="Xuất file Excel"
+          >
+            <FileSpreadsheet size={15} className="text-emerald-600" />
+            <span className="hidden sm:inline">Xuất Excel</span>
+          </button>
+
+          {/* Add Contact */}
+          <button
+            onClick={() => handleOpenContactModal()}
+            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0066D6] text-white font-semibold rounded-2xl text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-98"
+          >
+            <Plus size={16} />
+            <span>Thêm liên hệ</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Apple 3-Column / Master-Detail Container */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[720px]">
+        
+        {/* Pane 1: Group Filter Sidebar (Desktop 2 cols) */}
+        <div className="lg:col-span-3 bg-white/70 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-4 shadow-sm flex flex-col justify-between space-y-4">
+          <div>
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">
+              Nhóm Danh Bạ
+            </div>
+
+            <div className="space-y-1">
+              {[
+                { key: 'all', label: 'Tất cả liên hệ', count: contacts.length, icon: Users, color: 'text-slate-700' },
+                { key: 'customers', label: 'Khách hàng', count: contacts.filter(c => getCompanyType(c["Công ty"]) === 'Khách hàng').length, icon: Building2, color: 'text-blue-600' },
+                { key: 'suppliers', label: 'Nhà cung cấp', count: contacts.filter(c => getCompanyType(c["Công ty"]) === 'Nhà cung cấp').length, icon: Layers, color: 'text-purple-600' },
+                { key: 'executives', label: 'Ban Lãnh đạo', count: contacts.filter(c => isExecutive(c["Chức vụ"])).length, icon: Shield, color: 'text-amber-600' },
+                { key: 'starred', label: 'Đầu mối chiến lược (4-5★)', count: contacts.filter(c => Number(c["Mức độ quan hệ"] || 0) >= 4).length, icon: Star, color: 'text-orange-500' },
+              ].map(group => {
+                const Icon = group.icon;
+                const active = selectedGroup === group.key;
+                return (
+                  <button
+                    key={group.key}
+                    onClick={() => {
+                      setSelectedGroup(group.key as any);
+                      setShowMobileDetail(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+                      active 
+                        ? 'bg-[#0071E3] text-white shadow-md shadow-blue-500/20' 
+                        : 'text-slate-700 hover:bg-slate-100/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon size={16} className={active ? 'text-white' : group.color} />
+                      <span>{group.label}</span>
+                    </div>
+                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
+                      active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 font-medium'
+                    }`}>
+                      {group.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Google Drive Status Widget in Sidebar */}
+          <div className="p-3.5 bg-gradient-to-br from-blue-50/80 to-slate-50 rounded-2xl border border-blue-100/60 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <Cloud size={15} className="text-[#0071E3]" />
+              <span>Google Drive Sync</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Dữ liệu được lưu trữ trên master spreadsheet. Bạn có thể mở trực tiếp hoặc tải .xlsx về máy.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 shrink-0">
             <button
-              onClick={handleExportToExcel}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
-              title="Xuất toàn bộ danh bạ ra file Excel"
+              onClick={() => setIsDriveModalOpen(true)}
+              className="w-full py-1.5 bg-white hover:bg-blue-50 border border-slate-200 text-blue-700 font-semibold rounded-xl text-xs transition-colors flex items-center justify-center gap-1 shadow-2xs"
             >
-              <FileSpreadsheet size={15} className="text-emerald-600" />
-              <span>Xuất Excel</span>
-            </button>
-
-            <button 
-              onClick={() => handleOpenContactModal()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] transition-all shadow-xs"
-            >
-              <Plus size={16} />
-              <span>Thêm liên hệ</span>
+              <span>Quản lý Kho Drive</span>
+              <ArrowUpRight size={13} />
             </button>
           </div>
         </div>
 
-        {/* Apple Metrics Bar (Subtle & Clean) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-slate-400 block">Khách hàng</span>
-              <span className="text-lg font-bold text-blue-600 mt-0.5 block">{stats.custContacts}</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
-              🏢
-            </div>
-          </div>
-
-          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-slate-400 block">Nhà cung cấp</span>
-              <span className="text-lg font-bold text-purple-600 mt-0.5 block">{stats.suppContacts}</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">
-              🏭
-            </div>
-          </div>
-
-          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-slate-400 block">Ban Lãnh đạo</span>
-              <span className="text-lg font-bold text-amber-600 mt-0.5 block">{stats.execContacts}</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">
-              👑
-            </div>
-          </div>
-
-          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-slate-400 block">Tổng nhân sự</span>
-              <span className="text-lg font-bold text-slate-800 mt-0.5 block">{stats.total}</span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold">
-              👥
-            </div>
-          </div>
-        </div>
-
-        {/* Search & Apple Segmented Control Toolbar */}
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+        {/* Pane 2: Alphabetical Contact List (Desktop 4 cols) */}
+        <div className={`lg:col-span-4 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-4 shadow-sm flex flex-col ${
+          showMobileDetail ? 'hidden lg:flex' : 'flex'
+        }`}>
           
-          {/* Search Field */}
-          <div className="relative w-full md:w-96">
+          {/* Apple Spotlight Search Input */}
+          <div className="relative mb-3">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Tìm theo tên, công ty, chức vụ, SĐT..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] text-xs sm:text-sm transition-all placeholder:text-slate-400"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm theo tên, công ty, SĐT..."
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-400 rounded-2xl text-xs sm:text-sm outline-none transition-all placeholder:text-slate-400"
             />
             {searchTerm && (
               <button 
-                onClick={() => setSearchTerm('')} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X size={13} />
+                <X size={14} />
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
-            
-            {/* Apple Segmented Pill Filter */}
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5 overflow-x-auto max-w-full">
-              {[
-                { key: 'all', label: `Tất cả (${stats.total})` },
-                { key: 'customers', label: `Khách hàng (${stats.custContacts})` },
-                { key: 'suppliers', label: `Nhà cung cấp (${stats.suppContacts})` },
-                { key: 'executives', label: `Lãnh đạo (${stats.execContacts})` },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilterType(tab.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                    filterType === tab.key
-                      ? 'bg-white text-slate-900 shadow-xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5 shrink-0">
-              <button 
-                onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs transition-all ${viewMode === 'table' ? 'bg-white text-[#0071E3] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                title="Dạng Bảng"
-              >
-                <List size={16} />
-              </button>
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg text-xs transition-all ${viewMode === 'grid' ? 'bg-white text-[#0071E3] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                title="Dạng Thẻ"
-              >
-                <LayoutGrid size={16} />
-              </button>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Content View */}
-        {filteredContacts.length > 0 ? (
-          
-          /* MODE 1: APPLE CLEAN TABLE (WITH FULL METRICS, PROJECTS & TASKS) */
-          viewMode === 'table' ? (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm text-left border-collapse">
-                  <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
-                    <tr>
-                      <th className="px-5 py-3.5">Họ và Tên</th>
-                      <th className="px-5 py-3.5">Công ty liên kết</th>
-                      <th className="px-5 py-3.5">Chức vụ / Phòng ban</th>
-                      <th className="px-5 py-3.5">Phân loại</th>
-                      <th className="px-5 py-3.5">Kênh liên lạc</th>
-                      <th className="px-5 py-3.5">Dự án & Công việc</th>
-                      <th className="px-5 py-3.5 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredContacts.map((contact) => {
-                      const companyType = getCompanyType(contact["Công ty"]);
-                      const isCustomer = companyType === 'Khách hàng';
-                      const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                      const cleanName = formatContactFullName(contact["Tên"] || "");
-                      const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
-                      const initials = getAvatarInitials(cleanName);
-                      const exec = isExecutive(contact["Chức vụ"]);
-                      const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
-                      const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
-
-                      const contactTasks = tasks[contactId] || [];
-                      const doneTasks = contactTasks.filter(t => t.status === 'done').length;
-                      const contactProjects = projects[contactId] || [];
-                      const contactActs = activities[contactId] || [];
-
-                      return (
-                        <tr 
-                          key={contactId}
-                          onClick={() => {
-                            setSelectedContact(contact);
-                            setDetailTab('tasks');
-                          }}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                        >
-                          {/* Name & Initials */}
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                exec 
-                                  ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' 
-                                  : isCustomer 
-                                  ? 'bg-blue-100 text-blue-800' 
-                                  : 'bg-purple-100 text-purple-800'
-                              }`}>
-                                {initials}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-slate-900 group-hover:text-[#0071E3] transition-colors flex items-center gap-1.5">
-                                  <span>{fullName}</span>
-                                  {exec && (
-                                    <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1 rounded font-medium">
-                                      Lãnh đạo
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-slate-400 mt-0.5">
-                                  {contact["Phụ trách"] ? `Phụ trách: ${contact["Phụ trách"]}` : `Mức độ: ${contact["Mức độ quan hệ"] || "3"}★`}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Company with 2-way cross navigation */}
-                          <td className="px-5 py-3" onClick={(e) => {
-                            e.stopPropagation();
-                            if (isCustomer && onNavigateToCustomer) {
-                              onNavigateToCustomer(contact["Công ty"]);
-                            } else if (!isCustomer && onNavigateToSupplier) {
-                              onNavigateToSupplier(contact["Công ty"]);
-                            }
-                          }}>
-                            <div className="flex items-center gap-2 group/comp cursor-pointer" title={`Mở hồ sơ ${companyType}`}>
-                              <CompanyLogo name={contact["Công ty"]} size="sm" className="rounded shadow-2xs" />
-                              <span className="font-medium text-slate-800 group-hover/comp:text-[#0071E3] group-hover/comp:underline flex items-center gap-1">
-                                {contact["Công ty"]}
-                                <ArrowUpRight size={11} className="text-slate-400 group-hover/comp:text-[#0071E3]" />
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Role / Dept */}
-                          <td className="px-5 py-3 text-slate-600">
-                            <div className="font-medium text-slate-800">{contact["Chức vụ"] || "—"}</div>
-                            {contact["Phòng ban"] && (
-                              <div className="text-xs text-slate-400">{contact["Phòng ban"]}</div>
-                            )}
-                          </td>
-
-                          {/* Category Badge */}
-                          <td className="px-5 py-3">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-medium ${
-                              isCustomer 
-                                ? 'bg-blue-50 text-blue-700' 
-                                : 'bg-purple-50 text-purple-700'
-                            }`}>
-                              {companyType}
-                            </span>
-                          </td>
-
-                          {/* Contact Info (Clickable Phone, Zalo, Email) */}
-                          <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="space-y-0.5 text-xs">
-                              {contact["Điện thoại"] ? (
-                                <div className="flex items-center gap-1.5 font-mono">
-                                  <a 
-                                    href={`tel:${cleanPhone}`} 
-                                    className="font-medium text-slate-700 hover:text-blue-600 transition-colors"
-                                  >
-                                    {formattedPhone}
-                                  </a>
-                                  {cleanPhone && (
-                                    <a 
-                                      href={`https://zalo.me/${cleanPhone}`} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="px-1 text-[9px] bg-blue-100 text-blue-700 hover:bg-blue-200 rounded font-sans font-semibold"
-                                      title="Mở Zalo chat"
-                                    >
-                                      Zalo
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-300">—</span>
-                              )}
-                              {contact["Email"] && (
-                                <a 
-                                  href={`mailto:${contact["Email"]}`} 
-                                  className="text-slate-400 hover:text-slate-700 truncate block max-w-[170px]"
-                                >
-                                  {contact["Email"]}
-                                </a>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Projects & Tasks Metrics */}
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {contactProjects.length > 0 && (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-medium border border-purple-100">
-                                  <Folder size={11} className="text-purple-500" />
-                                  {contactProjects.length} dự án
-                                </span>
-                              )}
-                              <span className="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-medium border border-blue-100">
-                                <CheckSquare size={11} className="text-blue-500" />
-                                {contactTasks.length > 0 ? `${doneTasks}/${contactTasks.length} việc` : '0 việc'}
-                              </span>
-                              {contactActs.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-400" title="Nhật ký tương tác">
-                                  • {contactActs.length} ghi chú
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => {
-                                  setSelectedContact(contact);
-                                  setDetailTab('tasks');
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-[#0071E3] hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Xem hồ sơ & công việc"
-                              >
-                                <Eye size={15} />
-                              </button>
-                              <button 
-                                onClick={() => handleOpenContactModal(contact)}
-                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                title="Chỉnh sửa"
-                              >
-                                <Edit2 size={15} />
-                              </button>
-                              <button 
-                                onClick={(e) => handleDeleteContact(contact, e)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Xóa"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {/* List grouped by Letter Index A-Z */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 mobile-scroll-x max-h-[640px]">
+            {filteredContacts.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 text-xs">
+                <UserCircle size={36} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                <p>Không tìm thấy liên hệ phù hợp</p>
               </div>
-            </div>
-          ) : (
-            
-            /* MODE 2: APPLE CLEAN CARDS (WITH TASKS & PROJECTS BADGES) */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredContacts.map((contact) => {
-                const companyType = getCompanyType(contact["Công ty"]);
-                const isCustomer = companyType === 'Khách hàng';
-                const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                const cleanName = formatContactFullName(contact["Tên"] || "");
-                const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
-                const initials = getAvatarInitials(cleanName);
-                const exec = isExecutive(contact["Chức vụ"]);
-                const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
-                const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
+            ) : (
+              letters.map(letter => (
+                <div key={letter} className="space-y-1">
+                  {/* Alphabet Letter Header */}
+                  <div className="sticky top-0 bg-white/90 backdrop-blur-md px-3 py-1 text-[11px] font-black text-slate-400 font-mono tracking-wider border-b border-slate-100 z-10">
+                    {letter}
+                  </div>
 
-                const contactTasks = tasks[contactId] || [];
-                const doneTasks = contactTasks.filter(t => t.status === 'done').length;
-                const contactProjects = projects[contactId] || [];
+                  {groupedContacts[letter].map(contact => {
+                    const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
+                    const isSelected = selectedContactId === contactId;
+                    const cleanName = formatContactFullName(contact["Tên"] || "");
+                    const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                    const initials = getAvatarInitials(cleanName);
+                    const exec = isExecutive(contact["Chức vụ"]);
+                    const compType = getCompanyType(contact["Công ty"]);
+                    const isCustomer = compType === 'Khách hàng';
+                    const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
 
-                return (
-                  <div 
-                    key={contactId}
-                    onClick={() => {
-                      setSelectedContact(contact);
-                      setDetailTab('tasks');
-                    }}
-                    className="bg-white rounded-2xl border border-slate-200 p-4 hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                            exec 
-                              ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' 
+                    return (
+                      <div
+                        key={contactId}
+                        onClick={() => {
+                          setSelectedContact(contact);
+                          setShowMobileDetail(true);
+                        }}
+                        className={`p-3 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-[#0071E3] text-white shadow-md shadow-blue-500/20'
+                            : 'hover:bg-slate-100/70 text-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Circular Apple Avatar */}
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : exec 
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300/60'
                               : isCustomer 
-                              ? 'bg-blue-100 text-blue-800' 
-                              : 'bg-purple-100 text-purple-800'
+                              ? 'bg-blue-100 text-blue-900' 
+                              : 'bg-purple-100 text-purple-900'
                           }`}>
                             {initials}
                           </div>
-                          <div>
-                            <div className="font-semibold text-slate-900 text-sm">
-                              {fullName}
+
+                          <div className="min-w-0">
+                            <div className="font-bold text-xs sm:text-sm truncate flex items-center gap-1.5">
+                              <span>{fullName}</span>
+                              {exec && (
+                                <span className={`text-[9px] px-1 rounded font-semibold ${
+                                  isSelected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  Lãnh đạo
+                                </span>
+                              )}
                             </div>
-                            <div className="text-xs text-slate-500 font-medium">
-                              {contact["Chức vụ"] || "Chức vụ chưa cập nhật"}
+                            <div className={`text-[11px] truncate mt-0.5 ${
+                              isSelected ? 'text-blue-100' : 'text-slate-500'
+                            }`}>
+                              {contact["Chức vụ"] || "Chức vụ chưa cập nhật"} • {contact["Công ty"]}
                             </div>
                           </div>
                         </div>
 
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-medium shrink-0 ${
-                          isCustomer ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
-                        }`}>
-                          {companyType}
-                        </span>
+                        <ChevronRight size={15} className={`shrink-0 ${
+                          isSelected ? 'text-white' : 'text-slate-300'
+                        }`} />
                       </div>
-
-                      <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
-                        <div className="flex items-center gap-2 text-slate-700">
-                          <Building2 size={13} className="text-slate-400 shrink-0" />
-                          <span className="font-medium truncate">{contact["Công ty"]}</span>
-                        </div>
-                        {contact["Điện thoại"] && (
-                          <div className="flex items-center gap-2 text-slate-700 font-mono">
-                            <Phone size={13} className="text-slate-400 shrink-0" />
-                            <span>{formattedPhone}</span>
-                          </div>
-                        )}
-                        {contact["Email"] && (
-                          <div className="flex items-center gap-2 text-slate-500">
-                            <Mail size={13} className="text-slate-400 shrink-0" />
-                            <span className="truncate">{contact["Email"]}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Project & Tasks Pills */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
-                        {contactProjects.length > 0 && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md">
-                            <Folder size={10} /> {contactProjects.length} dự án
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
-                          <CheckSquare size={10} /> {contactTasks.length > 0 ? `${doneTasks}/${contactTasks.length} việc` : '0 việc'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1 font-mono">
-                        {cleanPhone && (
-                          <a 
-                            href={`tel:${cleanPhone}`} 
-                            className="px-2.5 py-1 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 transition-colors"
-                          >
-                            Gọi điện
-                          </a>
-                        )}
-                        {cleanPhone && (
-                          <a 
-                            href={`https://zalo.me/${cleanPhone}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="px-2.5 py-1 text-xs font-medium bg-blue-50 hover:bg-blue-100 rounded-lg text-blue-700 transition-colors"
-                          >
-                            Zalo
-                          </a>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => handleOpenContactModal(contact)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
-                          title="Chỉnh sửa"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button 
-                          onClick={(e) => handleDeleteContact(contact, e)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                          title="Xóa"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
-          )
-
-        ) : (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-10 text-center space-y-2">
-            <UserCircle size={36} className="mx-auto text-slate-300" />
-            <div className="text-sm font-semibold text-slate-700">Không tìm thấy liên hệ</div>
-            <p className="text-xs text-slate-400">Thử tìm kiếm với từ khóa khác.</p>
+                    );
+                  })}
+                </div>
+              ))
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Pane 3: Full Apple Contact Dossier / Inspector (Desktop 5 cols) */}
+        <div className={`lg:col-span-5 bg-white/80 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-between ${
+          showMobileDetail ? 'flex' : 'hidden lg:flex'
+        }`}>
+          
+          {selectedContact ? (
+            <div className="space-y-6 flex-1 flex flex-col">
+              
+              {/* Mobile Back Button */}
+              <div className="lg:hidden pb-2">
+                <button
+                  onClick={() => setShowMobileDetail(false)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  <ChevronLeft size={16} /> Quay lại danh sách
+                </button>
+              </div>
+
+              {/* Hero Header */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pb-5 border-b border-slate-100">
+                {/* Big Apple Avatar */}
+                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-black shadow-lg shrink-0 ${
+                  selectedIsExec 
+                    ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white ring-4 ring-amber-100' 
+                    : selectedIsCustomer 
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-4 ring-blue-50' 
+                    : 'bg-gradient-to-br from-purple-500 to-purple-700 text-white ring-4 ring-purple-50'
+                }`}>
+                  {selectedInitials}
+                </div>
+
+                <div className="text-center sm:text-left flex-1 min-w-0">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                      {selectedFullName}
+                    </h2>
+                    {selectedIsExec && (
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
+                        Ban Lãnh Đạo
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs font-semibold text-slate-600 mt-1">
+                    {selectedContact["Chức vụ"] || "Chức vụ chưa cập nhật"}
+                    {selectedContact["Phòng ban"] ? ` • Phòng ${selectedContact["Phòng ban"]}` : ''}
+                  </p>
+
+                  {/* Clickable Linked Company with 2-way Cross Navigation */}
+                  <div 
+                    onClick={() => {
+                      if (selectedIsCustomer && onNavigateToCustomer) {
+                        onNavigateToCustomer(selectedContact["Công ty"]);
+                      } else if (!selectedIsCustomer && onNavigateToSupplier) {
+                        onNavigateToSupplier(selectedContact["Công ty"]);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-slate-100/90 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl cursor-pointer transition-all group"
+                    title={`Mở hồ sơ chi tiết ${selectedCompType}`}
+                  >
+                    <CompanyLogo name={selectedContact["Công ty"]} size="sm" className="rounded" />
+                    <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 flex items-center gap-1">
+                      {selectedContact["Công ty"]}
+                      <ArrowUpRight size={12} className="text-slate-400 group-hover:text-blue-600" />
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                      selectedIsCustomer ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {selectedCompType}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Apple Quick Action Pills */}
+              <div className="grid grid-cols-4 gap-2">
+                {/* Call Button */}
+                {selectedCleanPhone ? (
+                  <a
+                    href={`tel:${selectedCleanPhone}`}
+                    className="p-2.5 bg-slate-100/80 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Phone size={15} />
+                    </div>
+                    <span className="text-[11px] font-bold">Gọi điện</span>
+                  </a>
+                ) : (
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-1 opacity-40">
+                    <Phone size={15} className="text-slate-400" />
+                    <span className="text-[11px]">Gọi điện</span>
+                  </div>
+                )}
+
+                {/* Zalo Button */}
+                {selectedCleanPhone ? (
+                  <a
+                    href={`https://zalo.me/${selectedCleanPhone}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-slate-100/80 hover:bg-blue-50 hover:text-blue-700 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <MessageCircle size={15} />
+                    </div>
+                    <span className="text-[11px] font-bold">Zalo</span>
+                  </a>
+                ) : (
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-1 opacity-40">
+                    <MessageCircle size={15} className="text-slate-400" />
+                    <span className="text-[11px]">Zalo</span>
+                  </div>
+                )}
+
+                {/* Email Button */}
+                {selectedContact["Email"] ? (
+                  <a
+                    href={`mailto:${selectedContact["Email"]}`}
+                    className="p-2.5 bg-slate-100/80 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all group"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Mail size={15} />
+                    </div>
+                    <span className="text-[11px] font-bold">Email</span>
+                  </a>
+                ) : (
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-1 opacity-40">
+                    <Mail size={15} className="text-slate-400" />
+                    <span className="text-[11px]">Email</span>
+                  </div>
+                )}
+
+                {/* Edit Button */}
+                <button
+                  onClick={() => handleOpenContactModal(selectedContact)}
+                  className="p-2.5 bg-slate-100/80 hover:bg-slate-200 border border-slate-200/60 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Edit2 size={14} />
+                  </div>
+                  <span className="text-[11px] font-bold">Sửa hồ sơ</span>
+                </button>
+              </div>
+
+              {/* Apple Segmented Control Tabs */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
+                {[
+                  { key: 'dossier', label: 'Hồ sơ', icon: UserCircle },
+                  { key: 'tasks', label: `Việc (${currentTasks.length})`, icon: CheckSquare },
+                  { key: 'projects', label: `Dự án (${currentProjects.length})`, icon: Folder },
+                  { key: 'activities', label: `Nhật ký (${currentActivities.length})`, icon: Clock },
+                ].map(tab => {
+                  const Icon = tab.icon;
+                  const active = detailTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setDetailTab(tab.key as any)}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                        active 
+                          ? 'bg-white text-slate-900 shadow-xs' 
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Icon size={14} />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab Content Panels */}
+              <div className="flex-1 overflow-y-auto space-y-4 max-h-[380px] pr-1">
+                
+                {/* 1. Dossier Tab */}
+                {detailTab === 'dossier' && (
+                  <div className="space-y-3 animate-fade-in text-xs">
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-medium">Số điện thoại</span>
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                          <span>{selectedFormattedPhone || "Chưa cập nhật"}</span>
+                          {selectedContact["Điện thoại"] && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedFormattedPhone);
+                                toast.success("Đã sao chép SĐT: " + selectedFormattedPhone);
+                              }}
+                              className="text-slate-400 hover:text-slate-700 p-0.5"
+                              title="Sao chép"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                        <span className="text-slate-400 font-medium">Hòm thư Email</span>
+                        <span className="font-medium text-blue-600 truncate max-w-[200px]">
+                          {selectedContact["Email"] || "Chưa cập nhật"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                        <span className="text-slate-400 font-medium">Nhân sự TSG phụ trách</span>
+                        <span className="font-semibold text-slate-800">
+                          {selectedContact["Phụ trách"] || "Chưa phân công"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
+                        <span className="text-slate-400 font-medium">Mức độ quan hệ</span>
+                        <div className="flex items-center gap-1 text-amber-500 font-bold">
+                          {Array.from({ length: Number(selectedContact["Mức độ quan hệ"] || 3) }).map((_, i) => (
+                            <Star key={i} size={13} fill="currentColor" />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={(e) => handleDeleteContact(selectedContact, e)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1"
+                      >
+                        <Trash2 size={13} /> Xóa liên hệ này
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Tasks Tab */}
+                {detailTab === 'tasks' && (
+                  <div className="space-y-3 animate-fade-in text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">Công việc theo dõi</span>
+                      <button
+                        onClick={() => setShowAddTaskForm(!showAddTaskForm)}
+                        className="text-xs font-semibold text-[#0071E3] hover:underline flex items-center gap-1"
+                      >
+                        <PlusCircle size={13} /> {showAddTaskForm ? 'Hủy' : '+ Thêm việc'}
+                      </button>
+                    </div>
+
+                    {showAddTaskForm && (
+                      <form onSubmit={handleAddTask} className="p-3 bg-blue-50/60 border border-blue-100 rounded-2xl space-y-2.5">
+                        <input
+                          type="text"
+                          required
+                          value={taskForm.title}
+                          onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                          placeholder="Nội dung công việc cần làm..."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="date"
+                            value={taskForm.dueDate}
+                            onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                            className="bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs outline-none"
+                          />
+                          <select
+                            value={taskForm.priority}
+                            onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as any })}
+                            className="bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs outline-none"
+                          >
+                            <option value="low">Ưu tiên thấp</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="high">Gấp / Quan trọng</option>
+                          </select>
+                        </div>
+                        <button type="submit" className="w-full py-1.5 bg-[#0071E3] text-white font-semibold rounded-xl text-xs shadow-xs">
+                          Tạo công việc
+                        </button>
+                      </form>
+                    )}
+
+                    <div className="space-y-2">
+                      {currentTasks.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-100">
+                          Chưa có công việc nào cần xử lý với nhân sự này.
+                        </div>
+                      ) : (
+                        currentTasks.map(t => (
+                          <div 
+                            key={t.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+                              t.status === 'done' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={t.status === 'done'}
+                                onChange={() => handleToggleTask(t.id)}
+                                className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                              />
+                              <div className="min-w-0">
+                                <div className={`font-semibold truncate ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                                  {t.title}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  Hạn: {t.dueDate || "Không có hạn"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button onClick={() => handleDeleteTask(t.id)} className="text-slate-300 hover:text-red-500 p-1">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Projects Tab */}
+                {detailTab === 'projects' && (
+                  <div className="space-y-3 animate-fade-in text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">Dự án liên kết</span>
+                      <button
+                        onClick={() => setShowAddProjectForm(!showAddProjectForm)}
+                        className="text-xs font-semibold text-[#0071E3] hover:underline flex items-center gap-1"
+                      >
+                        <PlusCircle size={13} /> {showAddProjectForm ? 'Hủy' : '+ Thêm dự án'}
+                      </button>
+                    </div>
+
+                    {showAddProjectForm && (
+                      <form onSubmit={handleAddProject} className="p-3 bg-purple-50/60 border border-purple-100 rounded-2xl space-y-2.5">
+                        <input
+                          type="text"
+                          required
+                          value={projectForm.name}
+                          onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
+                          placeholder="Tên dự án / Hợp đồng..."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={projectForm.description}
+                          onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+                          placeholder="Mô tả tóm tắt..."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none"
+                        />
+                        <button type="submit" className="w-full py-1.5 bg-purple-600 text-white font-semibold rounded-xl text-xs shadow-xs">
+                          Thêm dự án
+                        </button>
+                      </form>
+                    )}
+
+                    <div className="space-y-2">
+                      {currentProjects.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-100">
+                          Chưa có dự án nào gắn với nhân sự này.
+                        </div>
+                      ) : (
+                        currentProjects.map(p => (
+                          <div key={p.id} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+                            <div>
+                              <div className="font-bold text-slate-900">{p.name}</div>
+                              <div className="text-[11px] text-slate-500">{p.description || `Mã: ${p.code}`}</div>
+                            </div>
+                            <button onClick={() => handleDeleteProject(p.id)} className="text-slate-300 hover:text-red-500 p-1">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Activities Tab */}
+                {detailTab === 'activities' && (
+                  <div className="space-y-3 animate-fade-in text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">Nhật ký gặp gỡ & tương tác</span>
+                      <button
+                        onClick={() => setShowAddActivityForm(!showAddActivityForm)}
+                        className="text-xs font-semibold text-[#0071E3] hover:underline flex items-center gap-1"
+                      >
+                        <PlusCircle size={13} /> {showAddActivityForm ? 'Hủy' : '+ Ghi nhật ký'}
+                      </button>
+                    </div>
+
+                    {showAddActivityForm && (
+                      <form onSubmit={handleAddActivity} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            value={activityForm.type}
+                            onChange={(e) => setActivityForm({ ...activityForm, type: e.target.value as any })}
+                            className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none"
+                          >
+                            <option value="call">📞 Cuộc gọi</option>
+                            <option value="meeting">🤝 Gặp mặt / Họp</option>
+                            <option value="email">✉️ Trao đổi Email</option>
+                            <option value="note">📝 Ghi chú nhanh</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={activityForm.user}
+                            onChange={(e) => setActivityForm({ ...activityForm, user: e.target.value })}
+                            placeholder="Người thực hiện..."
+                            className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none"
+                          />
+                        </div>
+                        <textarea
+                          required
+                          value={activityForm.content}
+                          onChange={(e) => setActivityForm({ ...activityForm, content: e.target.value })}
+                          placeholder="Nội dung chi tiết buổi làm việc..."
+                          rows={2}
+                          className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs outline-none resize-none"
+                        />
+                        <button type="submit" className="w-full py-1.5 bg-slate-900 text-white font-semibold rounded-xl text-xs shadow-xs">
+                          Lưu nhật ký
+                        </button>
+                      </form>
+                    )}
+
+                    <div className="space-y-2.5">
+                      {currentActivities.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-100">
+                          Chưa có nhật ký tương tác nào được ghi nhận.
+                        </div>
+                      ) : (
+                        currentActivities.map(a => (
+                          <div key={a.id} className="p-3 bg-white rounded-2xl border border-slate-100 shadow-2xs space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-slate-700 uppercase">
+                                {a.type === 'call' ? '📞 Cuộc gọi' : a.type === 'meeting' ? '🤝 Gặp mặt' : a.type === 'email' ? '✉️ Email' : '📝 Ghi chú'}
+                              </span>
+                              <span className="text-slate-400 font-mono">{a.timestamp}</span>
+                            </div>
+                            <p className="text-slate-800 text-xs">{a.content}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+          ) : (
+            <div className="py-32 text-center text-slate-400 space-y-2 my-auto">
+              <UserCircle size={48} className="mx-auto text-slate-300" />
+              <div className="font-bold text-slate-600 text-sm">Chưa chọn liên hệ</div>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                Chọn một liên hệ từ danh bạ bên trái để xem hồ sơ chi tiết và các tác vụ liên kết.
+              </p>
+            </div>
+          )}
+
+        </div>
 
       </div>
 
-      {/* Dynamic Add/Edit Contact Modal */}
+      {/* Google Drive Master Sync Modal */}
+      <GoogleDriveSyncModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        data={{
+          contacts,
+          customers,
+          suppliers,
+          products,
+          po_headers: poHeaders,
+          deliveries
+        }}
+      />
+
+      {/* Contact Add/Edit Dialog */}
       {isContactModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
               <h3 className="text-base font-bold text-slate-900">
                 {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
               </h3>
@@ -1028,8 +1232,7 @@ export default function ContactView({
               </button>
             </div>
 
-            <form onSubmit={handleSaveContact} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
-              {/* Type Switcher */}
+            <form onSubmit={handleSaveContact} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
               <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button
                   type="button"
@@ -1041,38 +1244,41 @@ export default function ContactView({
                   }}
                   className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${contactType === 'customer' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500'}`}
                 >
-                  Khách hàng
+                  Khách hàng ({customers.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setContactType('supplier');
                     if (suppliers.length > 0) {
-                      setContactFormData(prev => ({ ...prev, "Công ty": suppliers[0]["Tên Nhà Cung Cấp"] || suppliers[0]["Mã nhà cung cấp"] }));
+                      setContactFormData(prev => ({ ...prev, "Công ty": suppliers[0]["Mã nhà cung cấp"] }));
                     }
                   }}
                   className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${contactType === 'supplier' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-500'}`}
                 >
-                  Nhà cung cấp
+                  Nhà cung cấp ({suppliers.length})
                 </button>
               </div>
 
-              {/* Dynamic Company dropdown */}
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Công ty liên kết</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">
+                  {contactType === 'customer' ? 'Doanh nghiệp khách hàng liên kết *' : 'Nhà cung cấp liên kết *'}
+                </label>
                 <select
                   value={contactFormData["Công ty"]}
                   onChange={(e) => setContactFormData({ ...contactFormData, "Công ty": e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-medium"
                 >
                   {contactType === 'customer' ? (
                     customers.map((c) => (
-                      <option key={c["Customer_ID"]} value={c["Customer_ID"]}>{c["Tên đầy đủ"]} ({c["Customer_ID"]})</option>
+                      <option key={c["Customer_ID"]} value={c["Customer_ID"]}>
+                        {c["Tên đầy đủ"]} ({c["Customer_ID"]})
+                      </option>
                     ))
                   ) : (
                     suppliers.map((s) => (
-                      <option key={s["Mã nhà cung cấp"] || s["Tên Nhà Cung Cấp"]} value={s["Tên Nhà Cung Cấp"] || s["Mã nhà cung cấp"]}>
-                        {s["Tên Nhà Cung Cấp"] || s["Mã nhà cung cấp"]}
+                      <option key={s["Mã nhà cung cấp"]} value={s["Mã nhà cung cấp"]}>
+                        {s["Tên Nhà Cung Cấp"]} ({s["Mã nhà cung cấp"]})
                       </option>
                     ))
                   )}
@@ -1094,14 +1300,14 @@ export default function ContactView({
                 </div>
 
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Họ và Tên</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Họ và Tên *</label>
                   <input
                     type="text"
                     required
                     value={contactFormData["Tên"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Tên": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="Nguyễn Văn A"
+                    placeholder="VD: Nguyễn Văn A"
                   />
                 </div>
               </div>
@@ -1114,7 +1320,7 @@ export default function ContactView({
                     value={contactFormData["Chức vụ"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Chức vụ": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="VD: Giám đốc / Trưởng phòng"
+                    placeholder="VD: Trưởng phòng Mua hàng"
                   />
                 </div>
 
@@ -1125,7 +1331,7 @@ export default function ContactView({
                     value={contactFormData["Phòng ban"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Phòng ban": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="VD: Kế hoạch - Vật tư"
+                    placeholder="VD: Kế hoạch / Thu mua"
                   />
                 </div>
               </div>
@@ -1138,12 +1344,12 @@ export default function ContactView({
                     value={contactFormData["Điện thoại"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Điện thoại": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
-                    placeholder="0912..."
+                    placeholder="0987.713.899"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Hòm thư Email</label>
                   <input
                     type="email"
                     value={contactFormData["Email"]}
@@ -1171,13 +1377,13 @@ export default function ContactView({
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Ghi chú phụ trách</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Nhân sự TSG phụ trách</label>
                   <input
                     type="text"
                     value={contactFormData["Phụ trách"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Phụ trách": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="Nhân sự TSG quản lý đối tác"
+                    placeholder="Họ tên nhân viên"
                   />
                 </div>
               </div>
@@ -1198,377 +1404,6 @@ export default function ContactView({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Complete Apple Inspector / Detail Modal with Tasks, Projects, Activities, and Company Details */}
-      {selectedContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
-              <div className="flex items-center gap-3.5">
-                <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-sm shadow-2xs">
-                  {getAvatarInitials(selectedContact["Tên"] || "")}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span>{selectedContact["Danh xưng"] ? `${selectedContact["Danh xưng"]} ` : ''}{selectedContact["Tên"]}</span>
-                    {isExecutive(selectedContact["Chức vụ"]) && (
-                      <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded font-semibold">
-                        Lãnh đạo
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {selectedContact["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContact["Công ty"]}
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedContact(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body: Left Info Bar + Right Interactive Tabs */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              
-              {/* Left Column: Quick Profile */}
-              <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-slate-100 p-5 overflow-y-auto space-y-4 bg-slate-50/50">
-                
-                {/* Contact channels */}
-                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kênh kết nối</span>
-                  
-                  {selectedContact["Điện thoại"] && (
-                    <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-xl text-xs font-mono">
-                      <a href={`tel:${getRawCallablePhone(selectedContact["Điện thoại"])}`} className="font-bold text-slate-800 hover:text-blue-600 truncate">
-                        {formatVietnamesePhone(selectedContact["Điện thoại"])}
-                      </a>
-                      <div className="flex items-center gap-1 shrink-0 font-sans">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(formatVietnamesePhone(selectedContact["Điện thoại"]));
-                            toast.success("Đã sao chép SĐT: " + formatVietnamesePhone(selectedContact["Điện thoại"]));
-                          }}
-                          className="p-1 text-slate-400 hover:text-slate-700"
-                          title="Sao chép"
-                        >
-                          <Copy size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedContact["Email"] && (
-                    <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-xl text-xs">
-                      <a href={`mailto:${selectedContact["Email"]}`} className="text-blue-600 hover:underline truncate">
-                        {selectedContact["Email"]}
-                      </a>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedContact["Email"]);
-                          toast.success("Đã sao chép Email!");
-                        }}
-                        className="p-1 text-slate-400 hover:text-slate-700 shrink-0"
-                        title="Sao chép"
-                      >
-                        <Copy size={12} />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[10px] text-slate-400 block">Phòng ban</span>
-                      <div className="font-semibold text-slate-700 truncate mt-0.5">{selectedContact["Phòng ban"] || "—"}</div>
-                    </div>
-                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-[10px] text-slate-400 block">Quan hệ</span>
-                      <div className="font-semibold text-slate-700 mt-0.5">{selectedContact["Mức độ quan hệ"] || "3"} Sao</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Company Linkage with Direct 2-Way Navigation */}
-                {(() => {
-                  const comp = getCompanyDetails(selectedContact["Công ty"]);
-                  if (!comp) return null;
-                  return (
-                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Doanh nghiệp</span>
-                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium ${comp.type === 'Khách hàng' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
-                          {comp.type}
-                        </span>
-                      </div>
-                      <div className="font-bold text-slate-800 text-xs leading-tight">{comp.name}</div>
-                      <div className="text-[11px] text-slate-500 space-y-0.5 pt-1 border-t border-slate-100">
-                        {comp.taxId && <div><strong>MST:</strong> {comp.taxId}</div>}
-                        <div className="line-clamp-2"><strong>Địa chỉ:</strong> {comp.address}</div>
-                      </div>
-
-                      {/* 2-Way Deep Linking Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const targetName = comp.code || comp.name;
-                          setSelectedContact(null);
-                          if (comp.type === 'Khách hàng' && onNavigateToCustomer) {
-                            onNavigateToCustomer(targetName);
-                          } else if (comp.type === 'Nhà cung cấp' && onNavigateToSupplier) {
-                            onNavigateToSupplier(targetName);
-                          }
-                        }}
-                        className="w-full mt-2 py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#0071E3] flex items-center justify-center gap-1.5 transition-all shadow-2xs"
-                      >
-                        <span>Mở hồ sơ {comp.type}</span>
-                        <ArrowUpRight size={13} />
-                      </button>
-                    </div>
-                  );
-                })()}
-
-              </div>
-
-              {/* Right Column: Full Interactive Tabs (Tasks, Projects, Activities) */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                
-                {/* Apple Segmented Tab Header */}
-                <div className="flex border-b border-slate-100 bg-white px-5 pt-2 gap-3 text-xs">
-                  <button
-                    onClick={() => setDetailTab('tasks')}
-                    className={`pb-2.5 font-bold transition-all border-b-2 flex items-center gap-1.5 ${
-                      detailTab === 'tasks' ? 'border-[#0071E3] text-[#0071E3]' : 'border-transparent text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    <CheckSquare size={14} />
-                    <span>Công việc ({(tasks[selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`] || []).length})</span>
-                  </button>
-                  <button
-                    onClick={() => setDetailTab('projects')}
-                    className={`pb-2.5 font-bold transition-all border-b-2 flex items-center gap-1.5 ${
-                      detailTab === 'projects' ? 'border-[#0071E3] text-[#0071E3]' : 'border-transparent text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    <Folder size={14} />
-                    <span>Dự án ({(projects[selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`] || []).length})</span>
-                  </button>
-                  <button
-                    onClick={() => setDetailTab('activities')}
-                    className={`pb-2.5 font-bold transition-all border-b-2 flex items-center gap-1.5 ${
-                      detailTab === 'activities' ? 'border-[#0071E3] text-[#0071E3]' : 'border-transparent text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    <Clock size={14} />
-                    <span>Nhật ký ({(activities[selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`] || []).length})</span>
-                  </button>
-                </div>
-
-                {/* Tab Content */}
-                <div className="flex-1 p-5 overflow-y-auto">
-                  
-                  {/* 1. TASKS TAB */}
-                  {detailTab === 'tasks' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500">Danh sách việc cần theo dõi</span>
-                        <button
-                          onClick={() => setShowAddTaskForm(!showAddTaskForm)}
-                          className="text-xs font-semibold text-[#0071E3] hover:underline"
-                        >
-                          + Thêm công việc
-                        </button>
-                      </div>
-
-                      {showAddTaskForm && (
-                        <form onSubmit={handleAddTask} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 animate-fade-in">
-                          <input 
-                            type="text" 
-                            required 
-                            placeholder="Nội dung công việc (VD: Gửi báo giá, hẹn mẫu thử...)" 
-                            value={taskForm.title}
-                            onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500/20"
-                          />
-                          <div className="grid grid-cols-3 gap-2">
-                            <input 
-                              type="date" 
-                              value={taskForm.dueDate}
-                              onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                              className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none"
-                            />
-                            <select
-                              value={taskForm.priority}
-                              onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as any })}
-                              className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none"
-                            >
-                              <option value="low">Ưu tiên thấp</option>
-                              <option value="medium">Ưu tiên vừa</option>
-                              <option value="high">Ưu tiên cao</option>
-                            </select>
-                            <button type="submit" className="bg-[#0071E3] text-white rounded-xl text-xs font-semibold hover:bg-[#0066D6] transition-colors">
-                              Lưu việc
-                            </button>
-                          </div>
-                        </form>
-                      )}
-
-                      <div className="space-y-2">
-                        {(() => {
-                          const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
-                          const contactTasks = tasks[contactId] || [];
-                          if (contactTasks.length === 0) {
-                            return <div className="text-slate-400 text-xs py-8 text-center italic">Chưa có công việc nào. Bấm "+ Thêm công việc" để tạo mới.</div>;
-                          }
-                          return contactTasks.map(task => (
-                            <div key={task.id} className="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">
-                              <div className="flex items-center gap-3">
-                                <input 
-                                  type="checkbox" 
-                                  checked={task.status === 'done'} 
-                                  onChange={() => handleToggleTaskStatus(task.id)}
-                                  className="h-4 w-4 rounded text-blue-600 cursor-pointer"
-                                />
-                                <div>
-                                  <span className={`text-xs font-medium block ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                                    {task.title}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400">Hạn: {task.dueDate || 'Không thời hạn'}</span>
-                                </div>
-                              </div>
-                              <button onClick={() => handleDeleteTask(task.id)} className="text-slate-300 hover:text-red-600 p-1">
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. PROJECTS TAB */}
-                  {detailTab === 'projects' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500">Dự án liên kết đối tác</span>
-                        <button
-                          onClick={() => setShowAddProjectForm(!showAddProjectForm)}
-                          className="text-xs font-semibold text-[#0071E3] hover:underline"
-                        >
-                          + Tạo dự án mới
-                        </button>
-                      </div>
-
-                      {showAddProjectForm && (
-                        <form onSubmit={handleAddProject} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 animate-fade-in">
-                          <input 
-                            type="text" 
-                            required 
-                            placeholder="Tên dự án..." 
-                            value={projectForm.name}
-                            onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <input 
-                              type="text" 
-                              placeholder="Mã dự án (Tùy chọn)" 
-                              value={projectForm.code}
-                              onChange={(e) => setProjectForm({ ...projectForm, code: e.target.value })}
-                              className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none"
-                            />
-                            <button type="submit" className="bg-[#0071E3] text-white rounded-xl text-xs font-semibold hover:bg-[#0066D6]">
-                              Lưu dự án
-                            </button>
-                          </div>
-                        </form>
-                      )}
-
-                      <div className="space-y-2">
-                        {(() => {
-                          const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
-                          const contactProjects = projects[contactId] || [];
-                          if (contactProjects.length === 0) {
-                            return <div className="text-slate-400 text-xs py-8 text-center italic">Chưa có dự án nào. Bấm "+ Tạo dự án mới" để bắt đầu.</div>;
-                          }
-                          return contactProjects.map(proj => (
-                            <div key={proj.id} className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                              <div>
-                                <span className="text-xs font-bold text-slate-800 block">{proj.name}</span>
-                                <span className="text-[10px] text-blue-600 font-mono font-semibold">Mã: {proj.code}</span>
-                              </div>
-                              <button onClick={() => handleDeleteProject(proj.id)} className="text-slate-300 hover:text-red-600 p-1">
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3. ACTIVITIES TAB */}
-                  {detailTab === 'activities' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500">Nhật ký trao đổi & Ghi chú</span>
-                        <button
-                          onClick={() => setShowAddActivityForm(!showAddActivityForm)}
-                          className="text-xs font-semibold text-[#0071E3] hover:underline"
-                        >
-                          + Thêm ghi chú
-                        </button>
-                      </div>
-
-                      {showAddActivityForm && (
-                        <form onSubmit={handleAddActivity} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 animate-fade-in">
-                          <textarea 
-                            required 
-                            rows={3}
-                            placeholder="Nội dung cuộc gọi, họp bàn hoặc trao đổi..." 
-                            value={activityForm.content}
-                            onChange={(e) => setActivityForm({ ...activityForm, content: e.target.value })}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button type="submit" className="bg-[#0071E3] text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold">
-                              Lưu nhật ký
-                            </button>
-                          </div>
-                        </form>
-                      )}
-
-                      <div className="space-y-2">
-                        {(() => {
-                          const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
-                          const contactActivities = activities[contactId] || [];
-                          if (contactActivities.length === 0) {
-                            return <div className="text-slate-400 text-xs py-8 text-center italic">Chưa có nhật ký trao đổi nào.</div>;
-                          }
-                          return contactActivities.map(act => (
-                            <div key={act.id} className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 space-y-1">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <span>{act.timestamp} • {act.user}</span>
-                                <button onClick={() => handleDeleteActivity(act.id)} className="text-slate-300 hover:text-red-600 p-0.5">
-                                  <Trash2 size={11} />
-                                </button>
-                              </div>
-                              <p className="text-xs text-slate-700">{act.content}</p>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-
-            </div>
-
           </div>
         </div>
       )}
