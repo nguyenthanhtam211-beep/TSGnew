@@ -16,6 +16,7 @@ import { getItemKey } from '../hooks/useFirestoreCollection';
 import { toast } from 'react-hot-toast';
 import { cleanCompanyName, isNameRepetitive } from '../lib/companyUtils';
 import { getAvatarInitials, isExecutive } from './ContactView';
+import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
 
 export const getSupplierLogo = (s: any) => {
   if (!s) return '';
@@ -1120,10 +1121,12 @@ export default function SupplierView({
                     <tbody className="divide-y divide-slate-100">
                       {filteredSupplierContacts.map((contact) => {
                         const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                        const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${contact["Tên"] || ""}`;
-                        const initials = getAvatarInitials(contact["Tên"] || "");
+                        const cleanName = formatContactFullName(contact["Tên"] || "");
+                        const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                        const initials = getAvatarInitials(cleanName);
                         const exec = isExecutive(contact["Chức vụ"]);
-                        const cleanPhone = (contact["Điện thoại"] || "").replace(/[^0-9+]/g, '');
+                        const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
+                        const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
 
                         const contactTasks = tasks[contactId] || [];
                         const doneTasks = contactTasks.filter(t => t.status === 'done').length;
@@ -1180,7 +1183,7 @@ export default function SupplierView({
                                 {contact["Điện thoại"] ? (
                                   <div className="flex items-center gap-1.5 font-mono">
                                     <a href={`tel:${cleanPhone}`} className="font-medium text-slate-700 hover:text-purple-600 transition-colors">
-                                      {contact["Điện thoại"]}
+                                      {formattedPhone}
                                     </a>
                                     {cleanPhone && (
                                       <a 
@@ -1704,12 +1707,14 @@ export default function SupplierView({
                     </div>
                   ) : (
                     getLinkedContacts(selectedSupplierDetail).map((c: any, cidx: number) => {
-                      const cleanPhone = (c["Điện thoại"] || "").replace(/[^0-9+]/g, '');
+                      const cleanPhone = getRawCallablePhone(c["Điện thoại"]);
+                      const formattedPhone = formatVietnamesePhone(c["Điện thoại"]);
+                      const cleanName = formatContactFullName(c["Tên"] || "");
                       return (
                         <div key={cidx} className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
                           <div>
                             <div className="font-bold text-slate-900 text-sm">
-                              {c["Danh xưng"] ? `${c["Danh xưng"]} ` : ''}{c["Tên"]}
+                              {c["Danh xưng"] ? `${c["Danh xưng"]} ` : ''}{cleanName}
                             </div>
                             <div className="text-xs text-slate-500">
                               {c["Chức vụ"] || "Chức vụ chưa cập nhật"} {c["Phòng ban"] ? `• ${c["Phòng ban"]}` : ''}
@@ -1719,7 +1724,7 @@ export default function SupplierView({
                           <div className="flex items-center gap-2">
                             {cleanPhone && (
                               <a href={`tel:${cleanPhone}`} className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700">
-                                Gọi: {c["Điện thoại"]}
+                                Gọi: {formattedPhone}
                               </a>
                             )}
                             {cleanPhone && (
@@ -1750,7 +1755,7 @@ export default function SupplierView({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{selectedContactDetail["Tên"]}
+                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{formatContactFullName(selectedContactDetail["Tên"] || "")}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
@@ -1769,8 +1774,8 @@ export default function SupplierView({
                   
                   {selectedContactDetail["Điện thoại"] && (
                     <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-xl text-xs font-mono">
-                      <a href={`tel:${selectedContactDetail["Điện thoại"]}`} className="font-bold text-slate-800 hover:text-purple-600 truncate">
-                        {selectedContactDetail["Điện thoại"]}
+                      <a href={`tel:${getRawCallablePhone(selectedContactDetail["Điện thoại"])}`} className="font-bold text-slate-800 hover:text-purple-600 truncate">
+                        {formatVietnamesePhone(selectedContactDetail["Điện thoại"])}
                       </a>
                     </div>
                   )}

@@ -14,6 +14,7 @@ import { db } from '../firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
 import { getItemKey } from '../hooks/useFirestoreCollection';
+import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
 import { toast } from 'react-hot-toast';
 
 interface ContactViewProps {
@@ -688,10 +689,12 @@ export default function ContactView({
                       const companyType = getCompanyType(contact["Công ty"]);
                       const isCustomer = companyType === 'Khách hàng';
                       const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                      const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${contact["Tên"] || ""}`;
-                      const initials = getAvatarInitials(contact["Tên"] || "");
+                      const cleanName = formatContactFullName(contact["Tên"] || "");
+                      const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                      const initials = getAvatarInitials(cleanName);
                       const exec = isExecutive(contact["Chức vụ"]);
-                      const cleanPhone = (contact["Điện thoại"] || "").replace(/[^0-9+]/g, '');
+                      const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
+                      const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
 
                       const contactTasks = tasks[contactId] || [];
                       const doneTasks = contactTasks.filter(t => t.status === 'done').length;
@@ -781,7 +784,7 @@ export default function ContactView({
                                     href={`tel:${cleanPhone}`} 
                                     className="font-medium text-slate-700 hover:text-blue-600 transition-colors"
                                   >
-                                    {contact["Điện thoại"]}
+                                    {formattedPhone}
                                   </a>
                                   {cleanPhone && (
                                     <a 
@@ -875,10 +878,12 @@ export default function ContactView({
                 const companyType = getCompanyType(contact["Công ty"]);
                 const isCustomer = companyType === 'Khách hàng';
                 const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${contact["Tên"] || ""}`;
-                const initials = getAvatarInitials(contact["Tên"] || "");
+                const cleanName = formatContactFullName(contact["Tên"] || "");
+                const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                const initials = getAvatarInitials(cleanName);
                 const exec = isExecutive(contact["Chức vụ"]);
-                const cleanPhone = (contact["Điện thoại"] || "").replace(/[^0-9+]/g, '');
+                const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
+                const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
 
                 const contactTasks = tasks[contactId] || [];
                 const doneTasks = contactTasks.filter(t => t.status === 'done').length;
@@ -930,7 +935,7 @@ export default function ContactView({
                         {contact["Điện thoại"] && (
                           <div className="flex items-center gap-2 text-slate-700 font-mono">
                             <Phone size={13} className="text-slate-400 shrink-0" />
-                            <span>{contact["Điện thoại"]}</span>
+                            <span>{formattedPhone}</span>
                           </div>
                         )}
                         {contact["Email"] && (
@@ -1239,14 +1244,14 @@ export default function ContactView({
                   
                   {selectedContact["Điện thoại"] && (
                     <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-xl text-xs font-mono">
-                      <a href={`tel:${selectedContact["Điện thoại"]}`} className="font-bold text-slate-800 hover:text-blue-600 truncate">
-                        {selectedContact["Điện thoại"]}
+                      <a href={`tel:${getRawCallablePhone(selectedContact["Điện thoại"])}`} className="font-bold text-slate-800 hover:text-blue-600 truncate">
+                        {formatVietnamesePhone(selectedContact["Điện thoại"])}
                       </a>
                       <div className="flex items-center gap-1 shrink-0 font-sans">
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(selectedContact["Điện thoại"]);
-                            toast.success("Đã sao chép SĐT!");
+                            navigator.clipboard.writeText(formatVietnamesePhone(selectedContact["Điện thoại"]));
+                            toast.success("Đã sao chép SĐT: " + formatVietnamesePhone(selectedContact["Điện thoại"]));
                           }}
                           className="p-1 text-slate-400 hover:text-slate-700"
                           title="Sao chép"

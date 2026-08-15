@@ -3,9 +3,10 @@ import { toast } from 'react-hot-toast';
 import { googleSignIn, getAccessToken, logout, initAuth, ensureGoogleToken, openGoogleAuthTab } from '../lib/auth';
 import { app, db } from '../firebase';
 import { collection, writeBatch, doc, getDocs } from 'firebase/firestore';
-import { RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check } from 'lucide-react';
+import { RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check, UploadCloud } from 'lucide-react';
 import { PRICING_DATA, PO_HEADER_DATA, PO_LINES_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA } from '../data';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
+import { getItemKey } from '../hooks/useFirestoreCollection';
 import Papa from 'papaparse';
 
 const parseCSV = (csv: string) => {
@@ -211,6 +212,60 @@ export default function SettingsView() {
     } catch (err: any) {
       console.error("Local backup error:", err);
       toast.error(`Không thể tạo sao lưu JSON: ${err.message}`, { id: toastId });
+    }
+  };
+
+  const handleRestoreJsonBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("Bạn có chắc chắn muốn nạp bản sao lưu JSON này vào cơ sở dữ liệu? Toàn bộ danh bạ, khách hàng, NCC, đơn hàng sẽ được đồng bộ lên Firebase.")) {
+      event.target.value = '';
+      return;
+    }
+
+    const toastId = toast.loading("Đang đọc và phục hồi dữ liệu từ file JSON...");
+    try {
+      const text = await file.text();
+      const backupJson = JSON.parse(text);
+      const data = backupJson.data || backupJson;
+
+      const collections = [
+        'customers', 'suppliers', 'contacts', 'products',
+        'pricing', 'po_headers', 'po_lines', 'deliveries', 'delivery_plans'
+      ];
+
+      let totalRestored = 0;
+      for (const colName of collections) {
+        const items = data[colName];
+        if (Array.isArray(items) && items.length > 0) {
+          let batch = writeBatch(db);
+          let count = 0;
+          for (const item of items) {
+            const rawId = item.id || getItemKey(item, colName) || doc(collection(db, colName)).id;
+            const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
+            const docRef = doc(db, colName, docId);
+            batch.set(docRef, item, { merge: true });
+            count++;
+            totalRestored++;
+            if (count >= 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              count = 0;
+            }
+          }
+          if (count > 0) {
+            await batch.commit();
+          }
+        }
+      }
+
+      toast.success(`Khôi phục thành công ${totalRestored} bản ghi lên hệ thống Cloud!`, { id: toastId });
+    } catch (err: any) {
+      console.error("Restore error:", err);
+      toast.error(`Khôi phục thất bại: ${err.message}`, { id: toastId });
+    } finally {
+      event.target.value = '';
     }
   };
 
@@ -447,14 +502,30 @@ export default function SettingsView() {
                   )}
                 </button>
 
-                <button
-                  onClick={handleDownloadLocalJsonBackup}
-                  className="w-full md:w-auto px-4 py-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-200 border border-emerald-500/30 font-medium rounded-lg transition-all text-xs flex items-center justify-center gap-2"
-                  title="Tải tập tin sao lưu JSON chứa toàn bộ dữ liệu về máy vi tính"
-                >
-                  <Download size={14} />
-                  <span>Tải bản sao lưu JSON về máy (Offline)</span>
-                </button>
+                <div className="flex flex-wrap gap-2 w-full justify-center">
+                  <button
+                    onClick={handleDownloadLocalJsonBackup}
+                    className="flex-1 md:flex-none px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-200 border border-emerald-500/30 font-medium rounded-lg transition-all text-xs flex items-center justify-center gap-1.5"
+                    title="Tải tập tin sao lưu JSON chứa toàn bộ dữ liệu về máy vi tính"
+                  >
+                    <Download size={14} />
+                    <span>Tải sao lưu JSON (Offline)</span>
+                  </button>
+
+                  <label 
+                    className="flex-1 md:flex-none px-3.5 py-2 bg-blue-950/60 hover:bg-blue-900/80 text-blue-200 border border-blue-500/30 font-medium rounded-lg transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Khôi phục dữ liệu từ tập tin JSON đã sao lưu trước đó"
+                  >
+                    <UploadCloud size={14} />
+                    <span>Khôi phục từ file JSON</span>
+                    <input 
+                      type="file" 
+                      accept=".json" 
+                      onChange={handleRestoreJsonBackup} 
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
 
                 {backupStatus && (
                   <span className="text-xs text-emerald-200 text-center font-medium max-w-xs animate-fade-in">
