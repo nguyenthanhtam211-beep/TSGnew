@@ -320,17 +320,29 @@ export default function SupplierView({
 
     const toastId = toast.loading("Đang lưu thông tin nhân sự...");
     try {
-      const docId = editingContact?.id || editingContact?.ID || contactFormData.ID || doc(collection(db, 'contacts')).id;
-      await setDoc(doc(db, 'contacts', docId), { ...contactFormData, id: docId, ID: contactFormData.ID || docId }, { merge: true });
+      const targetId = editingContact?.id || editingContact?.ID || getItemKey(contactFormData, 'contacts') || contactFormData.ID || doc(collection(db, 'contacts')).id;
+      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+
+      const payload = {
+        ...contactFormData,
+        id: docId,
+        ID: contactFormData.ID || docId,
+        updatedAt: new Date().toISOString()
+      };
+
+      await Promise.race([
+        setDoc(doc(db, 'contacts', docId), payload, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
+      ]);
       
       if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === docId)) {
-        setSelectedContactDetail({ ...selectedContactDetail, ...contactFormData, id: docId });
+        setSelectedContactDetail({ ...selectedContactDetail, ...payload });
       }
       toast.success(editingContact ? "Đã cập nhật nhân sự!" : "Đã thêm nhân sự vào danh bạ nhà cung cấp!", { id: toastId });
       setIsContactModalOpen(false);
     } catch (error) {
-      toast.error("Không thể lưu nhân sự!", { id: toastId });
-      handleFirestoreError(error, OperationType.WRITE, 'contacts');
+      console.warn("Supplier contact save error:", error);
+      toast.error("Không thể lưu nhân sự! Vui lòng thử lại.", { id: toastId });
     }
   };
 
@@ -339,16 +351,21 @@ export default function SupplierView({
     if (!confirm(`Bạn có chắc chắn muốn xóa liên hệ "${contact["Tên"]}"?`)) return;
     const loadingToast = toast.loading("Đang xóa...");
     try {
-      const docId = contact.id || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-      await setDoc(doc(db, 'contacts', docId), { isDeleted: true }, { merge: true });
+      const targetId = contact.id || getItemKey(contact, 'contacts') || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
+      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+      
+      await Promise.race([
+        setDoc(doc(db, 'contacts', docId), { ...contact, isDeleted: true, deletedAt: new Date().toISOString() }, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
+      ]);
       
       if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === contact.ID)) {
         setSelectedContactDetail(null);
       }
       toast.success("Đã xóa nhân sự!", { id: loadingToast });
     } catch (error) {
-      toast.error("Không thể xóa nhân sự!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.DELETE, 'contacts');
+      console.warn("Supplier contact delete error:", error);
+      toast.error("Không thể xóa nhân sự! Vui lòng thử lại.", { id: loadingToast });
     }
   };
 

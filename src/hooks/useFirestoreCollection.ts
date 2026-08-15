@@ -38,6 +38,9 @@ export function getItemKey(item: any, collectionName?: string): string {
     rawKey = `${parentId}_${sku}_${item["STT"]}`;
   } else if (item["STT"] && item["Mã KH"]) {
     rawKey = `${item["Mã KH"]}_${item["STT"]}`;
+  } else if (collectionName === 'contacts') {
+    const cId = item.id || item.ID || (item["Tên"] && item["Công ty"] ? `${item["Tên"]}_${item["Công ty"]}` : item["Tên"]);
+    rawKey = String(cId || '');
   } else if (item["STT"] && (item["Mã nhà cung cấp"] || item["Mã NCC"])) {
     rawKey = `${item["Mã nhà cung cấp"] || item["Mã NCC"]}_${item["STT"]}`;
   } else {

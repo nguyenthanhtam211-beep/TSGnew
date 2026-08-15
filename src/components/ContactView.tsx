@@ -13,6 +13,7 @@ import CompanyLogo from './CompanyLogo';
 import { db } from '../firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
+import { getItemKey } from '../hooks/useFirestoreCollection';
 import { toast } from 'react-hot-toast';
 
 interface ContactViewProps {
@@ -362,17 +363,29 @@ export default function ContactView({
 
     const toastId = toast.loading("Đang lưu thông tin...");
     try {
-      const docId = editingContact?.id || editingContact?.ID || contactFormData.ID || doc(collection(db, 'contacts')).id;
-      await setDoc(doc(db, 'contacts', docId), { ...contactFormData, id: docId, ID: contactFormData.ID || docId }, { merge: true });
+      const targetId = editingContact?.id || editingContact?.ID || getItemKey(contactFormData, 'contacts') || contactFormData.ID || doc(collection(db, 'contacts')).id;
+      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+
+      const payload = {
+        ...contactFormData,
+        id: docId,
+        ID: contactFormData.ID || docId,
+        updatedAt: new Date().toISOString()
+      };
+
+      await Promise.race([
+        setDoc(doc(db, 'contacts', docId), payload, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
+      ]);
       
       if (selectedContact && (selectedContact.id === docId || selectedContact.ID === docId)) {
-        setSelectedContact({ ...selectedContact, ...contactFormData, id: docId });
+        setSelectedContact({ ...selectedContact, ...payload });
       }
       toast.success(editingContact ? "Đã cập nhật hồ sơ liên hệ!" : "Đã thêm liên hệ mới!", { id: toastId });
       setIsContactModalOpen(false);
     } catch (error) {
-      toast.error("Không thể lưu liên hệ!", { id: toastId });
-      handleFirestoreError(error, OperationType.WRITE, 'contacts');
+      console.warn("Contact save error:", error);
+      toast.error("Không thể lưu liên hệ! Vui lòng thử lại.", { id: toastId });
     }
   };
 
@@ -381,16 +394,21 @@ export default function ContactView({
     if (!confirm(`Bạn có chắc chắn muốn xóa liên hệ "${contact["Tên"]}"?`)) return;
     const loadingToast = toast.loading("Đang xóa liên hệ...");
     try {
-      const docId = contact.id || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-      await setDoc(doc(db, 'contacts', docId), { isDeleted: true }, { merge: true });
+      const targetId = contact.id || getItemKey(contact, 'contacts') || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
+      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+      
+      await Promise.race([
+        setDoc(doc(db, 'contacts', docId), { ...contact, isDeleted: true, deletedAt: new Date().toISOString() }, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
+      ]);
       
       if (selectedContact && (selectedContact.id === docId || selectedContact.ID === contact.ID)) {
         setSelectedContact(null);
       }
       toast.success("Đã xóa liên hệ!", { id: loadingToast });
     } catch (error) {
-      toast.error("Không thể xóa liên hệ!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.DELETE, 'contacts');
+      console.warn("Contact delete error:", error);
+      toast.error("Không thể xóa liên hệ! Vui lòng thử lại.", { id: loadingToast });
     }
   };
 
