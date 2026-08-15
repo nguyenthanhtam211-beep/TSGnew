@@ -27,8 +27,10 @@ import {
   Eye,
   Columns,
   Cloud,
-  DownloadCloud
+  DownloadCloud,
+  FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { db, storage } from '../firebase';
 import { ensureGoogleToken, clearStoredGoogleToken, openGoogleAuthTab } from '../lib/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -445,69 +447,116 @@ export default function CustomerView({ initialData: customers = [], contacts = [
     });
   }, [customers, searchTerm, statusFilter, categoryFilter]);
 
+  const handleExportToExcel = () => {
+    try {
+      const exportData = filteredCustomers.map(c => ({
+        "Mã KH": c["Customer_ID"] || "",
+        "Tên doanh nghiệp": cleanCompanyName(c["Tên đầy đủ"] || ""),
+        "Tên pháp lý": c["Tên đầy đủ"] || "",
+        "Phân loại": c["Phân loại"] || "",
+        "Tình trạng": c["Tình trạng"] || "Đang mua",
+        "Mã số thuế": c["Mã số thuế"] || "",
+        "Số điện thoại": c["Số điện thoại"] || "",
+        "Địa chỉ trụ sở": c["Địa chỉ"] || "",
+        "Địa chỉ nhà máy": c["Nhà máy"] || "",
+        "Website": c["Website"] || "",
+        "Ghi chú": c["Ghi chú"] || ""
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Khach_Hang_TSG");
+      XLSX.writeFile(wb, `Danh_Ba_Khach_Hang_TSG_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success("Đã xuất danh bạ khách hàng ra file Excel thành công!");
+    } catch (err: any) {
+      toast.error("Lỗi xuất Excel: " + (err?.message || err));
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50/70 min-h-screen">
-      <div className="p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-3 sm:p-5 lg:p-8 max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-24 lg:pb-8">
         
         {/* Hero Header with Decorative Gradient Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-6 sm:p-8 text-white shadow-xl shadow-indigo-950/20 border border-slate-800">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 p-5 sm:p-8 text-white shadow-xl shadow-indigo-950/20 border border-slate-800">
           <div className="absolute right-0 top-0 -mt-10 -mr-10 w-96 h-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
           <div className="absolute left-1/3 bottom-0 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
+            <div className="space-y-1.5 sm:space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold backdrop-blur-md">
                 <Sparkles size={14} className="text-blue-400 animate-pulse" />
                 <span>Hệ Thống Quản Lý Đối Tác Khách Hàng Doanh Nghiệp</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                <Building2 className="text-blue-400 shrink-0" size={34} />
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5 sm:gap-3">
+                <Building2 className="text-blue-400 shrink-0" size={30} />
                 Danh Mục Khách Hàng TSG
               </h1>
-              <p className="text-slate-300 text-sm max-w-2xl leading-relaxed">
+              <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
                 Tra cứu hồ sơ pháp lý, địa chỉ trụ sở/nhà máy, lịch sử hợp tác và mạng lưới nhân sự liên kết với trải nghiệm trực quan.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+              <button
+                onClick={handleExportToExcel}
+                className="inline-flex items-center justify-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2.5 sm:py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all duration-300 shadow-md hover:-translate-y-0.5"
+                title="Xuất toàn bộ danh bạ khách hàng ra Excel"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-400" />
+                <span>Xuất Excel</span>
+              </button>
+
               <button
                 onClick={openGoogleAuthTab}
-                className="inline-flex items-center justify-center gap-2 bg-indigo-600/80 hover:bg-indigo-600 text-white px-3.5 py-3 rounded-2xl font-semibold text-xs transition-all duration-300 shadow-md hover:-translate-y-0.5 border border-indigo-400/40"
+                className="inline-flex items-center justify-center gap-2 bg-indigo-600/80 hover:bg-indigo-600 text-white px-3.5 py-2.5 sm:py-3 rounded-2xl font-semibold text-xs transition-all duration-300 shadow-md hover:-translate-y-0.5 border border-indigo-400/40"
                 title="Mở ứng dụng ở Tab mới để đăng nhập Google OAuth mà không bị chặn popup"
               >
                 <ExternalLink size={16} />
-                <span>Mở Tab Mới Xác Thực Google</span>
+                <span className="hidden sm:inline">Mở Tab Xác Thực Google</span>
               </button>
 
               <button
                 onClick={handleSyncGoogle}
                 disabled={isSyncingGoogle}
-                className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-2xl font-semibold text-sm transition-all duration-300 shadow-lg shadow-emerald-900/30 hover:shadow-emerald-600/40 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 border border-emerald-400/40"
+                className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl font-semibold text-xs sm:text-sm transition-all duration-300 shadow-lg shadow-emerald-900/30 hover:shadow-emerald-600/40 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 border border-emerald-400/40"
                 title="Đồng bộ 2 chiều danh sách khách hàng tới Google Sheets và tạo Backup Google Drive"
               >
-                <Cloud size={18} className={isSyncingGoogle ? "animate-spin" : ""} />
-                <span>{isSyncingGoogle ? "Đang đồng bộ..." : "Đồng bộ Google Sheets & Drive"}</span>
-              </button>
-
-              <button
-                onClick={handleImportGoogleSheets}
-                disabled={isImportingGoogle}
-                className="inline-flex items-center justify-center gap-2 bg-slate-800/80 hover:bg-slate-800 text-slate-200 px-4 py-3 rounded-2xl font-semibold text-sm transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 border border-slate-700 backdrop-blur-md"
-                title="Nhập dữ liệu khách hàng mới nhất từ Google Sheets"
-              >
-                <DownloadCloud size={18} className={isImportingGoogle ? "animate-spin" : ""} />
-                <span>{isImportingGoogle ? "Đang nhập..." : "Nhập từ Sheets"}</span>
+                <Cloud size={16} className={isSyncingGoogle ? "animate-spin" : ""} />
+                <span>{isSyncingGoogle ? "Đang đồng bộ..." : "Đồng bộ Sheets"}</span>
               </button>
 
               <button 
                 onClick={() => handleOpenModal()}
-                className="inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 border border-blue-400/30"
+                className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 border border-blue-400/30"
               >
-                <PlusCircle size={20} />
-                <span>Thêm Khách Hàng Mới</span>
+                <PlusCircle size={18} />
+                <span>Thêm Khách Hàng</span>
               </button>
             </div>
 
+          </div>
+
+          {/* Quick Filter Tabs inside Hero */}
+          <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-slate-800/80">
+            {[
+              { key: 'all', label: `Tất cả (${stats.total})` },
+              { key: 'Đang mua', label: `Đang mua hàng (${stats.active})` },
+              { key: 'Đang đàm phán', label: `Đang đàm phán (${stats.negotiating})` },
+              { key: 'Ngừng mua', label: `Tạm dừng (${stats.stopped})` },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setStatusFilter(tab.key)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  statusFilter === tab.key
+                    ? "bg-blue-600 border-blue-400 text-white shadow-md shadow-blue-600/30"
+                    : "bg-slate-800/60 border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 

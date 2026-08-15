@@ -23,8 +23,13 @@ import {
   ExternalLink,
   Phone,
   FileText,
-  UserCheck
+  UserCheck,
+  FileSpreadsheet,
+  Sparkles,
+  Eye,
+  Copy
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import CompanyLogo from './CompanyLogo';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 
@@ -237,74 +242,153 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
     return { total, active, paused, highlyRated };
   }, [suppliers]);
 
+  const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<any>(null);
+
+  const handleExportToExcel = () => {
+    try {
+      const exportData = filteredSuppliers.map(s => ({
+        "Mã NCC": s["Mã nhà cung cấp"] || "",
+        "Tên nhà cung cấp": cleanCompanyName(s["Tên Nhà Cung Cấp"] || ""),
+        "Tên pháp lý": s["Tên Nhà Cung Cấp"] || "",
+        "Nhóm hàng": s["Nhóm hàng"] || "",
+        "Tình trạng": s["Tình trạng"] || "Đang hoạt động",
+        "Đánh giá": `${s["Đánh giá"] || "5"} sao`,
+        "Mã số thuế": s["Mã số thuế"] || "",
+        "Số điện thoại": s["Số điện thoại"] || "",
+        "Địa chỉ trụ sở": s["Địa chỉ"] || "",
+        "Địa chỉ nhà máy": s["Nhà máy"] || "",
+        "Website": s["Website"] || "",
+        "Ghi chú": s["Ghi chú"] || ""
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Nha_Cung_Cap_TSG");
+      XLSX.writeFile(wb, `Danh_Ba_Nha_Cung_Cap_TSG_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success("Đã xuất danh bạ nhà cung cấp ra file Excel thành công!");
+    } catch (err: any) {
+      toast.error("Lỗi xuất Excel: " + (err?.message || err));
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    toast.success(`Đã sao chép ${label}: ${text}`);
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50/50">
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="flex-1 overflow-y-auto bg-slate-50/70 min-h-screen">
+      <div className="p-3 sm:p-5 lg:p-8 max-w-[1600px] mx-auto space-y-5 sm:space-y-6 pb-24 lg:pb-8">
         
-        {/* Header Block */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <Factory className="text-purple-600" size={26} />
-              Quản lý Nhà Cung Cấp
-            </h2>
-            <p className="text-sm text-slate-500">Đối soát hồ sơ chuỗi cung ứng, phân loại nhóm nguyên vật liệu hàng hóa.</p>
+        {/* Hero Header with Decorative Gradient Banner */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-950 p-5 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-slate-800">
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 w-96 h-96 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+          <div className="absolute left-1/3 bottom-0 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-semibold backdrop-blur-md">
+                <Sparkles size={14} className="text-purple-400 animate-pulse" />
+                <span>Hệ Thống Quản Trị Chuỗi Cung Ứng & NCC Chiến Lược</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5 sm:gap-3">
+                <Factory className="text-purple-400 shrink-0" size={30} />
+                Danh Mục Nhà Cung Cấp TSG
+              </h1>
+              <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                Quản lý hồ sơ đối tác gia công, nhà máy bao bì, phân loại nhóm nguyên vật liệu và xếp hạng uy tín cung ứng.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+              <button
+                onClick={handleExportToExcel}
+                className="inline-flex items-center justify-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2.5 sm:py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all duration-300 shadow-md hover:-translate-y-0.5"
+                title="Xuất toàn bộ danh bạ nhà cung cấp ra Excel"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-400" />
+                <span>Xuất Excel</span>
+              </button>
+
+              <button 
+                onClick={() => handleOpenModal()}
+                className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all duration-300 shadow-lg shadow-purple-600/25 hover:shadow-purple-600/40 hover:-translate-y-0.5 active:translate-y-0 border border-purple-400/30"
+              >
+                <PlusCircle size={18} />
+                <span>Thêm Nhà Cung Cấp</span>
+              </button>
+            </div>
           </div>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all duration-200 shadow-sm shadow-purple-100 hover:shadow-lg hover:shadow-purple-200/50 shrink-0 transform active:scale-98"
-          >
-            <PlusCircle size={20} />
-            <span>Thêm Nhà Cung Cấp</span>
-          </button>
+
+          {/* Quick Filter Tabs inside Hero */}
+          <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-slate-800/80">
+            {[
+              { key: 'all', label: `Tất cả NCC (${stats.total})` },
+              { key: 'Đang hoạt động', label: `Đang hoạt động (${stats.active})` },
+              { key: 'rated_5', label: `Đánh giá 5★ (${stats.highlyRated})` },
+              { key: 'Tạm ngưng', label: `Tạm ngưng (${stats.paused})` },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setStatusFilter(tab.key === 'rated_5' ? 'all' : tab.key)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  (statusFilter === tab.key) || (tab.key === 'all' && statusFilter === 'all')
+                    ? "bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-600/30"
+                    : "bg-slate-800/60 border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* KPIs row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4 hover:border-purple-200 transition-all">
-            <div className="h-12 w-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <Building2 size={22} />
+        {/* KPIs Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3 sm:gap-4 hover:border-purple-200 transition-all">
+            <div className="h-11 w-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <Building2 size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tổng Nhà Cung Cấp</p>
-              <p className="text-2xl font-bold text-slate-800 mt-0.5">{stats.total}</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Nhà Cung Cấp</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-slate-800 mt-0.5">{stats.total}</p>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4 hover:border-green-200 transition-all">
-            <div className="h-12 w-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={22} />
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3 sm:gap-4 hover:border-green-200 transition-all">
+            <div className="h-11 w-11 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Đang hoạt động</p>
-              <p className="text-2xl font-bold text-green-600 mt-0.5">{stats.active}</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đang hoạt động</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-green-600 mt-0.5">{stats.active}</p>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4 hover:border-amber-200 transition-all">
-            <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <AlertCircle size={22} />
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3 sm:gap-4 hover:border-amber-200 transition-all">
+            <div className="h-11 w-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <AlertCircle size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tạm ngưng/Khác</p>
-              <p className="text-2xl font-bold text-amber-600 mt-0.5">{stats.paused}</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tạm ngưng/Khác</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-amber-600 mt-0.5">{stats.paused}</p>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4 hover:border-yellow-200 transition-all">
-            <div className="h-12 w-12 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
-              <Award size={22} />
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3 sm:gap-4 hover:border-yellow-200 transition-all">
+            <div className="h-11 w-11 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
+              <Award size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Đánh giá xuất sắc</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-0.5">{stats.highlyRated}</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đánh giá 5 Sao</p>
+              <p className="text-xl sm:text-2xl font-extrabold text-yellow-600 mt-0.5">{stats.highlyRated}</p>
             </div>
           </div>
         </div>
 
-        {/* Filters Box */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-          
+        {/* Filters and Search Bar */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row gap-3 sm:gap-4 items-center justify-between">
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -316,34 +400,10 @@ export default function SupplierView({ initialData: suppliers = [], contacts = [
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-            {/* Status Tabs */}
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button 
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${statusFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Tất cả
-              </button>
-              <button 
-                onClick={() => setStatusFilter('Đang hoạt động')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${statusFilter === 'Đang hoạt động' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Hoạt động
-              </button>
-              <button 
-                onClick={() => setStatusFilter('Tạm ngưng')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${statusFilter === 'Tạm ngưng' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Tạm ngưng
-              </button>
-              <button 
-                onClick={() => setStatusFilter('Ngừng hợp tác')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${statusFilter === 'Ngừng hợp tác' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Ngừng hợp tác
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full md:w-auto justify-end">
+            <span className="text-xs text-slate-500 font-medium">
+              Hiển thị <strong>{filteredSuppliers.length}</strong> nhà cung cấp
+            </span>
 
             {/* Grid / List toggle */}
             <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5 border border-slate-200/40">
