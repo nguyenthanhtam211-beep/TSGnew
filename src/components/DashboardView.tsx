@@ -848,11 +848,11 @@ export default function DashboardView({ poData, deliveryData, poLinesData, custo
 
   return (
     <div id="dashboard-content" className="flex-1 overflow-auto bg-gray-50/50 print:overflow-visible print:bg-white print:block">
-      <div ref={dashboardRef} className="p-8 max-w-[1400px] mx-auto print:max-w-none print:p-0">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm print:hidden">
+      <div ref={dashboardRef} className="p-3 sm:p-5 lg:p-8 max-w-[1400px] mx-auto print:max-w-none print:p-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-8 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm print:hidden">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Tổng quan Hoạt động</h2>
-            <p className="text-xs text-slate-500 mt-1">Phân tích chuyên sâu sản lượng, doanh thu, lợi nhuận và tiến độ giao hàng</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Tổng quan Hoạt động</h2>
+            <p className="text-xs text-slate-500 mt-0.5 sm:mt-1">Phân tích chuyên sâu sản lượng, doanh thu, lợi nhuận và tiến độ giao hàng</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-2.5">
@@ -994,53 +994,54 @@ export default function DashboardView({ poData, deliveryData, poLinesData, custo
         </div>
 
         {/* Bento Grid Executive Insights & KPI Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-          <div className="bg-gradient-to-br from-blue-600/90 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl shadow-blue-500/15 backdrop-blur-md border border-blue-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5 mb-5 sm:mb-8">
+          <div className="bg-gradient-to-br from-blue-600/90 via-blue-700 to-indigo-800 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-blue-500/15 backdrop-blur-md border border-blue-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <TrendingUp size={24} className="text-blue-100" />
+            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
+              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
+                <TrendingUp size={22} className="text-blue-100" />
               </div>
-              <span className="text-[11px] font-bold bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 tracking-wider">DỰ BÁO DÒNG TIỀN</span>
+              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">DỰ BÁO DÒNG TIỀN</span>
             </div>
-            <h3 className="text-xs font-semibold text-blue-100 uppercase tracking-wide mb-1 relative z-10">Doanh thu dự kiến (PO còn lại)</h3>
-            <div className="text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.projectedRev.toLocaleString('vi-VN')} đ</div>
-            <p className="text-xs text-blue-100/80 leading-relaxed relative z-10">Dựa trên khối lượng hàng chưa giao trong các PO hiện hành</p>
+            <h3 className="text-[11px] sm:text-xs font-semibold text-blue-100 uppercase tracking-wide mb-1 relative z-10">Doanh thu dự kiến (PO còn lại)</h3>
+            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.projectedRev.toLocaleString('vi-VN')} đ</div>
+            <p className="text-[11px] sm:text-xs text-blue-100/80 leading-relaxed relative z-10">Dựa trên khối lượng hàng chưa giao trong các PO hiện hành</p>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-500/90 via-amber-600 to-orange-700 rounded-2xl p-6 text-white shadow-xl shadow-amber-500/15 backdrop-blur-md border border-amber-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+          <div className="bg-gradient-to-br from-amber-500/90 via-amber-600 to-orange-700 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-amber-500/15 backdrop-blur-md border border-amber-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <Clock size={24} className="text-amber-100" />
+            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
+              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
+                <Clock size={22} className="text-amber-100" />
               </div>
-              <span className="text-[11px] font-bold bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 tracking-wider">TIẾN ĐỘ & UY TÍN</span>
+              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">TIẾN ĐỘ & UY TÍN</span>
             </div>
-            <h3 className="text-xs font-semibold text-amber-100 uppercase tracking-wide mb-1 relative z-10">Đơn hàng chậm tiến độ</h3>
-            <div className="text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.delayedPOs} PO Line</div>
-            <p className="text-xs text-amber-100/80 leading-relaxed relative z-10">Cảnh báo: Đã quá hạn giao hàng nhưng chưa hoàn tất 100%</p>
+            <h3 className="text-[11px] sm:text-xs font-semibold text-amber-100 uppercase tracking-wide mb-1 relative z-10">Đơn hàng chậm tiến độ</h3>
+            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.delayedPOs} PO Line</div>
+            <p className="text-[11px] sm:text-xs text-amber-100/80 leading-relaxed relative z-10">Cảnh báo: Đã quá hạn giao hàng nhưng chưa hoàn tất 100%</p>
           </div>
 
-          <div className="bg-gradient-to-br from-rose-500/90 via-rose-600 to-red-700 rounded-2xl p-6 text-white shadow-xl shadow-rose-500/15 backdrop-blur-md border border-rose-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+          <div className="bg-gradient-to-br from-rose-500/90 via-rose-600 to-red-700 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-rose-500/15 backdrop-blur-md border border-rose-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300 sm:col-span-2 md:col-span-1">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <ShieldAlert size={24} className="text-rose-100" />
+            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
+              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
+                <ShieldAlert size={22} className="text-rose-100" />
               </div>
-              <span className="text-[11px] font-bold bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 tracking-wider">RỦI RO TÀI CHÍNH</span>
+              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">RỦI RO TÀI CHÍNH</span>
             </div>
-            <h3 className="text-xs font-semibold text-rose-100 uppercase tracking-wide mb-1 relative z-10">Mục biên lợi nhuận thấp (&lt;15%)</h3>
-            <div className="text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.lowMarginItems} SKU</div>
-            <p className="text-xs text-rose-100/80 leading-relaxed relative z-10">Cần rà soát lại giá NCC hoặc giá bán cho Khách hàng</p>
+            <h3 className="text-[11px] sm:text-xs font-semibold text-rose-100 uppercase tracking-wide mb-1 relative z-10">Mục biên lợi nhuận thấp (&lt;15%)</h3>
+            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.lowMarginItems} SKU</div>
+            <p className="text-[11px] sm:text-xs text-rose-100/80 leading-relaxed relative z-10">Cần rà soát lại giá NCC hoặc giá bán cho Khách hàng</p>
           </div>
         </div>
 
         {/* Overall Order Lifecycle Pipeline */}
-        <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/50 mb-8 hover:border-blue-400/40 transition-all duration-300">
-          <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-8 flex items-center gap-2">
+        <div className="bg-white/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/50 mb-5 sm:mb-8 hover:border-blue-400/40 transition-all duration-300">
+          <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-5 sm:mb-8 flex items-center gap-2">
             <Activity className="text-emerald-500" size={18} /> Phân bổ Vòng đời Đơn hàng (Toàn hệ thống)
           </h3>
-          <div className="relative flex items-center justify-between w-full px-4 md:px-12">
+          <div className="relative overflow-x-auto mobile-scroll-x py-2">
+            <div className="relative flex items-center justify-between min-w-[500px] px-4 md:px-12">
             {(() => {
               const steps = [
                 { label: 'Mới tạo', count: overallPoLifecycle.newPos, color: 'bg-slate-500', ring: 'ring-slate-100' },
@@ -1074,11 +1075,12 @@ export default function DashboardView({ poData, deliveryData, poLinesData, custo
                 </>
               );
             })()}
+            </div>
           </div>
         </div>
 
         {/* Bento Grid Top KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-5 sm:mb-8">
           <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/40 relative overflow-hidden group hover:border-blue-500/50 hover:shadow-[0_10px_30px_rgba(59,130,246,0.15)] transition-all duration-300">
              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-15 group-hover:scale-110 transition-all duration-300">
                 <DollarSign size={80} className="text-blue-600" />

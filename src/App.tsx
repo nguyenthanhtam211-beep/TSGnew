@@ -51,6 +51,7 @@ export default function App() {
   const [selectedProductDetails, setSelectedProductDetails] = useState<string | null>(null);
   const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   
   const initialPricing = useMemo(() => parseCSV(PRICING_DATA), []);
@@ -530,11 +531,135 @@ export default function App() {
   };
 
 
+  const TAB_TITLES: Record<string, string> = {
+    dashboard: "Bảng Điều Hành",
+    workflow: "Quy Trình Nghiệp Vụ",
+    customers: "Quản Lý Khách Hàng",
+    pricing: "Bảng Giá 2026",
+    po: "Đơn Hàng (PO)",
+    polines: "Chi Tiết Đơn Hàng",
+    delivery_plan: "Kế Hoạch Giao",
+    delivery: "Giao Hàng (PXK)",
+    profit_report: "Báo Cáo Lợi Nhuận",
+    products: "Sản Phẩm",
+    specs: "Tiêu Chuẩn Specs",
+    suppliers: "Nhà Cung Cấp",
+    contacts: "Danh Bạ",
+    assistant: "Trợ Lý AI",
+    ocr: "Quét OCR",
+    tasks: "Công Việc & Lịch",
+    storage: "Kho Lưu Trữ",
+    settings: "Cài Đặt"
+  };
+
+  const navItemClick = (tab: string) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-900 font-sans print:bg-white print:h-auto print:block">
+    <div className="flex flex-col lg:flex-row h-screen bg-gray-50 text-gray-900 font-sans print:bg-white print:h-auto print:block overflow-hidden">
       <Toaster position="top-right" />
-      {/* Sidebar */}
-      <div className="w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/80 flex flex-col text-slate-300 shadow-2xl print:hidden relative z-20">
+
+      {/* Mobile Top Header */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900 text-white border-b border-slate-800 shrink-0 z-30 shadow-md">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-2 -ml-1 text-slate-300 hover:text-white rounded-lg active:bg-slate-800 transition-colors"
+            aria-label="Mở menu"
+          >
+            <Menu size={22} />
+          </button>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse" />
+              <h1 className="text-sm font-black text-white tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">TSG ERP</h1>
+            </div>
+            <p className="text-[10px] text-slate-400 truncate max-w-[140px] font-medium">{TAB_TITLES[activeTab] || activeTab}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button 
+            onClick={() => navItemClick("assistant")} 
+            className={clsx(
+              "p-2 rounded-lg transition-all flex items-center gap-1 text-xs font-semibold",
+              activeTab === "assistant" ? "bg-blue-600 text-white shadow-md shadow-blue-500/30" : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+            )}
+          >
+            <Bot size={16} />
+            <span className="hidden xs:inline">AI</span>
+          </button>
+          <button 
+            onClick={() => navItemClick("settings")} 
+            className="p-2 text-slate-300 hover:text-white rounded-lg active:bg-slate-800 transition-colors"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Navigation Drawer (Modal Backdrop) */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+            onClick={() => setMobileMenuOpen(false)} 
+          />
+          <div className="relative w-4/5 max-w-xs bg-slate-900 flex flex-col text-slate-300 shadow-2xl h-full border-r border-slate-800 z-10 animate-in slide-in-from-left duration-200">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6] animate-pulse" />
+                <h2 className="text-base font-black text-white tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">TSG BUSINESS OS</h2>
+              </div>
+              <button 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto py-3 space-y-1 custom-scrollbar">
+              <div className="px-5 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng quan</div>
+              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => navItemClick("dashboard")} />
+              <NavItem icon={<TrendingUp size={18} />} label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => navItemClick("workflow")} />
+              
+              <div className="px-5 py-1.5 mt-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quy trình kinh doanh</div>
+              <NavItem icon={<Users size={18} />} label="Khách hàng" isActive={activeTab === "customers"} onClick={() => navItemClick("customers")} />
+              <NavItem icon={<Package size={18} />} label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => navItemClick("pricing")} />
+              <NavItem icon={<FileText size={18} />} label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => navItemClick("po")} />
+              <NavItem icon={<FileText size={18} />} label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => navItemClick("polines")} />
+              <NavItem icon={<CheckCircle size={18} />} label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => navItemClick("delivery_plan")} />
+              <NavItem icon={<Truck size={18} />} label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => navItemClick("delivery")} />
+              <NavItem icon={<TrendingUp size={18} />} label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => navItemClick("profit_report")} />
+              
+              <div className="px-5 py-1.5 mt-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Dữ liệu nền tảng</div>
+              <NavItem icon={<Package size={18} />} label="Sản phẩm" isActive={activeTab === "products"} onClick={() => navItemClick("products")} />
+              <NavItem icon={<ShieldCheck size={18} />} label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => navItemClick("specs")} />
+              <NavItem icon={<BookUser size={18} />} label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => navItemClick("suppliers")} />
+              <NavItem icon={<Users size={18} />} label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => navItemClick("contacts")} />
+              
+              <div className="px-5 py-1.5 mt-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Công cụ hỗ trợ</div>
+              <NavItem icon={<Bot size={18} />} label="Trợ lý AI" isActive={activeTab === "assistant"} onClick={() => navItemClick("assistant")} />
+              <NavItem icon={<Camera size={18} />} label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => navItemClick("ocr")} />
+              <NavItem icon={<CheckCircle size={18} />} label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => navItemClick("tasks")} />
+              <NavItem icon={<HardDrive size={18} />} label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => navItemClick("storage")} />
+              
+              <div className="px-5 py-1.5 mt-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hệ thống</div>
+              <NavItem icon={<Settings size={18} />} label="Cài đặt" isActive={activeTab === "settings"} onClick={() => navItemClick("settings")} />
+            </nav>
+
+            <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 text-center">
+              <p className="text-[10px] text-slate-500">Tâm Sen Group • ERP Mobile v2.5</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/80 flex-col text-slate-300 shadow-2xl print:hidden relative z-20 shrink-0">
         <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/40">
           <div>
             <div className="flex items-center gap-2">
@@ -575,8 +700,8 @@ export default function App() {
         </nav>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible print:h-auto print:block">
+      {/* Main Content Viewport */}
+      <div className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-20 lg:pb-0">
         {activeTab === "dashboard" && <DashboardView poData={poHeaderData} deliveryData={enrichedDeliveryData} poLinesData={enrichedPoLinesData} customersData={customerData} />}
         {activeTab === "workflow" && (
           <WorkflowView 
@@ -684,23 +809,77 @@ export default function App() {
         )}
         {activeTab === "products" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Sản phẩm" data={productData} showAddButton={true} onAdd={(row) => handleAddToFirestore("products", row)} onEdit={(row) => handleUpdateToFirestore("products", row)} onDelete={(row) => handleDeleteFromFirestore("products", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
         {activeTab === "specs" && (
-          <SpecsView 
-            specsData={specsData}
-            productData={productData}
-            customerData={customerData}
-            onAdd={(row) => handleAddToFirestore("specs", row)}
-            onEdit={(row) => handleUpdateToFirestore("specs", row)}
-            onDelete={(row) => handleDeleteFromFirestore("specs", row)}
-          />
+          <div className="p-3 sm:p-5 lg:p-8">
+            <SpecsView 
+              specsData={specsData}
+              productData={productData}
+              customerData={customerData}
+              onAdd={(row) => handleAddToFirestore("specs", row)}
+              onEdit={(row) => handleUpdateToFirestore("specs", row)}
+              onDelete={(row) => handleDeleteFromFirestore("specs", row)}
+            />
+          </div>
         )}
         {activeTab === "storage" && (
-          <StorageView 
-            files={fileStorageData}
-            onUpload={handleUploadToDrive}
-            onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
-          />
+          <div className="p-3 sm:p-5 lg:p-8">
+            <StorageView 
+              files={fileStorageData}
+              onUpload={handleUploadToDrive}
+              onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
+            />
+          </div>
         )}
-        {activeTab === "settings" && <SettingsView />}
+        {activeTab === "settings" && (
+          <div className="p-3 sm:p-5 lg:p-8">
+            <SettingsView />
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Floating Bottom Dock (Thumb-friendly iOS/Android Navigation) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800/90 px-2 py-1 flex items-center justify-around text-slate-400 pb-[max(env(safe-area-inset-bottom),6px)] shadow-[0_-8px_20px_rgba(0,0,0,0.45)]">
+        <button 
+          onClick={() => navItemClick("dashboard")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", activeTab === "dashboard" ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <LayoutDashboard size={20} className={activeTab === "dashboard" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Tổng quan</span>
+        </button>
+        <button 
+          onClick={() => navItemClick("customers")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", activeTab === "customers" ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <Users size={20} className={activeTab === "customers" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Khách hàng</span>
+        </button>
+        <button 
+          onClick={() => navItemClick("po")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", activeTab === "po" ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <FileText size={20} className={activeTab === "po" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Đơn hàng</span>
+        </button>
+        <button 
+          onClick={() => navItemClick("delivery")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", activeTab === "delivery" ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <Truck size={20} className={activeTab === "delivery" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Giao hàng</span>
+        </button>
+        <button 
+          onClick={() => navItemClick("specs")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", activeTab === "specs" ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <ShieldCheck size={20} className={activeTab === "specs" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Specs</span>
+        </button>
+        <button 
+          onClick={() => setMobileMenuOpen(true)}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[54px] min-h-[44px]", mobileMenuOpen ? "text-blue-400 font-bold scale-105" : "hover:text-slate-200 active:scale-95")}
+        >
+          <Menu size={20} className={mobileMenuOpen ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          <span className="text-[10px] mt-0.5 tracking-tight">Menu</span>
+        </button>
       </div>
 
       {selectedProductDetails && (
@@ -1441,10 +1620,10 @@ function TableView({
   };
 
   return (
-    <div className="flex-1 p-8 flex flex-col h-full overflow-hidden relative">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 relative">
-        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-        <div className="flex items-center gap-3 relative">
+    <div className="flex-1 p-3 sm:p-5 lg:p-8 flex flex-col h-full overflow-hidden relative pb-24 lg:pb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4 flex-shrink-0 relative">
+        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 tracking-tight">{title}</h2>
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap relative">
           {title.includes("Báo cáo") && (
             <button
               onClick={() => {
