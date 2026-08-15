@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, MapPin, Tag, Plus, Search, Edit2, Trash2, X, 
   Upload, LayoutGrid, List, Users, Briefcase, CheckCircle2, 
   Clock, AlertCircle, Phone, FileText, Factory, Globe, Copy, 
   ExternalLink, ChevronRight, Eye, Columns, Cloud, 
-  DownloadCloud, FileSpreadsheet, PhoneCall, Send, Sparkles
+  DownloadCloud, FileSpreadsheet, PhoneCall, Send, Sparkles,
+  Folder, CheckSquare, MessageCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db, storage } from '../firebase';
@@ -26,7 +27,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any>(null);
@@ -34,6 +35,21 @@ export default function CustomerView({ initialData: customers = [], contacts = [
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
   const [isImportingGoogle, setIsImportingGoogle] = useState(false);
+
+  // Load shared tasks and projects for contact linkage
+  const [tasks, setTasks] = useState<{ [contactId: string]: any[] }>({});
+  const [projects, setProjects] = useState<{ [contactId: string]: any[] }>({});
+
+  useEffect(() => {
+    try {
+      const storedTasks = localStorage.getItem('tsg_contact_tasks');
+      const storedProjects = localStorage.getItem('tsg_contact_projects');
+      if (storedTasks) setTasks(JSON.parse(storedTasks));
+      if (storedProjects) setProjects(JSON.parse(storedProjects));
+    } catch (e) {
+      console.error('Error reading shared tasks/projects:', e);
+    }
+  }, []);
 
   // Helper to resolve linked contacts for a customer
   const getLinkedContacts = (customer: any) => {
@@ -48,6 +64,21 @@ export default function CustomerView({ initialData: customers = [], contacts = [
       
       return compName && (compName === custName || compName === custCode || (custName.length > 3 && custName.includes(compName)));
     });
+  };
+
+  // Helper to get total tasks and projects across all contacts for a customer
+  const getCustomerTasksAndProjects = (customer: any) => {
+    const linked = getLinkedContacts(customer);
+    let allTasks: any[] = [];
+    let allProjects: any[] = [];
+
+    linked.forEach(c => {
+      const contactId = c.ID || `${c["Tên"]}-${c["Công ty"]}`;
+      if (tasks[contactId]) allTasks = [...allTasks, ...tasks[contactId]];
+      if (projects[contactId]) allProjects = [...allProjects, ...projects[contactId]];
+    });
+
+    return { allTasks, allProjects, totalTasks: allTasks.length, totalProjects: allProjects.length };
   };
 
   const handleSyncGoogle = async () => {
@@ -252,19 +283,25 @@ export default function CustomerView({ initialData: customers = [], contacts = [
 
   const handleExportToExcel = () => {
     try {
-      const exportData = filteredCustomers.map(c => ({
-        "Mã KH": c["Customer_ID"] || "",
-        "Tên doanh nghiệp": cleanCompanyName(c["Tên đầy đủ"] || ""),
-        "Tên pháp lý": c["Tên đầy đủ"] || "",
-        "Phân loại": c["Phân loại"] || "",
-        "Tình trạng": c["Tình trạng"] || "Đang mua",
-        "Mã số thuế": c["Mã số thuế"] || "",
-        "Số điện thoại": c["Số điện thoại"] || "",
-        "Địa chỉ trụ sở": c["Địa chỉ"] || "",
-        "Địa chỉ nhà máy": c["Nhà máy"] || "",
-        "Website": c["Website"] || "",
-        "Ghi chú": c["Ghi chú"] || ""
-      }));
+      const exportData = filteredCustomers.map(c => {
+        const { totalProjects, totalTasks } = getCustomerTasksAndProjects(c);
+        return {
+          "Mã KH": c["Customer_ID"] || "",
+          "Tên doanh nghiệp": cleanCompanyName(c["Tên đầy đủ"] || ""),
+          "Tên pháp lý": c["Tên đầy đủ"] || "",
+          "Phân loại": c["Phân loại"] || "",
+          "Tình trạng": c["Tình trạng"] || "Đang mua",
+          "Mã số thuế": c["Mã số thuế"] || "",
+          "Số điện thoại": c["Số điện thoại"] || "",
+          "Địa chỉ trụ sở": c["Địa chỉ"] || "",
+          "Địa chỉ nhà máy": c["Nhà máy"] || "",
+          "Website": c["Website"] || "",
+          "Số nhân sự liên hệ": getLinkedContacts(c).length,
+          "Dự án liên kết": totalProjects,
+          "Công việc đang theo dõi": totalTasks,
+          "Ghi chú": c["Ghi chú"] || ""
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
@@ -288,11 +325,11 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                 Khách Hàng
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                {customers.length}
+                {customers.length} doanh nghiệp
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Quản lý hồ sơ pháp lý, địa chỉ nhà máy và mạng lưới nhân sự liên kết.
+              Quản lý hồ sơ pháp lý, địa chỉ nhà máy, mạng lưới nhân sự và dự án triển khai.
             </p>
           </div>
 
@@ -440,7 +477,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
         {/* Content View */}
         {filteredCustomers.length > 0 ? (
           
-          /* MODE 1: APPLE CLEAN TABLE */
+          /* MODE 1: APPLE CLEAN TABLE WITH COMPLETE LINKAGES */
           viewMode === 'table' ? (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
@@ -452,7 +489,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                       <th className="px-5 py-3.5">Nhà máy</th>
                       <th className="px-5 py-3.5">Mã số thuế</th>
                       <th className="px-5 py-3.5">Trạng thái</th>
-                      <th className="px-5 py-3.5">Nhân sự</th>
+                      <th className="px-5 py-3.5">Nhân sự & Dự án</th>
                       <th className="px-5 py-3.5 text-right">Thao tác</th>
                     </tr>
                   </thead>
@@ -461,6 +498,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                       const cleanName = cleanCompanyName(customer["Tên đầy đủ"] || "");
                       const cardStatus = customer["Tình trạng"] || "Đang mua";
                       const linkedContacts = getLinkedContacts(customer);
+                      const { totalProjects, totalTasks } = getCustomerTasksAndProjects(customer);
                       const customerKey = customer.id || customer.Customer_ID || `cust-row-${idx}`;
 
                       return (
@@ -540,15 +578,28 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                             </span>
                           </td>
 
-                          {/* Contacts Count */}
+                          {/* Contacts & Projects Metrics */}
                           <td className="px-5 py-3">
-                            {linkedContacts.length > 0 ? (
-                              <span className="text-xs text-slate-600 font-medium">
-                                {linkedContacts.length} liên hệ
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-300">—</span>
-                            )}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {linkedContacts.length > 0 ? (
+                                <span className="text-xs text-slate-700 font-semibold">
+                                  {linkedContacts.length} nhân sự
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-300">—</span>
+                              )}
+
+                              {totalProjects > 0 && (
+                                <span className="text-[10px] bg-purple-50 text-purple-700 font-medium px-1.5 py-0.2 rounded border border-purple-100">
+                                  {totalProjects} dự án
+                                </span>
+                              )}
+                              {totalTasks > 0 && (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 font-medium px-1.5 py-0.2 rounded border border-blue-100">
+                                  {totalTasks} việc
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Actions */}
@@ -557,7 +608,7 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                               <button 
                                 onClick={() => setSelectedCustomerDetail(customer)}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Xem hồ sơ"
+                                title="Xem hồ sơ & nhân sự"
                               >
                                 <Eye size={15} />
                               </button>
@@ -587,12 +638,13 @@ export default function CustomerView({ initialData: customers = [], contacts = [
             </div>
           ) : (
             
-            /* MODE 2: APPLE CLEAN CARDS */
+            /* MODE 2: APPLE CLEAN CARDS WITH PERSONNEL & PROJECTS */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredCustomers.map((customer, idx) => {
                 const cleanName = cleanCompanyName(customer["Tên đầy đủ"] || "");
                 const cardStatus = customer["Tình trạng"] || "Đang mua";
                 const linkedContacts = getLinkedContacts(customer);
+                const { totalProjects, totalTasks } = getCustomerTasksAndProjects(customer);
                 const customerKey = customer.id || customer.Customer_ID || `cust-card-${idx}`;
 
                 return (
@@ -661,12 +713,26 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                           </div>
                         )}
                       </div>
+
+                      {/* Personnel & Project Badges */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                        {totalProjects > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md">
+                            <Folder size={10} /> {totalProjects} dự án
+                          </span>
+                        )}
+                        {totalTasks > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
+                            <CheckSquare size={10} /> {totalTasks} việc
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs" onClick={(e) => e.stopPropagation()}>
                       <div className="text-slate-500">
                         {linkedContacts.length > 0 ? (
-                          <span className="font-medium text-blue-600">{linkedContacts.length} người liên hệ</span>
+                          <span className="font-semibold text-blue-600">{linkedContacts.length} người liên hệ</span>
                         ) : (
                           <span className="text-slate-400 italic">Chưa có liên hệ</span>
                         )}
@@ -836,18 +902,18 @@ export default function CustomerView({ initialData: customers = [], contacts = [
         </div>
       )}
 
-      {/* Customer Detail Drawer / Modal */}
+      {/* Customer Detail Drawer / Modal with Comprehensive Information, Personnel, Tasks and Projects */}
       {selectedCustomerDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
             
             {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <div className="flex items-center gap-3">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
+              <div className="flex items-center gap-3.5">
                 <CompanyLogo 
                   name={selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]} 
                   size="md" 
-                  className="rounded-xl shadow-2xs" 
+                  className="rounded-2xl shadow-2xs" 
                   logoUrl={getCustomerLogo(selectedCustomerDetail)} 
                   logoFit={selectedCustomerDetail.logoFit} 
                 />
@@ -860,68 +926,132 @@ export default function CustomerView({ initialData: customers = [], contacts = [
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedCustomerDetail(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+              <button onClick={() => setSelectedCustomerDetail(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
                 <X size={18} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm">
+            <div className="p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
               
+              {/* Legal & Factory Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="text-[11px] text-slate-400 font-medium block">Tên pháp lý</span>
-                  <div className="font-semibold text-slate-800 mt-0.5">
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <span className="text-[11px] text-slate-400 font-medium block">Tên pháp lý doanh nghiệp</span>
+                  <div className="font-semibold text-slate-800 mt-1">
                     {selectedCustomerDetail["Tên đầy đủ"] || "—"}
                   </div>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="text-[11px] text-slate-400 font-medium block">Mã số thuế</span>
-                  <div className="font-mono font-semibold text-slate-800 mt-0.5">
-                    {selectedCustomerDetail["Mã số thuế"] || "—"}
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Mã số thuế</span>
+                    {selectedCustomerDetail["Mã số thuế"] && (
+                      <button 
+                        onClick={(e) => copyToClipboard(selectedCustomerDetail["Mã số thuế"], "Mã số thuế", e)}
+                        className="text-[11px] text-blue-600 hover:underline"
+                      >
+                        Sao chép
+                      </button>
+                    )}
+                  </div>
+                  <div className="font-mono font-bold text-slate-800 mt-1">
+                    {selectedCustomerDetail["Mã số thuế"] || "Chưa cập nhật"}
                   </div>
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+              {/* Addresses */}
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
                 <div>
                   <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ trụ sở</span>
-                  <div className="text-slate-700 mt-0.5">
+                  <div className="text-slate-700 font-medium mt-0.5">
                     {selectedCustomerDetail["Địa chỉ"] || "Chưa cập nhật địa chỉ trụ sở"}
                   </div>
                 </div>
                 {selectedCustomerDetail["Nhà máy"] && (
-                  <div className="pt-2 border-t border-slate-200/60">
+                  <div className="pt-2.5 border-t border-slate-200/60">
                     <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ nhà máy giao hàng</span>
-                    <div className="text-slate-700 mt-0.5">
+                    <div className="text-slate-700 font-medium mt-0.5">
                       {selectedCustomerDetail["Nhà máy"]}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Linked Contacts */}
+              {/* Linked Contacts Dossier with Tasks and Projects */}
               <div>
-                <span className="font-bold text-slate-800 text-xs block mb-2">
-                  Nhân sự liên hệ ({getLinkedContacts(selectedCustomerDetail).length})
-                </span>
-                <div className="space-y-1.5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-bold text-slate-800 text-sm">
+                    Mạng lưới nhân sự liên kết ({getLinkedContacts(selectedCustomerDetail).length})
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
                   {getLinkedContacts(selectedCustomerDetail).length === 0 ? (
-                    <div className="text-slate-400 text-xs py-3 italic">Chưa có liên hệ nào trong danh bạ gắn với khách hàng này.</div>
+                    <div className="text-slate-400 text-xs py-5 text-center bg-slate-50 rounded-2xl border border-slate-100 italic">
+                      Chưa có nhân sự liên kết nào trong danh bạ gắn với khách hàng này.
+                    </div>
                   ) : (
-                    getLinkedContacts(selectedCustomerDetail).map((c: any, cidx: number) => (
-                      <div key={cidx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
-                        <div>
-                          <span className="font-semibold text-slate-800">{c["Tên"]}</span>
-                          {c["Chức vụ"] && <span className="text-slate-400 ml-1.5 text-xs">({c["Chức vụ"]})</span>}
+                    getLinkedContacts(selectedCustomerDetail).map((c: any, cidx: number) => {
+                      const contactId = c.ID || `${c["Tên"]}-${c["Công ty"]}`;
+                      const contactTasks = tasks[contactId] || [];
+                      const contactProjects = projects[contactId] || [];
+                      const cleanPhone = (c["Điện thoại"] || "").replace(/[^0-9+]/g, '');
+
+                      return (
+                        <div key={cidx} className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-bold text-slate-900 text-sm">
+                                {c["Danh xưng"] ? `${c["Danh xưng"]} ` : ''}{c["Tên"]}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {c["Chức vụ"] || "Chức vụ chưa cập nhật"} {c["Phòng ban"] ? `• ${c["Phòng ban"]}` : ''}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {cleanPhone && (
+                                <a 
+                                  href={`tel:${cleanPhone}`} 
+                                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 transition-colors"
+                                >
+                                  Gọi: {c["Điện thoại"]}
+                                </a>
+                              )}
+                              {cleanPhone && (
+                                <a 
+                                  href={`https://zalo.me/${cleanPhone}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 text-xs font-semibold bg-blue-50 hover:bg-blue-100 rounded-xl text-blue-700 transition-colors"
+                                >
+                                  Zalo
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Projects & Tasks for this Contact */}
+                          {(contactProjects.length > 0 || contactTasks.length > 0) && (
+                            <div className="pt-2 border-t border-slate-200/60 flex items-center gap-2 flex-wrap">
+                              {contactProjects.map(p => (
+                                <span key={p.id} className="inline-flex items-center gap-1 text-[11px] font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg border border-purple-100">
+                                  <Folder size={11} /> {p.name} ({p.code})
+                                </span>
+                              ))}
+                              {contactTasks.map(t => (
+                                <span key={t.id} className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg border ${
+                                  t.status === 'done' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 line-through opacity-70' : 'bg-blue-50 text-blue-700 border-blue-100'
+                                }`}>
+                                  <CheckSquare size={11} /> {t.title}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        {c["Điện thoại"] && (
-                          <a href={`tel:${c["Điện thoại"]}`} className="text-blue-600 font-mono text-xs font-semibold">
-                            {c["Điện thoại"]}
-                          </a>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
