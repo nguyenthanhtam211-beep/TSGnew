@@ -597,14 +597,33 @@ export default function SettingsView() {
             </p>
             
             {needsAuth ? (
-               <button 
-                onClick={handleLogin}
-                disabled={isLoggingIn}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
-               >
+              <div className="space-y-3">
+                <button 
+                  onClick={handleLogin}
+                  disabled={isLoggingIn}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                >
                   <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
                   {isLoggingIn ? 'Đang kết nối...' : 'Đăng nhập với Google'}
-               </button>
+                </button>
+
+                <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-[11px] text-blue-900 space-y-1.5">
+                  <div className="font-semibold flex items-center gap-1 text-blue-800">
+                    <span>💡 Hướng dẫn cấp quyền Google OAuth (nếu gặp lỗi 400):</span>
+                  </div>
+                  <p className="text-slate-600">
+                    Thêm <code className="bg-blue-100 px-1 rounded font-mono text-blue-800">https://tsg-business-new.vercel.app</code> vào <strong>Authorized JavaScript origins</strong> trong Google Cloud Console.
+                  </p>
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0509365022"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline pt-0.5"
+                  >
+                    <span>Mở Google Cloud Console Credentials ↗</span>
+                  </a>
+                </div>
+              </div>
             ) : (
                <div className="space-y-3">
                  <div className="flex items-center justify-between bg-emerald-50 px-3.5 py-2.5 rounded-lg border border-emerald-100">

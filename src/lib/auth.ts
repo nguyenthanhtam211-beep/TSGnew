@@ -81,7 +81,9 @@ export async function requestGoogleAccessTokenDirectly(scopes: string[] = [
   'https://www.googleapis.com/auth/drive.file'
 ]): Promise<string> {
   await loadGsiScript();
-  const clientId = (firebaseConfig as any).oAuthClientId || '779403158794-hp217r3191umide2gsfl8b46je9sp538.apps.googleusercontent.com';
+  const clientId = localStorage.getItem('google_custom_client_id')?.trim() || 
+                   (firebaseConfig as any).oAuthClientId || 
+                   '779403158794-hp217r3191umide2gsfl8b46je9sp538.apps.googleusercontent.com';
 
   return new Promise((resolve, reject) => {
     try {
