@@ -23,6 +23,7 @@ export function cleanCompanyName(fullName: string): string {
     
     // Standard prefixes
     /^(CÔNG TY TRÁCH NHIỆM HỮU HẠN|CONG TY TRACH NIEM HUU HAN)/i,
+    /^(CÔNG TY TNHH MỘT THÀNH VIÊN|CÔNG TY TNHH MTV|CÔNG TY MTV|CONG TY TNHH MTV|CONG TY MTV|MTV)/i,
     /^(CÔNG TY CỔ PHẦN|CÔNG TY CO PHAN|CÔNG TY TNHH|CONG TY TNHH|CÔNG TY CP|CONG TY CP)/i,
     /^(CÔNG TY|CONG TY)/i,
     
@@ -36,6 +37,7 @@ export function cleanCompanyName(fullName: string): string {
     /^(Công ty TNHH Bao bì)/i,
     /^(Công ty Cổ phần In)/i,
     /^(Công ty Trách nhiệm hữu hạn)/i,
+    /^(Công ty TNHH Một thành viên|Công ty TNHH MTV|Công ty MTV|MTV)/i,
     /^(Công ty Cổ phần|Công ty TNHH|Công ty CP)/i,
     /^(Công ty)/i,
     

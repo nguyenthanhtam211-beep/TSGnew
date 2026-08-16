@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Layers, Compass, Wind, Anchor, Award, Box, Factory, Truck, Printer, Droplets, Sliders } from 'lucide-react';
+import { 
+  Building2, Layers, Compass, Wind, Anchor, Award, Box, 
+  Factory, Truck, Printer, Droplets, Sliders, Shield, Sparkles,
+  Hexagon, CircleDot, Landmark, Briefcase
+} from 'lucide-react';
 
 interface CompanyLogoProps {
   name: string;
@@ -9,192 +13,290 @@ interface CompanyLogoProps {
   logoFit?: 'cover' | 'contain';
 }
 
-export default function CompanyLogo({ name, size = 'md', className = '', logoUrl, logoFit = 'contain' }: CompanyLogoProps) {
+/**
+ * Intelligent Vietnamese Brand Initials & Core Name Extractor
+ * Strips legal boilerplate (Công ty, TNHH, MTV, Cổ phần...) to reveal the iconic enterprise brand
+ */
+export function extractBrandInfo(companyName: string): {
+  initials: string;
+  gradient: string;
+  subIcon?: any;
+} {
+  if (!companyName) {
+    return {
+      initials: 'TS',
+      gradient: 'from-[#007AFF] to-[#0051A8]'
+    };
+  }
+
+  const nameLower = companyName.toLowerCase().trim();
+
+  // 1. Exact TSG Known Enterprise Brand Mappings
+  if (nameLower.includes('thăng long')) {
+    return {
+      initials: 'TL',
+      gradient: 'from-[#FF2D55] via-[#E01E44] to-[#C70024]',
+      subIcon: Wind
+    };
+  }
+  if (nameLower.includes('thanh hoá') || nameLower.includes('thanh hóa')) {
+    return {
+      initials: 'TH',
+      gradient: 'from-[#30B0C7] via-[#0097A7] to-[#007A8D]',
+      subIcon: Compass
+    };
+  }
+  if (nameLower.includes('bắc sơn')) {
+    return {
+      initials: 'BS',
+      gradient: 'from-[#FF9500] via-[#F57C00] to-[#D84315]',
+      subIcon: Layers
+    };
+  }
+  if (nameLower.includes('ngân sơn')) {
+    return {
+      initials: 'NS',
+      gradient: 'from-[#5856D6] via-[#4338CA] to-[#312E81]',
+      subIcon: Award
+    };
+  }
+  if (nameLower.includes('viện thuốc lá') || nameLower.includes('vien thuoc la')) {
+    return {
+      initials: 'VTL',
+      gradient: 'from-[#007AFF] via-[#0284C7] to-[#0369A1]',
+      subIcon: Landmark
+    };
+  }
+  if (nameLower.includes('sài gòn') || nameLower.includes('sai gon')) {
+    return {
+      initials: 'SG',
+      gradient: 'from-[#FF6B22] via-[#EA580C] to-[#C2410C]',
+      subIcon: Building2
+    };
+  }
+  if (nameLower.includes('bến tre') || nameLower.includes('ben tre')) {
+    return {
+      initials: 'BT',
+      gradient: 'from-[#E11D48] via-[#BE123C] to-[#881337]',
+      subIcon: Hexagon
+    };
+  }
+  if (nameLower.includes('cửu long') || nameLower.includes('cuu long')) {
+    return {
+      initials: 'CL',
+      gradient: 'from-[#AF52DE] via-[#9333EA] to-[#6B21A8]',
+      subIcon: Layers
+    };
+  }
+  if (nameLower.includes('đà nẵng') || nameLower.includes('da nang')) {
+    return {
+      initials: 'ĐN',
+      gradient: 'from-[#64748B] via-[#475569] to-[#334155]',
+      subIcon: Landmark
+    };
+  }
+  if (nameLower.includes('long an')) {
+    return {
+      initials: 'LA',
+      gradient: 'from-[#0284C7] via-[#0369A1] to-[#075985]',
+      subIcon: Compass
+    };
+  }
+  if (nameLower.includes('đồng tháp') || nameLower.includes('dong thap')) {
+    return {
+      initials: 'ĐT',
+      gradient: 'from-[#D97706] via-[#B45309] to-[#78350F]',
+      subIcon: Layers
+    };
+  }
+  if (nameLower.includes('tâm sen') || nameLower.includes('tam sen')) {
+    return {
+      initials: 'TSG',
+      gradient: 'from-[#0A60A8] via-[#0071C2] to-[#004B87]',
+      subIcon: Anchor
+    };
+  }
+  if (nameLower.includes('tuấn bằng') || nameLower.includes('tuan bang')) {
+    return {
+      initials: 'TB',
+      gradient: 'from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6]',
+      subIcon: Printer
+    };
+  }
+  if (nameLower.includes('yfy')) {
+    return {
+      initials: 'YFY',
+      gradient: 'from-[#007AFF] via-[#1D4ED8] to-[#1E40AF]',
+      subIcon: Box
+    };
+  }
+  if (nameLower.includes('thp') || nameLower.includes('thuận hòa phát') || nameLower.includes('thuan hoa phat')) {
+    return {
+      initials: 'THP',
+      gradient: 'from-[#F97316] via-[#EA580C] to-[#9A3412]',
+      subIcon: Factory
+    };
+  }
+  if (nameLower.includes('vidon') || nameLower.includes('mm vidon')) {
+    return {
+      initials: 'VID',
+      gradient: 'from-[#C026D3] via-[#A21CAF] to-[#701A75]',
+      subIcon: Award
+    };
+  }
+  if (nameLower.includes('song dũng') || nameLower.includes('song dung')) {
+    return {
+      initials: 'SD',
+      gradient: 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]',
+      subIcon: Truck
+    };
+  }
+  if (nameLower.includes('sigwerk') || nameLower.includes('siegwerk') || nameLower.includes('sic')) {
+    return {
+      initials: 'SIC',
+      gradient: 'from-[#F43F5E] via-[#E11D48] to-[#9F1239]',
+      subIcon: Droplets
+    };
+  }
+  if (nameLower.includes('đại thành long') || nameLower.includes('dai thanh long')) {
+    return {
+      initials: 'ĐTL',
+      gradient: 'from-[#10B981] via-[#059669] to-[#065F46]',
+      subIcon: Factory
+    };
+  }
+  if (nameLower.includes('tân thành đạt') || nameLower.includes('tan thanh dat')) {
+    return {
+      initials: 'TTĐ',
+      gradient: 'from-[#2563EB] via-[#1D4ED8] to-[#1E3A8A]',
+      subIcon: Building2
+    };
+  }
+  if (nameLower.includes('ipvn')) {
+    return {
+      initials: 'IPVN',
+      gradient: 'from-[#64748B] via-[#475569] to-[#1E293B]',
+      subIcon: Box
+    };
+  }
+  if (nameLower.includes('tri-wall') || nameLower.includes('triwall')) {
+    return {
+      initials: 'TRI',
+      gradient: 'from-[#EAB308] via-[#CA8A04] to-[#854D0E]',
+      subIcon: Box
+    };
+  }
+
+  // 2. Generic Intelligent Fallback: Strip noise boilerplate
+  let clean = companyName
+    .replace(/^(công ty cổ phần kỹ thuật công nghiệp|cong ty co phan ky thuat cong nghiep)/gi, '')
+    .replace(/^(công ty tnhh một thành viên|công ty tnhh mtv|công ty tnhh|công ty cp|công ty cổ phần|công ty)/gi, '')
+    .replace(/^(cong ty tnhh mot thanh vien|cong ty tnhh mtv|cong ty tnhh|cong ty cp|cong ty co phan|cong ty)/gi, '')
+    .replace(/^(doanh nghiệp tư nhân|dntn|tập đoàn|chi nhánh|nhà máy|xí nghiệp)/gi, '')
+    .replace(/^(thuốc lá|bao bì|in ấn|thương mại|dịch vụ|sản xuất|kỹ thuật|công nghệ)/gi, '')
+    .replace(/^[-–—/:.\s]+/, '')
+    .replace(/\s*\([^)]+\)\s*$/, '')
+    .trim();
+
+  if (!clean) clean = companyName.trim();
+
+  // Extract initials from cleaned name words
+  const words = clean.split(/\s+/).filter(w => w.length > 0 && !/^(và|va|and|of|the|co|ltd|jsc)$/i.test(w));
+  let initials = '';
+
+  if (words.length >= 3) {
+    initials = (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+  } else if (words.length === 2) {
+    initials = (words[0][0] + words[1][0]).toUpperCase();
+  } else if (words.length === 1) {
+    initials = words[0].substring(0, Math.min(3, words[0].length)).toUpperCase();
+  } else {
+    initials = 'TS';
+  }
+
+  // Calculate stable hash for curated Apple gradient palette
+  let hash = 0;
+  for (let i = 0; i < companyName.length; i++) {
+    hash = companyName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const appleGradients = [
+    'from-[#007AFF] via-[#0066CC] to-[#004C99]', // Apple Sapphire
+    'from-[#5856D6] via-[#4338CA] to-[#312E81]', // Apple Indigo
+    'from-[#34C759] via-[#28A745] to-[#1E7E34]', // Apple Mint
+    'from-[#FF9500] via-[#E67E00] to-[#B36200]', // Apple Amber
+    'from-[#FF2D55] via-[#E01E44] to-[#B80028]', // Apple Rose
+    'from-[#AF52DE] via-[#9333EA] to-[#6B21A8]', // Apple Plum
+    'from-[#30B0C7] via-[#0097A7] to-[#007A8D]', // Apple Cyan
+    'from-[#636366] via-[#48484A] to-[#2C2C2E]', // Apple Titanium
+    'from-[#FF6B22] via-[#EA580C] to-[#C2410C]', // Apple Orange
+    'from-[#0A60A8] via-[#0071C2] to-[#004B87]', // Apple Navy
+  ];
+
+  const gradient = appleGradients[Math.abs(hash) % appleGradients.length];
+
+  return {
+    initials: initials.substring(0, 4),
+    gradient
+  };
+}
+
+export default function CompanyLogo({ 
+  name, 
+  size = 'md', 
+  className = '', 
+  logoUrl, 
+  logoFit = 'contain' 
+}: CompanyLogoProps) {
   const [imageError, setImageError] = useState(false);
   const normalizedName = name ? name.trim() : '';
   
   const sizeClasses = {
-    xs: 'w-7 h-7 text-[10px]',
-    sm: 'w-12 h-12 text-xs',
-    md: 'w-14 h-14 text-sm',
-    lg: 'w-18 h-18 text-lg',
-    xl: 'w-24 h-24 text-2xl'
+    xs: 'w-7 h-7 rounded-[8px]',
+    sm: 'w-10 h-10 rounded-[12px]',
+    md: 'w-12 h-12 rounded-[14px]',
+    lg: 'w-16 h-16 rounded-[18px]',
+    xl: 'w-20 h-20 rounded-[22px]'
+  };
+
+  const textSizes = {
+    xs: 'text-[9px]',
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-lg',
+    xl: 'text-2xl'
   };
 
   if (logoUrl && !imageError) {
     return (
-      <img 
-        src={logoUrl} 
-        alt={normalizedName} 
-        className={`${logoFit === 'contain' ? 'object-contain bg-white p-1' : 'object-cover'} rounded-xl border border-slate-200/80 shadow-sm shrink-0 ${sizeClasses[size]} ${className}`}
-        referrerPolicy="no-referrer"
-        onError={() => setImageError(true)}
-      />
+      <div className={`relative bg-white border border-black/[0.08] shadow-[0_1px_3px_rgba(0,0,0,0.04)] shrink-0 overflow-hidden flex items-center justify-center ${sizeClasses[size]} ${className}`}>
+        <img 
+          src={logoUrl} 
+          alt={normalizedName} 
+          className={`w-full h-full ${logoFit === 'contain' ? 'object-contain p-1' : 'object-cover'}`}
+          referrerPolicy="no-referrer"
+          onError={() => setImageError(true)}
+        />
+      </div>
     );
   }
-  
-  // Custom design configurations for major companies
-  const getLogoConfig = (compName: string) => {
-    const nameLower = compName.toLowerCase();
-    
-    if (nameLower.includes('thăng long')) {
-      return {
-        initials: 'TL',
-        gradient: 'from-red-600 via-rose-700 to-crimson-800',
-        textColor: 'text-rose-100',
-        icon: Wind,
-        accentColor: 'border-rose-200'
-      };
-    }
-    if (nameLower.includes('thanh hoá')) {
-      return {
-        initials: 'TH',
-        gradient: 'from-emerald-600 to-teal-800',
-        textColor: 'text-emerald-50',
-        icon: Compass,
-        accentColor: 'border-emerald-200'
-      };
-    }
-    if (nameLower.includes('bắc sơn')) {
-      return {
-        initials: 'BS',
-        gradient: 'from-amber-500 to-orange-700',
-        textColor: 'text-amber-50',
-        icon: Layers,
-        accentColor: 'border-amber-200'
-      };
-    }
-    if (nameLower.includes('tâm sen')) {
-      return {
-        initials: 'TS',
-        gradient: 'from-cyan-500 via-teal-600 to-blue-700',
-        textColor: 'text-cyan-50',
-        icon: Anchor,
-        accentColor: 'border-cyan-200'
-      };
-    }
-    if (nameLower.includes('tuấn bằng')) {
-      return {
-        initials: 'TB',
-        gradient: 'from-purple-600 to-indigo-800',
-        textColor: 'text-purple-50',
-        icon: Printer,
-        accentColor: 'border-purple-200'
-      };
-    }
-    if (nameLower.includes('yfy')) {
-      return {
-        initials: 'YF',
-        gradient: 'from-blue-600 to-sky-800',
-        textColor: 'text-blue-50',
-        icon: Box,
-        accentColor: 'border-blue-200'
-      };
-    }
-    if (nameLower.includes('thp') || nameLower.includes('thuận hòa phát')) {
-      return {
-        initials: 'HP',
-        gradient: 'from-orange-500 to-red-700',
-        textColor: 'text-orange-50',
-        icon: Factory,
-        accentColor: 'border-orange-200'
-      };
-    }
-    if (nameLower.includes('mm vidon') || nameLower.includes('vidon')) {
-      return {
-        initials: 'MM',
-        gradient: 'from-violet-600 to-fuchsia-800',
-        textColor: 'text-violet-50',
-        icon: Award,
-        accentColor: 'border-violet-200'
-      };
-    }
-    if (nameLower.includes('song dũng')) {
-      return {
-        initials: 'SD',
-        gradient: 'from-blue-500 to-indigo-600',
-        textColor: 'text-blue-50',
-        icon: Truck,
-        accentColor: 'border-blue-200'
-      };
-    }
-    if (nameLower.includes('sigwerk') || nameLower.includes('siegwerk') || nameLower.includes('sic')) {
-      return {
-        initials: 'SW',
-        gradient: 'from-pink-600 to-rose-800',
-        textColor: 'text-pink-50',
-        icon: Droplets,
-        accentColor: 'border-pink-200'
-      };
-    }
 
-    // Default auto-generated based on string hashing
-    let hash = 0;
-    for (let i = 0; i < compName.length; i++) {
-      hash = compName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    const gradients = [
-      'from-blue-600 to-indigo-700',
-      'from-purple-600 to-pink-700',
-      'from-emerald-500 to-teal-700',
-      'from-amber-500 to-orange-600',
-      'from-red-500 to-rose-700',
-      'from-cyan-500 to-blue-600',
-      'from-fuchsia-500 to-purple-700',
-      'from-sky-500 to-indigo-600'
-    ];
-    const icons = [Building2, Layers, Box, Factory, Sliders, Award];
-    
-    const gradientIdx = Math.abs(hash) % gradients.length;
-    const iconIdx = Math.abs(hash) % icons.length;
-    
-    const words = compName.split(/\s+/).filter(w => w.length > 0);
-    let initials = '';
-    if (words.length >= 2) {
-      initials = (words[0][0] + words[1][0]).toUpperCase();
-    } else if (words.length === 1) {
-      initials = words[0].substring(0, 2).toUpperCase();
-    } else {
-      initials = 'CO';
-    }
-
-    return {
-      initials: initials.substring(0, 2),
-      gradient: gradients[gradientIdx],
-      textColor: 'text-white',
-      icon: icons[iconIdx],
-      accentColor: 'border-gray-100'
-    };
-  };
-
-  const config = getLogoConfig(normalizedName);
-  const IconComponent = config.icon;
-
-  const iconSizes = {
-    xs: 10,
-    sm: 12,
-    md: 14,
-    lg: 18,
-    xl: 24
-  };
+  const { initials, gradient } = extractBrandInfo(normalizedName);
+  const isLongInitials = initials.length >= 3;
 
   return (
-    <div className={`relative flex items-center justify-center rounded-xl bg-gradient-to-br ${config.gradient} shadow-sm border border-black/5 ${sizeClasses[size]} ${className} shrink-0 select-none overflow-hidden group`}>
-      {/* Background soft element */}
-      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div 
+      className={`relative flex items-center justify-center bg-gradient-to-br ${gradient} border border-black/[0.08] dark:border-white/10 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] shrink-0 select-none overflow-hidden group transition-transform duration-150 active:scale-95 ${sizeClasses[size]} ${className}`}
+    >
+      {/* Apple Subtle Specular Glass Highlight */}
+      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
       
-      {/* Visual content: initials and a small floating indicator icon */}
-      <div className="flex flex-col items-center justify-center font-bold tracking-wider leading-none text-white z-10">
-        <span className="drop-shadow-sm">{config.initials}</span>
-      </div>
-      
-      {/* Micro floating icon */}
-      {size !== 'xs' && (
-        <div className="absolute bottom-1 right-1 p-0.5 rounded-full bg-black/10 text-white/80">
-          <IconComponent size={iconSizes[size] - 2} />
-        </div>
-      )}
+      {/* Monogram Acronym */}
+      <span 
+        className={`font-bold tracking-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)] z-10 font-sans ${textSizes[size]} ${isLongInitials ? 'tracking-tighter scale-90' : ''}`}
+      >
+        {initials}
+      </span>
     </div>
   );
 }
@@ -205,13 +307,11 @@ const processUploadedImage = (file: File, callback: (dataUrl: string) => void) =
     const rawData = event.target?.result as string;
     if (!rawData) return;
 
-    // SVG or small files use rawData directly
     if (file.type === "image/svg+xml" || file.size < 500 * 1024) {
       callback(rawData);
       return;
     }
 
-    // Resize raster images to prevent out-of-memory errors in PDF generator
     const img = new Image();
     img.onload = () => {
       const maxDim = 1000;
@@ -328,7 +428,6 @@ export function TamSenGroupHeaderLogo({
 
           {/* Top-Left Tilted Leaf & Stem */}
           <path d="M 17 28 C 11 18, 19 8, 25 7 C 23 13, 24 23, 28 27 Z" fill="url(#tsGrad)" />
-          {/* Leaf veins */}
           <path d="M 19 19 L 23 23 M 20 15 L 23 18" stroke="#FFFFFF" strokeWidth="1" strokeLinecap="round" />
 
           {/* Outer Circular Arcs */}
@@ -336,15 +435,12 @@ export function TamSenGroupHeaderLogo({
           <path d="M 86 34 C 93 52, 86 76, 68 86 C 79 76, 84 57, 82 38 Z" fill="url(#tsGrad)" />
 
           {/* Center Lotus Petals Structure */}
-          {/* Main Central Petal */}
           <path d="M 50 20 C 58 36, 56 64, 50 82 C 44 64, 42 36, 50 20 Z" fill="none" stroke="url(#tsGrad)" strokeWidth="4" strokeLinejoin="round" />
           <path d="M 50 28 C 53 42, 52 58, 50 72 C 48 58, 47 42, 50 28 Z" fill="url(#tsGrad)" />
 
-          {/* Inner Side Petals */}
           <path d="M 50 28 C 32 40, 31 66, 45 82 C 38 70, 37 50, 50 28 Z" fill="none" stroke="url(#tsGrad)" strokeWidth="4" strokeLinejoin="round" />
           <path d="M 50 28 C 68 40, 69 66, 55 82 C 62 70, 63 50, 50 28 Z" fill="none" stroke="url(#tsGrad)" strokeWidth="4" strokeLinejoin="round" />
 
-          {/* Outer Side Petals */}
           <path d="M 45 82 C 24 78, 16 62, 27 44 C 24 58, 30 74, 45 82 Z" fill="none" stroke="url(#tsGrad)" strokeWidth="3.6" strokeLinejoin="round" />
           <path d="M 55 82 C 76 78, 84 62, 73 44 C 76 58, 70 74, 55 82 Z" fill="none" stroke="url(#tsGrad)" strokeWidth="3.6" strokeLinejoin="round" />
 
@@ -371,11 +467,11 @@ export function TamSenGroupHeaderLogo({
 }
 
 export function AnVietPhatGroupHeaderLogo({ 
-  className = "",
+  className = "", 
   logoUrl 
 }: { 
-  className?: string;
-  logoUrl?: string;
+  className?: string; 
+  logoUrl?: string; 
 }) {
   const [activeLogo, setActiveLogo] = useState<string | null>(null);
 
@@ -436,16 +532,13 @@ export function AnVietPhatGroupHeaderLogo({
       <label className="flex items-center gap-3 cursor-pointer">
         <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
         
-        {/* Gold Emblem SVG matching An Việt Phát logo */}
+        {/* Gold Emblem SVG */}
         <svg className="w-14 h-14 shrink-0" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Circle Emblem Background */}
           <circle cx="60" cy="34" r="28" fill="#FCEECB" />
-          {/* White Stylized Leaf motif */}
           <circle cx="60" cy="18" r="5" fill="#FFFFFF" />
           <path d="M 55 26 C 50 34, 52 44, 60 50 C 66 54, 68 60, 62 64 C 54 60, 48 50, 52 34 Z" fill="#FFFFFF" />
           <path d="M 60 28 C 68 30, 74 26, 78 20 C 74 30, 66 40, 60 28 Z" fill="#FFFFFF" />
 
-          {/* Gold AV Wing Shape */}
           <path d="M 36 86 L 56 50 L 68 50 L 48 86 Z" fill="#E2C785" />
           <path d="M 68 50 L 84 86 L 72 86 L 58 60 Z" fill="#E2C785" />
           <path d="M 28 74 L 62 74 L 58 80 L 34 80 Z" fill="#E2C785" />
@@ -467,4 +560,3 @@ export function AnVietPhatGroupHeaderLogo({
     </div>
   );
 }
-
