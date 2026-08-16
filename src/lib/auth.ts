@@ -1,6 +1,7 @@
 import React from 'react';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { db, app } from '../firebase';
+import firebaseConfig from '../../firebase-applet-config.json';
 import toast from 'react-hot-toast';
 
 export const auth = getAuth(app);
@@ -12,7 +13,7 @@ let isSigningIn = false;
 let cachedAccessToken: string | null = localStorage.getItem('google_access_token');
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User | { email: string }, token: string) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
@@ -24,8 +25,14 @@ export const initAuth = (
         if (onAuthFailure) onAuthFailure();
       }
     } else {
-      cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
+      const storedToken = localStorage.getItem('google_access_token');
+      if (storedToken) {
+        cachedAccessToken = storedToken;
+        if (onAuthSuccess) onAuthSuccess({ email: 'Tài khoản Google đã kết nối' }, storedToken);
+      } else {
+        cachedAccessToken = null;
+        if (onAuthFailure) onAuthFailure();
+      }
     }
   });
 };
@@ -39,6 +46,75 @@ export const clearStoredGoogleToken = (): void => {
   localStorage.removeItem('google_access_token');
 };
 
+/**
+ * Tải script Google Identity Services (GIS) để đăng nhập Google trực tiếp không qua Firebase Auth domain check
+ */
+function loadGsiScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).google?.accounts?.oauth2) {
+      resolve();
+      return;
+    }
+    const existing = document.getElementById('google-gsi-script');
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Đăng nhập và lấy Google Access Token trực tiếp qua Google Identity Services (GIS)
+ * Hoạt động mượt mà trên MỌI domain (Vercel, custom domain, localhost)
+ */
+export async function requestGoogleAccessTokenDirectly(scopes: string[] = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.file'
+]): Promise<string> {
+  await loadGsiScript();
+  const clientId = (firebaseConfig as any).oAuthClientId || '779403158794-hp217r3191umide2gsfl8b46je9sp538.apps.googleusercontent.com';
+
+  return new Promise((resolve, reject) => {
+    try {
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: scopes.join(' '),
+        callback: (response: any) => {
+          if (response.error) {
+            console.warn('GIS Token Error:', response);
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+          if (response.access_token) {
+            cachedAccessToken = response.access_token;
+            localStorage.setItem('google_access_token', response.access_token);
+            resolve(response.access_token);
+          } else {
+            reject(new Error('Không nhận được access token từ Google.'));
+          }
+        },
+        error_callback: (err: any) => {
+          console.error('GIS Client Error:', err);
+          reject(new Error(err.message || 'Lỗi kết nối Google Identity Services.'));
+        }
+      });
+
+      client.requestAccessToken();
+    } catch (e: any) {
+      reject(e);
+    }
+  });
+}
+
 export const ensureGoogleToken = async (
   scopes: string[] = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -51,10 +127,11 @@ export const ensureGoogleToken = async (
     return token;
   }
 
-  const customProvider = new GoogleAuthProvider();
-  scopes.forEach(scope => customProvider.addScope(scope));
-
+  // Tầng 1: Thử đăng nhập qua Firebase Auth Popup
   try {
+    const customProvider = new GoogleAuthProvider();
+    scopes.forEach(scope => customProvider.addScope(scope));
+
     const result = await signInWithPopup(auth, customProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
@@ -64,40 +141,37 @@ export const ensureGoogleToken = async (
       return token;
     }
   } catch (error: any) {
-    console.error('Google Auth Error:', error);
+    console.warn('Firebase Auth popup failed, attempting direct Google GIS fallback...', error);
 
     const isUnauthorizedDomain =
       error?.code === 'auth/unauthorized-domain' ||
       error?.message?.includes('auth/unauthorized-domain') ||
-      error?.message?.includes('unauthorized-domain');
+      error?.message?.includes('unauthorized-domain') ||
+      error?.code === 'auth/network-request-failed';
 
-    if (isUnauthorizedDomain) {
-      const hostname = window.location.hostname || 'localhost';
-      toast.error(
-        React.createElement('div', { className: 'space-y-1 text-left' },
-          React.createElement('p', { className: 'font-bold text-sm text-red-200' }, '⚠️ Lỗi Firebase (auth/unauthorized-domain)'),
-          React.createElement('p', { className: 'text-xs' }, `Tên miền "${hostname}" chưa được cấp phép đăng nhập Google.`),
-          React.createElement('div', { className: 'text-[11px] bg-slate-900/90 p-2 rounded border border-slate-700 text-slate-200 mt-1 font-mono whitespace-pre-line' },
-            `Hướng dẫn thêm Domain vào Firebase:\n1. Vào console.firebase.google.com\n2. Chọn Dự án -> Authentication -> Settings -> Authorized domains\n3. Nhấn "Add domain" -> Nhập: ${hostname}`
-          )
-        ),
-        { duration: 12000 }
-      );
-      throw new Error(`Firebase Auth: Tên miền "${hostname}" chưa được thêm vào Authorized Domains trong Firebase Console.`);
+    // Tầng 2: Tự động chuyển tiếp qua Google Identity Services (GIS) nếu gặp lỗi domain hoặc network
+    try {
+      token = await requestGoogleAccessTokenDirectly(scopes);
+      if (token) {
+        cachedAccessToken = token;
+        localStorage.setItem('google_access_token', token);
+        return token;
+      }
+    } catch (gisError: any) {
+      console.error('Direct Google GIS authentication error:', gisError);
+      
+      if (isUnauthorizedDomain) {
+        const hostname = window.location.hostname || 'localhost';
+        toast(
+          React.createElement('div', { className: 'space-y-1 text-left' },
+            React.createElement('p', { className: 'font-bold text-xs text-amber-300' }, '💡 Gợi ý cấu hình domain Firebase:'),
+            React.createElement('p', { className: 'text-[11px]' }, `Thêm "${hostname}" vào Authorized Domains trong Firebase Console để hỗ trợ đăng nhập 1-click.`)
+          ),
+          { duration: 8000 }
+        );
+      }
+      throw gisError;
     }
-
-    if (error?.code === 'auth/network-request-failed' || error?.message?.includes('network-request-failed')) {
-      toast.error('Kết nối Google bị chặn trong iframe. Vui lòng bấm "Mở ứng dụng trong Tab mới" ở góc trên.');
-      throw new Error('Kết nối Google bị chặn trong iframe.');
-    }
-
-    if (error?.code === 'auth/popup-closed-by-user') {
-      toast.error('Cửa sổ xác thực Google đã bị đóng.');
-      throw new Error('Cửa sổ xác thực Google đã bị đóng.');
-    }
-
-    toast.error('Lỗi xác thực Google: ' + (error?.message || 'Không xác định'));
-    throw error;
   }
 
   if (!token) {
@@ -107,14 +181,14 @@ export const ensureGoogleToken = async (
   return token;
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async (): Promise<{ user: User | { email: string }; accessToken: string } | null> => {
   try {
     isSigningIn = true;
     const token = await ensureGoogleToken([], true);
     if (auth.currentUser) {
       return { user: auth.currentUser, accessToken: token };
     }
-    return null;
+    return { user: { email: 'Tài khoản Google đã kết nối' }, accessToken: token };
   } finally {
     isSigningIn = false;
   }
@@ -131,6 +205,8 @@ export const openGoogleAuthTab = (): void => {
 };
 
 export const logout = async () => {
-  await auth.signOut();
+  try {
+    await auth.signOut();
+  } catch (_) {}
   clearStoredGoogleToken();
 };

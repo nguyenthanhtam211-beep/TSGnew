@@ -102,20 +102,20 @@ export default function SettingsView() {
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
+    const toastId = toast.loading("Đang mở kết nối xác thực Google...");
     try {
       const token = await ensureGoogleToken([
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive.file'
-      ]);
+      ], true);
       if (token) {
         setNeedsAuth(false);
         setUser({ email: 'Tài khoản Google đã kết nối' });
-        toast.success("Đã kết nối tài khoản Google thành công!");
+        toast.success("Đã kết nối tài khoản Google thành công!", { id: toastId });
       }
     } catch (err: any) {
       console.error('Login failed:', err);
-      toast('Đang mở tab mới để hoàn tất xác thực Google OAuth...', { icon: '🔑' });
-      openGoogleAuthTab();
+      toast.error(`Không thể kết nối Google: ${err.message || err}`, { id: toastId });
     } finally {
       setIsLoggingIn(false);
     }
