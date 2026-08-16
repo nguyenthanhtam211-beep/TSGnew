@@ -69,8 +69,9 @@ export default function SettingsView() {
   const [isTestingGemini, setIsTestingGemini] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<any>(null);
 
-  // Custom Google Client ID
+  // Custom Google Client ID & Manual Token
   const [customClientId, setCustomClientId] = useState(() => localStorage.getItem('google_custom_client_id') || '');
+  const [manualToken, setManualToken] = useState(() => localStorage.getItem('google_access_token') || '');
 
   useEffect(() => {
     initAuth(
@@ -530,6 +531,46 @@ export default function SettingsView() {
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4 bg-white rounded-full p-0.5" />
                         <span>{isLoggingIn ? 'Đang xác thực Google...' : 'Đăng nhập & Cấp quyền Google Workspace'}</span>
                       </button>
+
+                      {/* Direct Token Fallback for origin_mismatch */}
+                      <div className="p-4 bg-[#F5F5F7] rounded-xl border border-black/[0.06] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-semibold text-slate-700">
+                            🔑 Hoặc dán trực tiếp Google Access Token (Nếu gặp lỗi origin_mismatch):
+                          </label>
+                          <a
+                            href="https://developers.google.com/oauthplayground"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-semibold text-[#007AFF] hover:underline"
+                          >
+                            Lấy Token nhanh qua OAuth Playground ↗
+                          </a>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="password"
+                            placeholder="ya29.a0A..."
+                            value={manualToken}
+                            onChange={(e) => setManualToken(e.target.value)}
+                            className="flex-1 bg-white border border-black/[0.08] rounded-xl px-3 py-1.5 text-xs font-mono outline-none focus:border-[#007AFF]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (manualToken.trim()) {
+                                localStorage.setItem('google_access_token', manualToken.trim());
+                                setUser({ email: 'Tài khoản Google đã kết nối (Direct Token)' });
+                                setNeedsAuth(false);
+                                toast.success('Đã lưu Google Access Token thành công!');
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shrink-0"
+                          >
+                            Lưu Token
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 

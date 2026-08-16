@@ -58,6 +58,21 @@ export default function App() {
   const [targetCustomerId, setTargetCustomerId] = useState<string | null>(null);
   const [targetSupplierId, setTargetSupplierId] = useState<string | null>(null);
   const [targetContactId, setTargetContactId] = useState<string | null>(null);
+  
+  // Apple macOS Window & Sidebar States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const handleToggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.warn("Fullscreen request error:", err);
+      });
+    } else {
+      document.exitFullscreen().catch(err => {
+        console.warn("Exit fullscreen error:", err);
+      });
+    }
+  };
 
   const handleNavigateToCustomer = (customerId: string) => {
     setTargetCustomerId(customerId);
@@ -680,55 +695,92 @@ export default function App() {
       )}
 
       {/* Desktop macOS Sequoia Sidebar */}
-      <div className="hidden lg:flex w-64 bg-[#F5F5F7]/95 backdrop-blur-2xl border-r border-black/[0.06] flex-col text-[#1D1D1F] shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none">
+      <div className={clsx(
+        "hidden lg:flex bg-[#F5F5F7]/95 backdrop-blur-2xl border-r border-black/[0.06] flex-col text-[#1D1D1F] shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none transition-all duration-200",
+        isSidebarCollapsed ? "w-16" : "w-64"
+      )}>
         
         {/* macOS Window Controls & Title */}
-        <div className="p-4 pt-3.5 border-b border-black/[0.06] bg-white/40">
+        <div className="p-3.5 border-b border-black/[0.06] bg-white/40">
+          {/* Functional Apple Traffic Lights */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 shadow-2xs inline-block" />
-            <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 shadow-2xs inline-block" />
-            <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 shadow-2xs inline-block" />
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedProductDetails || selectedPoDetails) {
+                  setSelectedProductDetails(null);
+                  setSelectedPoDetails(null);
+                  toast.success("Đã đóng cửa sổ chi tiết", { icon: "🔴" });
+                } else if (activeTab !== "dashboard") {
+                  setActiveTab("dashboard");
+                  toast("Đã trở về Bảng Điều Hành", { icon: "🔴" });
+                }
+              }}
+              title="Đóng / Trở về Bảng Điều Hành (⌘W)"
+              className="w-3 h-3 rounded-full bg-[#FF5F56] hover:bg-[#FF3B30] active:bg-[#E0443E] border border-[#E0443E]/60 shadow-2xs flex items-center justify-center text-[9px] text-red-950/0 hover:text-red-950 font-bold transition-all cursor-pointer"
+            >
+              ×
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title="Thu gọn / Mở rộng Sidebar (⌘M)"
+              className="w-3 h-3 rounded-full bg-[#FFBD2E] hover:bg-[#FF9500] active:bg-[#DEA123] border border-[#DEA123]/60 shadow-2xs flex items-center justify-center text-[9px] text-amber-950/0 hover:text-amber-950 font-bold transition-all cursor-pointer"
+            >
+              –
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleFullScreen}
+              title="Toàn màn hình / Thu phóng (⌃⌘F)"
+              className="w-3 h-3 rounded-full bg-[#27C93F] hover:bg-[#34C759] active:bg-[#1AAB29] border border-[#1AAB29]/60 shadow-2xs flex items-center justify-center text-[8px] text-green-950/0 hover:text-green-950 font-bold transition-all cursor-pointer"
+            >
+              ⤢
+            </button>
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#007AFF] to-[#5856D6] text-white flex items-center justify-center font-black text-xs shadow-sm shadow-blue-500/20">
-              TSG
+
+          {!isSidebarCollapsed && (
+            <div className="flex items-center gap-2.5 animate-in fade-in duration-150">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#007AFF] to-[#5856D6] text-white flex items-center justify-center font-black text-xs shadow-sm shadow-blue-500/20">
+                TSG
+              </div>
+              <div>
+                <h1 className="text-xs font-bold text-[#1D1D1F] tracking-[-0.015em] leading-tight">TSG Business OS</h1>
+                <p className="text-[10px] text-slate-500 font-medium">Tâm Sen Group • ERP 2026</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xs font-bold text-[#1D1D1F] tracking-[-0.015em] leading-tight">TSG Business OS</h1>
-              <p className="text-[10px] text-slate-500 font-medium">Tâm Sen Group • ERP 2026</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Apple Source List Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 custom-scrollbar px-2">
-          <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tổng quan</div>
-          <NavItem icon={<LayoutDashboard size={15} />} iconBg="bg-blue-500" label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
+          {!isSidebarCollapsed && <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tổng quan</div>}
+          <NavItem icon={<LayoutDashboard size={15} />} iconBg="bg-blue-500" label="Dashboard" isCollapsed={isSidebarCollapsed} isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
           
-          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>
-          <NavItem icon={<Users size={15} />} iconBg="bg-sky-500" label="Khách hàng" isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
-          <NavItem icon={<Package size={15} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
-          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
-          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
-          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
-          <NavItem icon={<Truck size={15} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
-          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
+          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>}
+          <NavItem icon={<Users size={15} />} iconBg="bg-sky-500" label="Khách hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
+          <NavItem icon={<Package size={15} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isCollapsed={isSidebarCollapsed} isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
+          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
+          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
+          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
+          <NavItem icon={<Truck size={15} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
+          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isCollapsed={isSidebarCollapsed} isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
           
-          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dữ liệu nền tảng</div>
-          <NavItem icon={<Package size={15} />} iconBg="bg-purple-500" label="Sản phẩm" isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
-          <NavItem icon={<ShieldCheck size={15} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
-          <NavItem icon={<BookUser size={15} />} iconBg="bg-amber-600" label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
-          <NavItem icon={<Users size={15} />} iconBg="bg-red-500" label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
+          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dữ liệu nền tảng</div>}
+          <NavItem icon={<Package size={15} />} iconBg="bg-purple-500" label="Sản phẩm" isCollapsed={isSidebarCollapsed} isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
+          <NavItem icon={<ShieldCheck size={15} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isCollapsed={isSidebarCollapsed} isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
+          <NavItem icon={<BookUser size={15} />} iconBg="bg-amber-600" label="Nhà cung cấp" isCollapsed={isSidebarCollapsed} isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
+          <NavItem icon={<Users size={15} />} iconBg="bg-red-500" label="Danh bạ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
           
-          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trí tuệ nhân tạo & Tiện ích</div>
-          <NavItem icon={<Bot size={15} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
-          <NavItem icon={<Camera size={15} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
-          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-green-600" label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
-          <NavItem icon={<HardDrive size={15} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
+          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trí tuệ nhân tạo & Tiện ích</div>}
+          <NavItem icon={<Bot size={15} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isCollapsed={isSidebarCollapsed} isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
+          <NavItem icon={<Camera size={15} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
+          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-green-600" label="Công việc & Lịch" isCollapsed={isSidebarCollapsed} isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
+          <NavItem icon={<HardDrive size={15} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
           
-          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hệ thống</div>
-          <NavItem icon={<Settings size={15} />} iconBg="bg-slate-600" label="Cài đặt" isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
+          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hệ thống</div>}
+          <NavItem icon={<Settings size={15} />} iconBg="bg-slate-600" label="Cài đặt" isCollapsed={isSidebarCollapsed} isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
         </nav>
       </div>
 
@@ -975,41 +1027,44 @@ function NavItem({
   iconBg = "bg-blue-500", 
   label, 
   isActive, 
+  isCollapsed = false,
   onClick 
 }: { 
   icon: React.ReactNode, 
   iconBg?: string, 
   label: string, 
   isActive: boolean, 
+  isCollapsed?: boolean,
   onClick: () => void 
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.96 }}
       onClick={onClick}
+      title={isCollapsed ? label : undefined}
       className={clsx(
-        "relative w-full flex items-center gap-3 px-5 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer overflow-hidden group max-w-[calc(100%-16px)]",
+        "relative flex items-center rounded-xl text-xs transition-all duration-150 cursor-pointer overflow-hidden group select-none text-left",
+        isCollapsed 
+          ? "w-10 h-10 mx-auto justify-center p-0" 
+          : "w-full gap-2.5 px-3 py-2",
         isActive 
-          ? "bg-gradient-to-r from-blue-600/90 to-indigo-600/90 text-white shadow-lg shadow-blue-500/25 font-semibold" 
-          : "text-slate-300 hover:text-white hover:bg-slate-800/60"
+          ? "bg-[#007AFF] text-white shadow-xs font-semibold" 
+          : "text-[#1D1D1F] hover:bg-black/[0.04] font-medium"
       )}
     >
-      {isActive && (
-        <motion.div 
-          layoutId="activeNavIndicator"
-          className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl -z-10 shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-          transition={{ type: "spring", stiffness: 350, damping: 30 }}
-        />
-      )}
-      <span className={clsx(
-        "transition-transform duration-200 group-hover:scale-110",
-        isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"
+      <div className={clsx(
+        "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105",
+        isActive ? "bg-white/20 text-white" : `${iconBg} text-white shadow-2xs`
       )}>
         {icon}
-      </span>
-      <span className="truncate tracking-wide">{label}</span>
-      {isActive && (
-        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse shadow-[0_0_8px_#ffffff]" />
+      </div>
+      {!isCollapsed && (
+        <>
+          <span className="truncate flex-1 tracking-[-0.012em]">{label}</span>
+          {isActive && (
+            <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+          )}
+        </>
       )}
     </motion.button>
   );
@@ -1687,39 +1742,49 @@ function TableView({
   };
 
   return (
-    <div className="flex-1 p-3 sm:p-5 lg:p-8 flex flex-col h-full overflow-hidden relative pb-24 lg:pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4 flex-shrink-0 relative">
-        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 tracking-tight">{title}</h2>
-        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap relative">
+    <div className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-hidden relative pb-24 lg:pb-8 bg-[#F5F5F7]">
+      
+      {/* Apple macOS Table Title & Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 flex-shrink-0 relative">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1D1D1F] tracking-[-0.015em]">{title}</h2>
+          <span className="text-[11px] font-semibold text-slate-500 bg-[#E5E5EA]/80 px-2.5 py-0.5 rounded-full">
+            {filteredData.length} bản ghi
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap relative">
           {title.includes("Báo cáo") && (
             <button
               onClick={() => {
                 alert("Vui lòng chọn khổ giấy A4 ngang (Landscape) và Tỷ lệ (Scale) phù hợp khi hộp thoại in hiện ra để báo cáo hiển thị đầy đủ nhất.");
                 window.print();
               }}
-              className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 bg-[#007AFF] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] transition-all shadow-xs"
               title="In báo cáo"
             >
-              <Printer size={16} /> In báo cáo
+              <Printer size={15} /> In báo cáo
             </button>
           )}
+
           <button 
             onClick={() => setShowColSettings(!showColSettings)}
-            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-2xs"
             title="Tuỳ chỉnh cột"
           >
-            <Columns size={16} />
+            <Columns size={15} />
+            <span className="hidden sm:inline">Cột</span>
           </button>
 
           {showColSettings && (
-            <div className="absolute top-12 right-0 z-50 w-72 bg-white border border-gray-200 shadow-xl rounded-xl max-h-[70vh] flex flex-col overflow-hidden">
-              <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-semibold text-gray-800 text-sm">Hiển thị cột</h3>
-                <button onClick={() => setShowColSettings(false)} className="text-gray-400 hover:text-gray-600">
-                  <X size={16} />
+            <div className="absolute top-12 right-0 z-50 w-72 bg-white border border-black/[0.08] shadow-2xl rounded-2xl max-h-[70vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+              <div className="flex justify-between items-center p-3.5 border-b border-black/[0.06] bg-[#F5F5F7]">
+                <h3 className="font-semibold text-[#1D1D1F] text-xs">Hiển thị & Sắp xếp cột</h3>
+                <button onClick={() => setShowColSettings(false)} className="text-slate-400 hover:text-slate-700">
+                  <X size={15} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
                     {columnOrder.map(col => (
@@ -1739,7 +1804,6 @@ function TableView({
 
           <button 
             onClick={() => {
-              // Export visible columns only
               const exportData = filteredData.map(row => {
                 const newRow: any = {};
                 visibleColumns.forEach(col => {
@@ -1752,11 +1816,11 @@ function TableView({
               XLSX.utils.book_append_sheet(wb, ws, "Data");
               XLSX.writeFile(wb, `${title}.xlsx`);
             }}
-            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-2xs"
             title="Xuất Bảng Excel"
           >
-            <Download size={16} />
-            <span className="hidden sm:inline">Xuất Excel</span>
+            <Download size={15} />
+            <span className="hidden sm:inline">Excel</span>
           </button>
 
           <button 
@@ -1780,11 +1844,11 @@ function TableView({
                 toast.error('Lỗi xuất PDF: ' + (err?.message || err));
               }
             }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-2xs"
             title="Xuất Bảng PDF Chuyên Nghiệp"
           >
-            <FileText size={16} />
-            <span className="hidden sm:inline">Xuất PDF</span>
+            <FileText size={15} />
+            <span className="hidden sm:inline">PDF</span>
           </button>
           
           {selectedRowIds.size > 0 && onDelete && (
@@ -1798,50 +1862,55 @@ function TableView({
                   setSelectedRowIds(new Set());
                 }
               }}
-              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 bg-red-600 text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-red-700 transition-all shadow-xs"
             >
-              <Trash2 size={16} />
-              <span className="hidden sm:inline">Xóa đã chọn ({selectedRowIds.size})</span>
+              <Trash2 size={15} />
+              <span>Xóa ({selectedRowIds.size})</span>
             </button>
           )}
 
           {showAddButton && (
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
-              <PlusCircle size={16} />
-              <span className="hidden sm:inline">Thêm mới</span>
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="flex items-center gap-1.5 bg-[#007AFF] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] active:bg-[#0051A8] transition-all shadow-xs"
+            >
+              <PlusCircle size={15} />
+              <span>Thêm mới</span>
             </button>
           )}
         </div>
       </div>
       
-      {/* Search */}
-      <div className="mb-4 flex flex-col sm:flex-row gap-4">
-        <div className="flex bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex-1 max-w-md">
+      {/* Apple Spotlight Search Capsule & KPI Cards */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text"
-            placeholder="Tìm kiếm nhanh..."
+            placeholder="Tìm kiếm nhanh trong bảng (Spotlight ⌘K)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full"
+            className="w-full bg-[#E5E5EA]/60 hover:bg-[#E5E5EA] focus:bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-xs font-medium text-[#1D1D1F] focus:border-[#007AFF] outline-none transition-all"
           />
         </div>
         
         {summaries && summaries.length > 0 && (
-          <div className="flex gap-4 overflow-x-auto pb-1 flex-1">
+          <div className="flex gap-3 overflow-x-auto pb-1 flex-1">
             {summaries.map((s) => (
-              <div key={s.label} className="bg-white border border-gray-200 shadow-sm rounded-lg p-3 min-w-[150px] flex-1">
-                <p className="text-xs text-gray-500 font-medium mb-1 truncate" title={s.label}>{s.label}</p>
-                <p className="text-lg font-bold text-gray-900 truncate" title={String(s.value)}>{s.value}</p>
+              <div key={s.label} className="bg-white border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.03)] rounded-2xl px-4 py-2.5 min-w-[140px] flex-1">
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-0.5 truncate" title={s.label}>{s.label}</p>
+                <p className="text-sm font-bold text-[#1D1D1F] tracking-[-0.015em] truncate" title={String(s.value)}>{s.value}</p>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col min-h-[400px]">
+      {/* Apple Inset-Grouped Table Container */}
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] flex-1 overflow-hidden flex flex-col min-h-[400px]">
         <div className="overflow-auto flex-1">
-          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-            <thead className="bg-gray-50 text-gray-700 sticky top-0 shadow-[0_1px_0_0_#e5e7eb] z-10">
+          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+            <thead className="bg-[#F5F5F7] text-slate-600 sticky top-0 border-b border-black/[0.06] z-10 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 {onDelete && (
                   <th className="px-4 py-3 font-semibold border-b border-gray-200 bg-gray-50 w-10 text-center">
