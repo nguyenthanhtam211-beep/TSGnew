@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
 export const config = {
   api: {
     bodyParser: {
@@ -8,6 +6,51 @@ export const config = {
   },
 };
 
+async function getRequestBody(req: any): Promise<any> {
+  if (req.body) {
+    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      return req.body;
+    }
+    if (typeof req.body === 'string') {
+      try {
+        return JSON.parse(req.body);
+      } catch (_) {
+        return req.body;
+      }
+    }
+    if (Buffer.isBuffer(req.body)) {
+      try {
+        return JSON.parse(req.body.toString('utf-8'));
+      } catch (_) {
+        return req.body.toString('utf-8');
+      }
+    }
+  }
+
+  // If req.body is undefined, read stream manually
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk: any) => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      if (!data) {
+        resolve({});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        resolve(parsed);
+      } catch (_) {
+        resolve(data);
+      }
+    });
+    req.on('error', (err: any) => {
+      reject(err);
+    });
+  });
+}
+
 export default async function handler(req: any, res: any) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -15,7 +58,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-gemini-key'
   );
 
   if (req.method === 'OPTIONS') {
@@ -28,16 +71,24 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    const body = await getRequestBody(req);
+
     let base64Data = '';
     let mimeType = 'image/jpeg';
 
-    if (req.body?.base64) {
-      base64Data = req.body.base64;
-      mimeType = req.body.mimeType || 'image/jpeg';
-    } else if (typeof req.body === 'string' && req.body.startsWith('{')) {
+    if (body?.base64) {
+      base64Data = body.base64;
+      mimeType = body.mimeType || 'image/jpeg';
+    } else if (body?.data) {
+      base64Data = body.data;
+      mimeType = body.mimeType || 'image/jpeg';
+    } else if (body?.image) {
+      base64Data = body.image;
+      mimeType = body.mimeType || 'image/jpeg';
+    } else if (typeof body === 'string') {
       try {
-        const parsed = JSON.parse(req.body);
-        base64Data = parsed.base64;
+        const parsed = JSON.parse(body);
+        base64Data = parsed.base64 || parsed.data || parsed.image || '';
         mimeType = parsed.mimeType || 'image/jpeg';
       } catch (_) {}
     }
@@ -46,7 +97,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Không tìm thấy dữ liệu tệp tin base64 để xử lý OCR.' });
     }
 
-    // Clean base64 if it has data URL prefix
+    // Clean base64 if it has data URL prefix (e.g. data:image/png;base64,...)
     if (base64Data.includes(',')) {
       const parts = base64Data.split(',');
       base64Data = parts[1];
@@ -56,21 +107,18 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (req.headers['x-gemini-key'] as string) || 
+                   body?.apiKey || 
+                   process.env.GEMINI_API_KEY || 
+                   process.env.VITE_GEMINI_API_KEY || 
+                   process.env.GOOGLE_API_KEY ||
+                   '';
+
     if (!apiKey) {
       return res.status(400).json({ 
-        error: 'Chưa cấu hình GEMINI_API_KEY trên môi trường Vercel. Bạn cũng có thể nhập API Key trực tiếp trong tab Cài đặt.' 
+        error: 'Chưa cấu hình GEMINI_API_KEY. Vui lòng nhập Gemini API Key trong tab Cài đặt & Quản lý dữ liệu.' 
       });
     }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    const filePart = {
-      inlineData: {
-        data: base64Data,
-        mimeType: mimeType,
-      },
-    };
 
     const prompt = `Bạn là một chuyên gia OCR tài liệu doanh nghiệp hàng đầu của Tập đoàn Tâm Sen (TSG). Hãy phân tích kỹ lưỡng tài liệu đính kèm (hình ảnh hoặc PDF) và trích xuất thông tin chính xác.
 
@@ -119,19 +167,43 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
 
     for (const model of models) {
       try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [filePart, prompt],
-          config: {
-            responseMimeType: "application/json",
-          },
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data
+                    }
+                  },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generation_config: {
+              response_mime_type: 'application/json',
+              temperature: 0.1,
+              max_output_tokens: 8192
+            }
+          })
         });
 
-        const textRes = response.text;
-        if (!textRes) continue;
-
-        const data = JSON.parse(textRes);
-        return res.status(200).json(data);
+        if (response.ok) {
+          const json = await response.json();
+          const textRes = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textRes) {
+            const data = JSON.parse(textRes);
+            return res.status(200).json(data);
+          }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          lastError = new Error(errData.error?.message || `HTTP ${response.status} from Google AI`);
+        }
       } catch (err: any) {
         lastError = err;
         console.warn(`OCR model ${model} failed, trying next...`, err.message);

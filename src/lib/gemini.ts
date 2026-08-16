@@ -351,12 +351,18 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
 
   // Engine 2: Serverless /api/ocr Endpoint
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) {
+      headers['x-gemini-key'] = apiKey;
+    }
+
     const res = await fetch('/api/ocr', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         base64: base64Data,
-        mimeType: mimeType
+        mimeType: mimeType,
+        apiKey: apiKey || undefined
       })
     });
 
