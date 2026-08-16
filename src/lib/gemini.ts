@@ -241,3 +241,144 @@ export async function sendGeminiPrompt(params: {
     throw new Error(`Lỗi gọi Gemini AI: ${clientErr.message || clientErr}`);
   }
 }
+
+/**
+ * Trích xuất dữ liệu OCR từ ảnh / file PDF chứng từ (PO / PXK / Hóa đơn)
+ * Sử dụng Dual-Engine: Trực tiếp Google AI Studio REST hoặc Serverless /api/ocr
+ */
+export async function processDocumentOCR(file: File, customApiKey?: string): Promise<any> {
+  const apiKey = customApiKey || getStoredGeminiKey();
+
+  // Convert file to Base64
+  const base64Data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
+  const prompt = `Bạn là một chuyên gia OCR tài liệu doanh nghiệp hàng đầu của Tập đoàn Tâm Sen (TSG). Hãy phân tích kỹ lưỡng tài liệu đính kèm (hình ảnh hoặc PDF) và trích xuất thông tin chính xác.
+
+ĐẶC BIỆT LƯU Ý VỀ SỐ ĐƠN HÀNG (PO):
+1. Nếu là "BIÊN BẢN GIAO HÀNG" hoặc "PHIẾU XUẤT KHO" (PXK): 
+   - Số hiệu ở góc trên bên phải là "documentNumber" (Số PXK).
+   - BẮT BUỘC tìm số ĐƠN ĐẶT HÀNG (Số PO) nằm trong văn bản (ví dụ: "Theo đơn đặt hàng số...", "Căn cứ PO số...", "06/TS/26", v.v.) và điền vào trường "documentReference".
+2. Nếu là "ĐƠN ĐẶT HÀNG": Số đơn hàng là "documentNumber", trường "documentReference" để trống.
+
+QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
+1. BẮT BUỘC đọc tất cả các cột trong bảng kê hàng hóa (Tên hàng hóa, Quy cách, Ký hiệu, Mã vật tư, ĐVT, Số lượng, Đơn giá, Thành tiền).
+2. Tên sản phẩm (name): Điền tên sản phẩm ĐẦY ĐỦ NGUYÊN VĂN bao gồm chủng loại, nhãn hiệu, thông số kỹ thuật.
+3. Mã sản phẩm (code): Trích xuất mã sản phẩm, ký hiệu mã vật tư nếu có.
+4. Quy cách (specs): Kích thước, định lượng (gsm), quy cách đóng gói.
+5. Số lượng (quantity), Đơn giá (price), Thành tiền (amount), ĐVT (unit).
+
+Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
+{
+  "documentType": "PO" | "PXK" | "Invoice" | "Unknown",
+  "documentTypeName": "Phiếu xuất kho" | "Đơn đặt hàng" | "Biên bản giao hàng",
+  "documentNumber": string,
+  "documentReference": string,
+  "documentDate": "DD/MM/YYYY",
+  "deliveryDate": "DD/MM/YYYY",
+  "buyerName": string,
+  "buyerAddress": string,
+  "sellerName": string,
+  "sellerAddress": string,
+  "items": [
+    {
+      "index": number,
+      "code": string,
+      "name": string,
+      "specs": string,
+      "unit": string,
+      "quantity": number,
+      "price": number,
+      "amount": number,
+      "notes": string
+    }
+  ]
+}`;
+
+  // Engine 1: Direct Google AI Studio REST Endpoint (Fastest, no timeout limits)
+  if (apiKey) {
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    for (const model of modelsToTry) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data
+                    }
+                  },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generation_config: {
+              response_mime_type: 'application/json',
+              temperature: 0.1,
+              max_output_tokens: 8192
+            }
+          })
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            return JSON.parse(text);
+          }
+        }
+      } catch (err) {
+        console.warn(`Direct Gemini OCR model ${model} error:`, err);
+      }
+    }
+  }
+
+  // Engine 2: Serverless /api/ocr Endpoint
+  try {
+    const res = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base64: base64Data,
+        mimeType: mimeType
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    
+    const errText = await res.text();
+    let errMsg = `Lỗi máy chủ OCR (${res.status})`;
+    try {
+      const parsed = JSON.parse(errText);
+      if (parsed.error) errMsg = parsed.error;
+    } catch (_) {}
+    throw new Error(errMsg);
+  } catch (serverErr: any) {
+    if (!apiKey) {
+      throw new Error(
+        "Chưa cấu hình Gemini API Key. Bạn vui lòng vào tab Cài đặt & Quản lý dữ liệu để dán khóa API miễn phí từ Google AI Studio (aistudio.google.com)."
+      );
+    }
+    throw serverErr;
+  }
+}
+

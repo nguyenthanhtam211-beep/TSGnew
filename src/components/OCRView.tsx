@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { findPriceRecord, parseNumber } from '../lib/business-logic';
 import { ProductHoverCard } from './ProductHoverCard';
+import { processDocumentOCR } from '../lib/gemini';
 
 interface OCRItem {
   index: number;
@@ -84,78 +85,64 @@ export default function OCRView({
     setStatus("uploading");
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      // Process OCR using Dual-Engine (Direct Gemini REST + Serverless API)
+      const rawData = await processDocumentOCR(selectedFile);
+      
+      let data: OCRData = {
+        documentType: rawData.documentType || 'Unknown',
+        documentTypeName: rawData.documentTypeName || 'Chứng từ',
+        documentNumber: rawData.documentNumber || '',
+        documentReference: rawData.documentReference || '',
+        documentDate: rawData.documentDate || '',
+        deliveryDate: rawData.deliveryDate || '',
+        buyerName: rawData.buyerName || '',
+        buyerAddress: rawData.buyerAddress || '',
+        sellerName: rawData.sellerName || '',
+        sellerAddress: rawData.sellerAddress || '',
+        items: Array.isArray(rawData.items) ? rawData.items.map((it: any, idx: number) => ({
+          index: it.index || idx + 1,
+          code: it.code || '',
+          name: it.name || '',
+          specs: it.specs || '',
+          unit: it.unit || 'Cái',
+          quantity: Number(it.quantity) || 0,
+          price: Number(it.price) || 0,
+          amount: Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.price) || 0)),
+          notes: it.notes || ''
+        })) : []
+      };
 
-      const response = await fetch("/api/ocr", {
-        method: "POST",
-        body: formData,
-      });
-
-      const textRes = await response.text();
-      console.log(`Raw response from /api/ocr (Status: ${response.status}):`, textRes.substring(0, 500));
-
-      // Check if the response is HTML (likely a proxy or redirection page)
-      if (textRes.trim().toLowerCase().startsWith("<!doctype html") || textRes.includes("<html")) {
-        if (response.status === 504 || response.status === 502) {
-          throw new Error("Xử lý OCR quá thời gian cho phép của máy chủ. Vui lòng chọn hình ảnh hoặc file PDF dung lượng nhỏ hơn (dưới 5MB) và thử lại.");
-        }
-        throw new Error("Máy chủ phản hồi trang HTML thay vì JSON. Vui lòng thử tải lại trang hoặc mở ứng dụng trong Tab mới.");
-      }
-
-      if (!response.ok) {
-        let errorMsg = `Lỗi máy chủ (${response.status})`;
-        try {
-          const errorData = JSON.parse(textRes);
-          if (errorData && errorData.error) errorMsg = errorData.error;
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-
-      let data: OCRData;
-      try {
-        data = JSON.parse(textRes);
-
-        // Enrich with internal pricing data immediately
-        const matchedCust = getMatchedCustomerID(data.buyerName);
-        data.items = data.items.map(item => {
-          // Robust matching: Try code first, then name
-          const priceRecord = findPriceRecord(pricingData, { 
-            sku: item.code || item.name, 
-            customer: matchedCust 
-          });
-          
-          if (priceRecord) {
-            const sellPrice = parseNumber(priceRecord['Giá bán']);
-            const buyPrice = parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua']);
-            return {
-              ...item,
-              code: priceRecord['Mã sản phẩm'] || item.code,
-              name: priceRecord['Tên sản phẩm'] || item.name, // Normalize name from DB
-              price: sellPrice || item.price,
-              amount: (sellPrice || item.price) * item.quantity,
-              notes: `Gsp_Matched: ${priceRecord['Mã giá']} | Margin: ${sellPrice > 0 ? (((sellPrice - buyPrice)/sellPrice)*100).toFixed(1) : 0}%`
-            };
-          }
-          return item;
+      // Enrich with internal pricing data immediately
+      const matchedCust = getMatchedCustomerID(data.buyerName);
+      data.items = data.items.map(item => {
+        // Robust matching: Try code first, then name
+        const priceRecord = findPriceRecord(pricingData, { 
+          sku: item.code || item.name, 
+          customer: matchedCust 
         });
-      } catch (jsonErr) {
-        console.error("OCR JSON parse error:", jsonErr, "Raw response:", textRes);
-        throw new Error(`Dữ liệu phản hồi không hợp lệ từ máy chủ (Status: ${response.status}). ${textRes ? 'Phản hồi: ' + textRes.substring(0, 100) : 'Phản hồi rỗng'}`);
-      }
+        
+        if (priceRecord) {
+          const sellPrice = parseNumber(priceRecord['Giá bán']);
+          const buyPrice = parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua']);
+          return {
+            ...item,
+            code: priceRecord['Mã sản phẩm'] || item.code,
+            name: priceRecord['Tên sản phẩm'] || item.name, // Normalize name from DB
+            price: sellPrice || item.price,
+            amount: (sellPrice || item.price) * item.quantity,
+            notes: `Gsp_Matched: ${priceRecord['Mã giá']} | Margin: ${sellPrice > 0 ? (((sellPrice - buyPrice)/sellPrice)*100).toFixed(1) : 0}%`
+          };
+        }
+        return item;
+      });
       
       setOcrResult(data);
       setStatus("success");
-      
-      // Removed auto-save to allow manual review and reconciliation
-      // handleSaveToSystem(data);
+      toast.success("Trích xuất OCR thành công!", { icon: "✨" });
       
     } catch (err: any) {
-      console.error(err);
-      let msg = err?.message;
-      if (!msg || msg.includes("Failed to fetch") || err?.name === "TypeError") {
-        msg = "Không thể kết nối đến máy chủ OCR. Vui lòng kiểm tra lại kết nối mạng hoặc mở ứng dụng trong tab mới.";
-      }
+      console.error("OCR Processing error:", err);
+      let msg = err?.message || "Không thể xử lý trích xuất văn bản từ chứng từ.";
       setErrorMessage(msg);
       setStatus("error");
     }
@@ -626,19 +613,25 @@ export default function OCRView({
         )}
 
         {status === "error" && (
-          <div className="max-w-md mx-auto h-full flex flex-col justify-center items-center text-center py-12">
-            <div className="bg-white border border-red-100 rounded-2xl p-10 shadow-sm flex flex-col items-center">
-              <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mb-6 text-red-500 shadow-sm">
-                <AlertCircle size={28} />
+          <div className="max-w-lg mx-auto h-full flex flex-col justify-center items-center text-center py-12">
+            <div className="bg-white border border-red-100 rounded-3xl p-8 sm:p-10 shadow-lg shadow-red-500/5 flex flex-col items-center">
+              <div className="bg-red-50 w-16 h-16 rounded-2xl flex items-center justify-center mb-5 text-red-500 shadow-xs">
+                <AlertCircle size={32} />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Đã xảy ra lỗi quét</h3>
-              <p className="text-sm text-gray-500 leading-relaxed mb-6">{errorMessage}</p>
-              <button 
-                onClick={handleReset}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-              >
-                Thử quét lại file khác
-              </button>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Đã xảy ra sự cố khi quét OCR</h3>
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs text-slate-600 leading-relaxed mb-6 max-w-sm text-left">
+                <span className="font-semibold text-slate-700 block mb-1">Chi tiết thông báo:</span>
+                {errorMessage}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 w-full">
+                <button 
+                  onClick={handleReset}
+                  className="flex-1 px-5 py-2.5 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-sm shadow-blue-500/20"
+                >
+                  Thử quét lại file khác
+                </button>
+              </div>
             </div>
           </div>
         )}
