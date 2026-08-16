@@ -5,8 +5,9 @@
 
 import { toast } from 'react-hot-toast';
 import { db } from '../firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { getItemKey } from '../hooks/useFirestoreCollection';
+import { ensureGoogleToken, clearStoredGoogleToken, getStoredGoogleToken } from './auth';
 
 export const MASTER_SHEET_TITLE = "[TSG ERP] Kho Dữ Liệu Doanh Nghiệp TSG (Master Data)";
 const STORAGE_KEY_SPREADSHEET_ID = 'google_spreadsheet_id';
@@ -17,7 +18,7 @@ export function getStoredSpreadsheetId(): string {
 
 export function setStoredSpreadsheetId(id: string): void {
   if (id) {
-    localStorage.setItem(STORAGE_KEY_SPREADSHEET_ID, id);
+    localStorage.setItem(STORAGE_KEY_SPREADSHEET_ID, id.trim());
   }
 }
 
@@ -81,11 +82,55 @@ export interface DriveSyncPayload {
 }
 
 /**
+ * Helper to call Google APIs with automatic 401 token refresh retry
+ */
+async function callGoogleApi(
+  url: string,
+  options: RequestInit,
+  token: string
+): Promise<Response> {
+  let currentToken = token || getStoredGoogleToken() || '';
+  
+  let res = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      "Authorization": `Bearer ${currentToken}`
+    }
+  });
+
+  // If 401 Unauthorized, force refresh token and retry once
+  if (res.status === 401) {
+    console.warn("Google Access Token expired (401). Requesting fresh token...");
+    try {
+      clearStoredGoogleToken();
+      currentToken = await ensureGoogleToken(undefined, true);
+      if (currentToken) {
+        res = await fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            "Authorization": `Bearer ${currentToken}`
+          }
+        });
+      }
+    } catch (authErr) {
+      console.error("Failed to auto-refresh Google token:", authErr);
+    }
+  }
+
+  return res;
+}
+
+/**
  * 1. PUSH (ERP ➔ Google Drive): Tạo hoặc cập nhật toàn bộ Master Spreadsheet trên Google Drive
  */
 export async function pushMasterDataToDrive(token: string, data: DriveSyncPayload): Promise<{ spreadsheetId: string; url: string }> {
   if (!token) {
-    throw new Error("Chưa có mã token xác thực Google.");
+    token = await ensureGoogleToken();
+  }
+  if (!token) {
+    throw new Error("Chưa có mã token xác thực Google. Vui lòng đăng nhập lại tài khoản Google.");
   }
 
   const existingSheetId = getStoredSpreadsheetId();
@@ -111,15 +156,15 @@ export async function pushMasterDataToDrive(token: string, data: DriveSyncPayloa
     },
     {
       title: "Danh_Ba_Nhan_Su",
-      data: toSheetMatrix(data.contacts, ["ID", "Danh xưng", "Tên", "Chức vụ", "Phòng ban", "Công ty", "Điện thoại", "Email", "Mức độ quan hệ", "Phụ trách"])
+      data: toSheetMatrix(data.contacts || [], ["ID", "Danh xưng", "Tên", "Chức vụ", "Phòng ban", "Công ty", "Điện thoại", "Email", "Mức độ quan hệ", "Phụ trách", "Ghi chú"])
     },
     {
       title: "Khach_Hang",
-      data: toSheetMatrix(data.customers, ["Customer_ID", "Tên đầy đủ", "Loại hình", "Phân loại", "Mã số thuế", "Số điện thoại", "Email", "Địa chỉ", "Nhà máy", "Hạn thanh toán", "Hạn mức nợ", "Tài khoản ngân hàng", "Tình trạng"])
+      data: toSheetMatrix(data.customers || [], ["Customer_ID", "Tên đầy đủ", "Loại hình", "Phân loại", "Mã số thuế", "Số điện thoại", "Email", "Địa chỉ", "Nhà máy", "Hạn thanh toán", "Hạn mức nợ", "Tài khoản ngân hàng", "Tình trạng"])
     },
     {
       title: "Nha_Cung_Cap",
-      data: toSheetMatrix(data.suppliers, ["Mã nhà cung cấp", "Tên Nhà Cung Cấp", "Nhóm hàng", "Loại hình", "Đánh giá", "Mã số thuế", "Số điện thoại", "Email", "Địa chỉ", "Điều khoản thanh toán", "Tài khoản ngân hàng", "Tình trạng"])
+      data: toSheetMatrix(data.suppliers || [], ["Mã nhà cung cấp", "Tên Nhà Cung Cấp", "Nhóm hàng", "Loại hình", "Đánh giá", "Mã số thuế", "Số điện thoại", "Email", "Địa chỉ", "Điều khoản thanh toán", "Tài khoản ngân hàng", "Tình trạng"])
     },
     {
       title: "San_Pham",
@@ -139,12 +184,9 @@ export async function pushMasterDataToDrive(token: string, data: DriveSyncPayloa
 
   // If no existing spreadsheet, create a new one on Google Drive
   if (!targetId) {
-    const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+    const createRes = await callGoogleApi("https://sheets.googleapis.com/v4/spreadsheets", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         properties: { title: MASTER_SHEET_TITLE },
         sheets: sheetsToSync.map(s => ({
@@ -160,11 +202,11 @@ export async function pushMasterDataToDrive(token: string, data: DriveSyncPayloa
           }]
         }))
       })
-    });
+    }, token);
 
     if (!createRes.ok) {
-      const err = await createRes.json();
-      throw new Error(err.error?.message || "Không thể tạo file trên Google Drive.");
+      const err = await createRes.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Không thể tạo file trên Google Drive (HTTP ${createRes.status}).`);
     }
 
     const created = await createRes.json();
@@ -174,18 +216,15 @@ export async function pushMasterDataToDrive(token: string, data: DriveSyncPayloa
     // Update existing spreadsheet on Drive
     for (const sheet of sheetsToSync) {
       try {
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${targetId}/values/'${sheet.title}'!A1?valueInputOption=USER_ENTERED`, {
+        await callGoogleApi(`https://sheets.googleapis.com/v4/spreadsheets/${targetId}/values/'${encodeURIComponent(sheet.title)}'!A1?valueInputOption=USER_ENTERED`, {
           method: "PUT",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             range: `'${sheet.title}'!A1`,
             majorDimension: "ROWS",
             values: sheet.data
           })
-        });
+        }, token);
       } catch (e) {
         console.warn(`Lỗi cập nhật sheet ${sheet.title}:`, e);
       }
@@ -210,29 +249,69 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
   }
 
   if (!token) {
-    throw new Error("Chưa có mã token xác thực Google.");
+    token = await ensureGoogleToken();
+  }
+  if (!token) {
+    throw new Error("Chưa có mã token xác thực Google. Vui lòng đăng nhập lại Google.");
   }
 
-  let contactsCount = 0;
-  let customersCount = 0;
-  let suppliersCount = 0;
+  // Bước 1: Khám phá tất cả các tab trong Spreadsheet để matching linh hoạt
+  const metaRes = await callGoogleApi(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(title,sheetId)`, {
+    method: "GET"
+  }, token);
 
-  // Helper to read a tab and convert to Array of Objects
-  const readSheet = async (tabName: string): Promise<any[]> => {
+  if (!metaRes.ok) {
+    const err = await metaRes.json().catch(() => ({}));
+    if (metaRes.status === 401 || metaRes.status === 403) {
+      clearStoredGoogleToken();
+      throw new Error("Phiên đăng nhập Google đã hết hạn hoặc không có quyền truy cập tệp. Vui lòng bấm đăng nhập lại Google.");
+    }
+    if (metaRes.status === 404) {
+      throw new Error(`Không tìm thấy file bảng tính trên Google Drive (ID: ${id}). Vui lòng kiểm tra lại quyền chia sẻ file.`);
+    }
+    throw new Error(err.error?.message || `Lỗi truy xuất Google Sheets (HTTP ${metaRes.status}).`);
+  }
+
+  const metaData = await metaRes.json();
+  const availableSheets: string[] = (metaData.sheets || []).map((s: any) => s.properties?.title).filter(Boolean);
+  console.log("Danh sách các sheet tab tìm thấy trên Google Drive:", availableSheets);
+
+  // Helper tìm tab phù hợp nhất
+  const findTabName = (patterns: RegExp[]): string | null => {
+    for (const pattern of patterns) {
+      const match = availableSheets.find(title => pattern.test(title.toLowerCase().trim()));
+      if (match) return match;
+    }
+    return null;
+  };
+
+  const contactsTab = findTabName([/danh.*ba.*nhan.*su/i, /danh.*ba/i, /nhan.*su/i, /contact/i]) || availableSheets[1] || 'Danh_Ba_Nhan_Su';
+  const customersTab = findTabName([/khach.*hang/i, /customer/i]) || availableSheets[2] || 'Khach_Hang';
+  const suppliersTab = findTabName([/nha.*cung.*cap/i, /supplier/i, /ncc/i]) || availableSheets[3] || 'Nha_Cung_Cap';
+
+  // Helper đọc dữ liệu một tab
+  const readSheetValues = async (tabName: string): Promise<any[]> => {
+    if (!tabName) return [];
     try {
-      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/'${tabName}'!A1:Z500`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (!res.ok) return [];
+      const encodedTab = encodeURIComponent(tabName);
+      const res = await callGoogleApi(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/'${encodedTab}'!A1:ZZ5000`, {
+        method: "GET"
+      }, token);
+
+      if (!res.ok) {
+        console.warn(`Không thể đọc tab "${tabName}" (HTTP ${res.status})`);
+        return [];
+      }
+
       const json = await res.json();
       const rows: string[][] = json.values || [];
       if (rows.length < 2) return [];
 
-      const headers = rows[0].map(h => String(h).trim());
+      const headers = rows[0].map(h => String(h || '').trim());
       const dataRows = rows.slice(1);
 
       return dataRows
-        .filter(r => r.some(cell => String(cell).trim() !== ''))
+        .filter(r => r.some(cell => String(cell || '').trim() !== ''))
         .map(r => {
           const item: any = {};
           headers.forEach((h, idx) => {
@@ -243,81 +322,299 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
           return item;
         });
     } catch (e) {
-      console.warn(`Không thể đọc tab ${tabName}:`, e);
+      console.warn(`Lỗi khi đọc tab ${tabName}:`, e);
       return [];
     }
   };
 
-  // 1. Pull Contacts
-  const rawContacts = await readSheet('Danh_Ba_Nhan_Su');
-  if (rawContacts.length > 0) {
-    let batch = writeBatch(db);
-    let count = 0;
-    for (const c of rawContacts) {
-      if (c["Tên"] && c["Công ty"]) {
-        const targetId = c.id || c.ID || getItemKey(c, 'contacts');
-        const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-        const docRef = doc(db, 'contacts', docId);
-        batch.set(docRef, { ...c, id: docId, ID: c.ID || docId, updatedAt: new Date().toISOString() }, { merge: true });
-        count++;
-        contactsCount++;
-        if (count >= 400) {
-          await batch.commit();
-          batch = writeBatch(db);
-          count = 0;
+  let contactsCount = 0;
+  let customersCount = 0;
+  let suppliersCount = 0;
+
+  // 1. KÉO VÀ ĐỒNG BỘ DANH BẠ (Contacts)
+  if (contactsTab) {
+    const rawContacts = await readSheetValues(contactsTab);
+    console.log(`Đã đọc ${rawContacts.length} dòng từ tab Danh bạ (${contactsTab})`);
+    
+    if (rawContacts.length > 0) {
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (let i = 0; i < rawContacts.length; i++) {
+        const c = rawContacts[i];
+        
+        // Flexible key extraction
+        const name = c["Tên"] || c["Họ và tên"] || c["Name"] || c["Họ tên"] || '';
+        const company = c["Công ty"] || c["Company"] || c["Mã công ty"] || c["Khách hàng"] || c["Nhà cung cấp"] || '';
+        const phone = c["Điện thoại"] || c["Số điện thoại"] || c["Phone"] || c["SĐT"] || c["SDT"] || '';
+        const role = c["Chức vụ"] || c["Position"] || c["Vị trí"] || '';
+        const dept = c["Phòng ban"] || c["Department"] || c["Bộ phận"] || '';
+        const email = c["Email"] || c["Mail"] || '';
+        const salutation = c["Danh xưng"] || c["Title"] || 'Mr';
+        const relationship = c["Mức độ quan hệ"] || '3';
+        const inCharge = c["Phụ trách"] || '';
+        const notes = c["Ghi chú"] || c["Notes"] || c["Note"] || '';
+
+        if (name || phone || company) {
+          const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
+          const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
+          const docRef = doc(db, 'contacts', docId);
+
+          const payload = {
+            id: docId,
+            ID: c.ID || docId,
+            "Danh xưng": salutation,
+            "Tên": name,
+            "Chức vụ": role,
+            "Phòng ban": dept,
+            "Công ty": company,
+            "Điện thoại": phone,
+            "Email": email,
+            "Mức độ quan hệ": relationship,
+            "Phụ trách": inCharge,
+            "Ghi chú": notes,
+            updatedAt: new Date().toISOString()
+          };
+
+          batch.set(docRef, payload, { merge: true });
+          count++;
+          contactsCount++;
+
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
         }
       }
+      if (count > 0) await batch.commit();
     }
-    if (count > 0) await batch.commit();
   }
 
-  // 2. Pull Customers
-  const rawCustomers = await readSheet('Khach_Hang');
-  if (rawCustomers.length > 0) {
-    let batch = writeBatch(db);
-    let count = 0;
-    for (const cust of rawCustomers) {
-      if (cust["Customer_ID"] || cust["Tên đầy đủ"]) {
-        const targetId = cust.Customer_ID || cust.id || getItemKey(cust, 'customers');
-        const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-        const docRef = doc(db, 'customers', docId);
-        batch.set(docRef, { ...cust, id: docId, Customer_ID: cust.Customer_ID || docId, updatedAt: new Date().toISOString() }, { merge: true });
-        count++;
-        customersCount++;
-        if (count >= 400) {
-          await batch.commit();
-          batch = writeBatch(db);
-          count = 0;
+  // 2. KÉO VÀ ĐỒNG BỘ KHÁCH HÀNG (Customers)
+  if (customersTab) {
+    const rawCustomers = await readSheetValues(customersTab);
+    console.log(`Đã đọc ${rawCustomers.length} dòng từ tab Khách hàng (${customersTab})`);
+
+    if (rawCustomers.length > 0) {
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (let i = 0; i < rawCustomers.length; i++) {
+        const cust = rawCustomers[i];
+        const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["Mã KH"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
+        const fullName = cust["Tên đầy đủ"] || cust["Tên khách hàng"] || cust["Customer Name"] || custId;
+
+        if (custId || fullName) {
+          const targetId = custId || `cust_${i + 1}`;
+          const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+          const docRef = doc(db, 'customers', docId);
+
+          const payload = {
+            id: docId,
+            Customer_ID: cust["Customer_ID"] || docId,
+            "Tên đầy đủ": fullName,
+            "Loại hình": cust["Loại hình"] || 'Khách hàng',
+            "Phân loại": cust["Phân loại"] || 'Doanh nghiệp',
+            "Mã số thuế": cust["Mã số thuế"] || '',
+            "Số điện thoại": cust["Số điện thoại"] || cust["Điện thoại"] || '',
+            "Email": cust["Email"] || '',
+            "Địa chỉ": cust["Địa chỉ"] || '',
+            "Nhà máy": cust["Nhà máy"] || '',
+            "Hạn thanh toán": cust["Hạn thanh toán"] || '30 ngày',
+            "Hạn mức nợ": cust["Hạn mức nợ"] || '500,000,000 đ',
+            "Tài khoản ngân hàng": cust["Tài khoản ngân hàng"] || '',
+            "Tình trạng": cust["Tình trạng"] || 'Hoạt động',
+            updatedAt: new Date().toISOString()
+          };
+
+          batch.set(docRef, payload, { merge: true });
+          count++;
+          customersCount++;
+
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
         }
       }
+      if (count > 0) await batch.commit();
     }
-    if (count > 0) await batch.commit();
   }
 
-  // 3. Pull Suppliers
-  const rawSuppliers = await readSheet('Nha_Cung_Cap');
-  if (rawSuppliers.length > 0) {
-    let batch = writeBatch(db);
-    let count = 0;
-    for (const supp of rawSuppliers) {
-      if (supp["Mã nhà cung cấp"] || supp["Tên Nhà Cung Cấp"]) {
-        const targetId = supp["Mã nhà cung cấp"] || supp.id || getItemKey(supp, 'suppliers');
-        const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-        const docRef = doc(db, 'suppliers', docId);
-        batch.set(docRef, { ...supp, id: docId, "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId, updatedAt: new Date().toISOString() }, { merge: true });
-        count++;
-        suppliersCount++;
-        if (count >= 400) {
-          await batch.commit();
-          batch = writeBatch(db);
-          count = 0;
+  // 3. KÉO VÀ ĐỒNG BỘ NHÀ CUNG CẤP (Suppliers)
+  if (suppliersTab) {
+    const rawSuppliers = await readSheetValues(suppliersTab);
+    console.log(`Đã đọc ${rawSuppliers.length} dòng từ tab Nhà cung cấp (${suppliersTab})`);
+
+    if (rawSuppliers.length > 0) {
+      let batch = writeBatch(db);
+      let count = 0;
+
+      for (let i = 0; i < rawSuppliers.length; i++) {
+        const supp = rawSuppliers[i];
+        const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["Supplier_ID"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
+        const suppName = supp["Tên Nhà Cung Cấp"] || supp["Tên nhà cung cấp"] || supp["Supplier Name"] || suppId;
+
+        if (suppId || suppName) {
+          const targetId = suppId || `supp_${i + 1}`;
+          const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+          const docRef = doc(db, 'suppliers', docId);
+
+          const payload = {
+            id: docId,
+            "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId,
+            "Tên Nhà Cung Cấp": suppName,
+            "Nhóm hàng": supp["Nhóm hàng"] || 'Bao bì & Giấy',
+            "Loại hình": supp["Loại hình"] || 'Nhà sản xuất',
+            "Đánh giá": supp["Đánh giá"] || '5',
+            "Mã số thuế": supp["Mã số thuế"] || '',
+            "Số điện thoại": supp["Số điện thoại"] || supp["Điện thoại"] || '',
+            "Email": supp["Email"] || '',
+            "Địa chỉ": supp["Địa chỉ"] || '',
+            "Điều khoản thanh toán": supp["Điều khoản thanh toán"] || '30 ngày',
+            "Tài khoản ngân hàng": supp["Tài khoản ngân hàng"] || '',
+            "Tình trạng": supp["Tình trạng"] || 'Đang hợp tác',
+            updatedAt: new Date().toISOString()
+          };
+
+          batch.set(docRef, payload, { merge: true });
+          count++;
+          suppliersCount++;
+
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
         }
       }
+      if (count > 0) await batch.commit();
     }
-    if (count > 0) await batch.commit();
   }
 
   return { contactsCount, customersCount, suppliersCount };
+}
+
+/**
+ * 3. IMPORT TRỰC TIẾP TỪ FILE EXCEL (.XLSX) MASTER DATA
+ * Cho phép tải file từ Drive về hoặc sửa offline rồi nạp ngay vào hệ thống
+ */
+export async function importMasterDataFromExcelFile(file: File): Promise<{
+  contactsCount: number;
+  customersCount: number;
+  suppliersCount: number;
+}> {
+  const XLSX = await import('xlsx');
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  let contactsCount = 0;
+  let customersCount = 0;
+  let suppliersCount = 0;
+
+  for (const sheetName of workbook.SheetNames) {
+    const sNameLower = sheetName.toLowerCase();
+    const ws = workbook.Sheets[sheetName];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (rows.length === 0) continue;
+
+    // Contacts
+    if (sNameLower.includes('danh_ba') || sNameLower.includes('nhan_su') || sNameLower.includes('contact')) {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const c = rows[i];
+        const name = c["Tên"] || c["Họ và tên"] || c["Name"] || '';
+        const company = c["Công ty"] || c["Company"] || '';
+        const phone = c["Điện thoại"] || c["Số điện thoại"] || c["Phone"] || '';
+
+        if (name || phone || company) {
+          const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
+          const docId = String(rawKeySafe(rawId));
+          const docRef = doc(db, 'contacts', docId);
+
+          batch.set(docRef, {
+            id: docId,
+            ID: c.ID || docId,
+            "Danh xưng": c["Danh xưng"] || 'Mr',
+            "Tên": name,
+            "Chức vụ": c["Chức vụ"] || '',
+            "Phòng ban": c["Phòng ban"] || '',
+            "Công ty": company,
+            "Điện thoại": phone,
+            "Email": c["Email"] || '',
+            "Mức độ quan hệ": String(c["Mức độ quan hệ"] || '3'),
+            "Phụ trách": c["Phụ trách"] || '',
+            "Ghi chú": c["Ghi chú"] || '',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+
+          count++;
+          contactsCount++;
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+      }
+      if (count > 0) await batch.commit();
+    }
+
+    // Customers
+    if (sNameLower.includes('khach_hang') || sNameLower.includes('customer')) {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const cust = rows[i];
+        const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
+        if (custId) {
+          const docId = rawKeySafe(custId);
+          const docRef = doc(db, 'customers', docId);
+          batch.set(docRef, { ...cust, id: docId, Customer_ID: cust["Customer_ID"] || docId, updatedAt: new Date().toISOString() }, { merge: true });
+          count++;
+          customersCount++;
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+      }
+      if (count > 0) await batch.commit();
+    }
+
+    // Suppliers
+    if (sNameLower.includes('nha_cung_cap') || sNameLower.includes('supplier') || sNameLower.includes('ncc')) {
+      let batch = writeBatch(db);
+      let count = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const supp = rows[i];
+        const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
+        if (suppId) {
+          const docId = rawKeySafe(suppId);
+          const docRef = doc(db, 'suppliers', docId);
+          batch.set(docRef, { ...supp, id: docId, "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId, updatedAt: new Date().toISOString() }, { merge: true });
+          count++;
+          suppliersCount++;
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+      }
+      if (count > 0) await batch.commit();
+    }
+  }
+
+  return { contactsCount, customersCount, suppliersCount };
+}
+
+function rawKeySafe(val: any): string {
+  return String(val || '').replace(/[/\\#?%[\]\s.]+/g, '_');
 }
 
 export const getStoredMasterSpreadsheetId = getStoredSpreadsheetId;
@@ -326,17 +623,16 @@ export async function exportMasterDataToExcelDirectly(): Promise<void> {
   const toastId = toast.loading('Đang khởi tạo sổ bảng tính Excel Master Data...');
   try {
     const XLSX = await import('xlsx');
-    const { getDocs } = await import('firebase/firestore');
 
     const collections = [
-      { name: 'contacts', title: 'Danh_Ba' },
+      { name: 'contacts', title: 'Danh_Ba_Nhan_Su' },
       { name: 'customers', title: 'Khach_Hang' },
       { name: 'suppliers', title: 'Nha_Cung_Cap' },
       { name: 'products', title: 'San_Pham' },
       { name: 'pricing', title: 'Bang_Gia' },
       { name: 'po_headers', title: 'Don_Hang_PO' },
       { name: 'po_lines', title: 'Chi_Tiet_PO' },
-      { name: 'deliveries', title: 'Giao_Hang_PXK' },
+      { name: 'deliveries', title: 'Phieu_Xuat_Kho' },
       { name: 'delivery_plans', title: 'Ke_Hoach_Giao' },
     ];
 
@@ -366,4 +662,3 @@ export async function exportMasterDataToExcelDirectly(): Promise<void> {
     toast.error(`Lỗi xuất Excel: ${err.message || err}`, { id: toastId });
   }
 }
-

@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Cloud, RefreshCw, ExternalLink, Download, ArrowUpRight, 
   CheckCircle, AlertCircle, X, FileSpreadsheet, ShieldCheck, 
-  UploadCloud, ArrowDownRight, HardDrive, FileCheck, Layers
+  UploadCloud, ArrowDownRight, HardDrive, FileCheck, Layers,
+  FileUp, Sparkles
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { 
   getStoredSpreadsheetId, getDriveFileUrl, getExcelDownloadUrl, 
-  pushMasterDataToDrive, pullMasterDataFromDrive, MASTER_SHEET_TITLE,
-  DriveSyncPayload
+  pushMasterDataToDrive, pullMasterDataFromDrive, importMasterDataFromExcelFile,
+  MASTER_SHEET_TITLE, DriveSyncPayload
 } from '../lib/driveSync';
 import { ensureGoogleToken, openGoogleAuthTab, getStoredGoogleToken } from '../lib/auth';
+import MacTrafficLights from './MacTrafficLights';
 
 interface GoogleDriveSyncModalProps {
   isOpen: boolean;
@@ -21,8 +23,10 @@ interface GoogleDriveSyncModalProps {
 export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDriveSyncModalProps) {
   const [isPushing, setIsPushing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [spreadsheetId, setSpreadsheetId] = useState<string>('');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,7 +51,7 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
       if (!token) {
         token = await ensureGoogleToken();
       }
-      if (!token) throw new Error("Chưa có quyền truy cập Google Account.");
+      if (!token) throw new Error("Chưa có quyền truy cập Google Account. Vui lòng đăng nhập lại Google.");
 
       const result = await pushMasterDataToDrive(token, data);
       setSpreadsheetId(result.spreadsheetId);
@@ -71,12 +75,8 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
       return;
     }
 
-    if (!confirm("Bạn có chắc chắn muốn nạp dữ liệu từ Google Sheets về hệ thống ERP? Dữ liệu trên hệ thống sẽ được cập nhật đồng bộ.")) {
-      return;
-    }
-
     setIsPulling(true);
-    const toastId = toast.loading("Đang đọc dữ liệu mới nhất từ Google Drive về ERP...");
+    const toastId = toast.loading("Đang nạp dữ liệu mới nhất từ Google Sheets về ERP...");
     try {
       let token = getStoredGoogleToken();
       if (!token) {
@@ -90,8 +90,8 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
       localStorage.setItem('google_last_sync_time', timeStr);
 
       toast.success(
-        `Đã kéo về thành công: ${result.contactsCount} danh bạ, ${result.customersCount} khách hàng, ${result.suppliersCount} nhà cung cấp!`, 
-        { id: toastId }
+        `Đã kéo thành công: ${result.contactsCount} danh bạ, ${result.customersCount} khách hàng, ${result.suppliersCount} nhà cung cấp!`, 
+        { id: toastId, duration: 6000 }
       );
     } catch (err: any) {
       console.error("Pull from Drive error:", err);
@@ -101,32 +101,54 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
     }
   };
 
+  // 3. Nạp trực tiếp từ file Excel (.xlsx) tải từ Drive về
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setIsImportingExcel(true);
+    const toastId = toast.loading(`Đang nạp dữ liệu từ file ${selectedFile.name}...`);
+    try {
+      const result = await importMasterDataFromExcelFile(selectedFile);
+      const timeStr = new Date().toLocaleString('vi-VN');
+      setLastSyncTime(timeStr);
+      localStorage.setItem('google_last_sync_time', timeStr);
+
+      toast.success(
+        `Đã nạp file Excel thành công: ${result.contactsCount} danh bạ, ${result.customersCount} khách hàng, ${result.suppliersCount} nhà cung cấp!`,
+        { id: toastId, duration: 6000 }
+      );
+    } catch (err: any) {
+      console.error("Excel import error:", err);
+      toast.error(`Lỗi nạp file Excel: ${err.message || err}`, { id: toastId });
+    } finally {
+      setIsImportingExcel(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
         
-        {/* Header - Apple macOS Modal Style */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-blue-50/40">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-              <Cloud size={24} />
+        {/* Apple macOS Window Header */}
+        <div className="px-6 py-4 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
+          <MacTrafficLights onClose={onClose} />
+          <div className="h-4 w-px bg-black/[0.08]" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+              <Cloud size={18} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
                 Kho Dữ Liệu Đồng Bộ Google Drive
                 <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded-full">2-Way Sync</span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] text-slate-500 font-medium">
                 Lưu trữ master spreadsheet, chỉnh sửa trên Sheets và đồng bộ 2 chiều tức thì
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
-          >
-            <X size={16} />
-          </button>
         </div>
 
         {/* Modal Body */}
@@ -259,6 +281,34 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
             </div>
           </div>
 
+          {/* Option: Quick Local Excel Import */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <FileUp className="text-blue-600 shrink-0" size={18} />
+              <div>
+                <div className="font-bold text-xs text-slate-900">Nạp nhanh từ file Excel (.xlsx)</div>
+                <div className="text-[11px] text-slate-500">Tải file từ Drive về máy, chỉnh sửa rồi tải lên trực tiếp</div>
+              </div>
+            </div>
+            <div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleExcelUpload} 
+                accept=".xlsx,.xls,.csv" 
+                className="hidden" 
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImportingExcel || isPulling || isPushing}
+                className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-60"
+              >
+                {isImportingExcel ? <RefreshCw size={13} className="animate-spin" /> : <FileUp size={13} />}
+                <span>Chọn file Excel...</span>
+              </button>
+            </div>
+          </div>
+
           {/* Sync Information Guide */}
           <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-100/80 text-blue-900 text-xs space-y-1.5">
             <div className="font-bold flex items-center gap-1.5">
@@ -268,7 +318,7 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
             <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 text-[11px]">
               <li>Bảng tính chứa đầy đủ các tab: <strong>Danh bạ</strong>, <strong>Khách hàng</strong>, <strong>Nhà cung cấp</strong>, <strong>Sản phẩm</strong>, <strong>PO</strong>.</li>
               <li>Bạn có thể vào Google Drive chỉnh sửa thông tin nhân sự/khách hàng, sau đó bấm <strong>"(2) Kéo Google Drive ➔ ERP"</strong> để cập nhật ngay.</li>
-              <li>Bạn có thể tải file Excel về máy tính bất cứ lúc nào qua nút <strong>"Tải Excel (.xlsx) từ Drive"</strong>.</li>
+              <li>Cơ chế đồng bộ tự động tìm đúng tab dữ liệu và ghép nối chính xác tên nhân sự, số điện thoại, công ty vào hệ thống.</li>
             </ul>
           </div>
 
