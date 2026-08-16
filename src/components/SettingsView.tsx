@@ -3,11 +3,17 @@ import { toast } from 'react-hot-toast';
 import { googleSignIn, getAccessToken, logout, initAuth, ensureGoogleToken, openGoogleAuthTab } from '../lib/auth';
 import { app, db } from '../firebase';
 import { collection, writeBatch, doc, getDocs } from 'firebase/firestore';
-import { RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check, UploadCloud, Bot, Key, Eye, EyeOff, Cpu, Zap, AlertCircle } from 'lucide-react';
+import { 
+  RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, 
+  ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check, UploadCloud, 
+  Bot, Key, Eye, EyeOff, Cpu, Zap, AlertCircle, HardDrive, Globe,
+  Lock, Sliders, ChevronRight, Laptop, Info, ArrowUpRight, Copy
+} from 'lucide-react';
 import { PRICING_DATA, PO_HEADER_DATA, PO_LINES_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA } from '../data';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 import { getStoredGeminiKey, setStoredGeminiKey, testGeminiConnection } from '../lib/gemini';
+import { exportMasterDataToExcelDirectly, getStoredMasterSpreadsheetId } from '../lib/driveSync';
 import Papa from 'papaparse';
 
 const parseCSV = (csv: string) => {
@@ -44,6 +50,7 @@ function prepareSheetValues(docs: any[], defaultHeaders?: string[]): string[][] 
 }
 
 export default function SettingsView() {
+  const [activeSection, setActiveSection] = useState<'google' | 'gemini' | 'data' | 'system' | 'about'>('google');
   const [needsAuth, setNeedsAuth] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -61,6 +68,9 @@ export default function SettingsView() {
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [isTestingGemini, setIsTestingGemini] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<any>(null);
+
+  // Custom Google Client ID
+  const [customClientId, setCustomClientId] = useState(() => localStorage.getItem('google_custom_client_id') || '');
 
   useEffect(() => {
     initAuth(
@@ -97,6 +107,16 @@ export default function SettingsView() {
       toast.error(`Lỗi: ${e.message}`, { id: toastId });
     } finally {
       setIsTestingGemini(false);
+    }
+  };
+
+  const handleSaveCustomClientId = () => {
+    if (customClientId.trim()) {
+      localStorage.setItem('google_custom_client_id', customClientId.trim());
+      toast.success("Đã lưu Google Client ID tùy chỉnh.");
+    } else {
+      localStorage.removeItem('google_custom_client_id');
+      toast.success("Đã đặt lại Google Client ID mặc định.");
     }
   };
 
@@ -143,10 +163,10 @@ export default function SettingsView() {
       for (const col of collections) {
         const batch = writeBatch(db);
         col.data.forEach((item: any) => {
-           if (item[col.idField]) {
-             const docRef = doc(collection(db, col.name), item[col.idField]);
-             batch.set(docRef, item);
-           }
+          if (item[col.idField]) {
+            const docRef = doc(collection(db, col.name), item[col.idField]);
+            batch.set(docRef, item);
+          }
         });
         await batch.commit();
       }
@@ -158,660 +178,680 @@ export default function SettingsView() {
         setSyncSuccess(false);
       }, 10000);
     } catch (error: any) {
-      console.error(error);
-      setSyncStatus(`Lỗi: ${error.message}`);
-      toast.error('Lỗi khi nạp dữ liệu!', { id: toastId });
-      handleFirestoreError(error, OperationType.WRITE, 'batch-sync');
+      console.error("Lỗi khi nạp dữ liệu Firebase:", error);
+      setSyncStatus("Lỗi: " + error.message);
+      toast.error('Nạp dữ liệu thất bại: ' + error.message, { id: toastId });
     } finally {
       setIsSyncingFirebase(false);
     }
   };
 
-  const fetchCollectionData = async (colName: string, fallbackCsv?: string) => {
-    try {
-      const snap = await getDocs(collection(db, colName));
-      if (!snap.empty) {
-        return snap.docs.map(docItem => ({ id: docItem.id, ...docItem.data() }));
-      }
-    } catch (e) {
-      console.warn(`Could not fetch Firestore collection ${colName}:`, e);
-    }
-    if (fallbackCsv) {
-      return parseCSV(fallbackCsv);
-    }
-    return [];
-  };
-
-  const handleDownloadLocalJsonBackup = async () => {
-    const toastId = toast.loading("Đang đọc và đóng gói dữ liệu hệ thống...");
-    try {
-      const [
-        customers, suppliers, contacts, products, pricing,
-        poHeaders, poLines, deliveries, deliveryPlans, specs, fileStorage
-      ] = await Promise.all([
-        fetchCollectionData('customers', CUSTOMER_DATA),
-        fetchCollectionData('suppliers', SUPPLIER_DATA),
-        fetchCollectionData('contacts', CONTACT_DATA),
-        fetchCollectionData('products', PRODUCT_DATA),
-        fetchCollectionData('pricing', PRICING_DATA),
-        fetchCollectionData('po_headers', PO_HEADER_DATA),
-        fetchCollectionData('po_lines', PO_LINES_DATA),
-        fetchCollectionData('deliveries', DELIVERY_DATA),
-        fetchCollectionData('delivery_plans', DELIVERY_PLAN_DATA),
-        fetchCollectionData('specs'),
-        fetchCollectionData('file_storage')
-      ]);
-
-      const backupData = {
-        app: "TSG Sales & Operations Manager",
-        version: "1.0",
-        exportDate: new Date().toISOString(),
-        exportDateFormatted: new Date().toLocaleString('vi-VN'),
-        summary: {
-          customersCount: customers.length,
-          suppliersCount: suppliers.length,
-          contactsCount: contacts.length,
-          productsCount: products.length,
-          pricingCount: pricing.length,
-          poHeadersCount: poHeaders.length,
-          poLinesCount: poLines.length,
-          deliveriesCount: deliveries.length,
-          deliveryPlansCount: deliveryPlans.length,
-          specsCount: specs.length,
-          fileStorageCount: fileStorage.length,
-        },
-        collections: {
-          customers,
-          suppliers,
-          contacts,
-          products,
-          pricing,
-          po_headers: poHeaders,
-          po_lines: poLines,
-          deliveries,
-          delivery_plans: deliveryPlans,
-          specs,
-          file_storage: fileStorage
-        }
-      };
-
-      const jsonString = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `TSG_Full_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success("Đã tải xuống tập tin sao lưu JSON toàn bộ hệ thống thành công!", { id: toastId });
-    } catch (err: any) {
-      console.error("Local backup error:", err);
-      toast.error(`Không thể tạo sao lưu JSON: ${err.message}`, { id: toastId });
-    }
-  };
-
-  const handleRestoreJsonBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!confirm("Bạn có chắc chắn muốn nạp bản sao lưu JSON này vào cơ sở dữ liệu? Toàn bộ danh bạ, khách hàng, NCC, đơn hàng sẽ được đồng bộ lên Firebase.")) {
-      event.target.value = '';
-      return;
-    }
-
-    const toastId = toast.loading("Đang đọc và phục hồi dữ liệu từ file JSON...");
-    try {
-      const text = await file.text();
-      const backupJson = JSON.parse(text);
-      const data = backupJson.data || backupJson;
-
-      const collections = [
-        'customers', 'suppliers', 'contacts', 'products',
-        'pricing', 'po_headers', 'po_lines', 'deliveries', 'delivery_plans'
-      ];
-
-      let totalRestored = 0;
-      for (const colName of collections) {
-        const items = data[colName];
-        if (Array.isArray(items) && items.length > 0) {
-          let batch = writeBatch(db);
-          let count = 0;
-          for (const item of items) {
-            const rawId = item.id || getItemKey(item, colName) || doc(collection(db, colName)).id;
-            const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
-            const docRef = doc(db, colName, docId);
-            batch.set(docRef, item, { merge: true });
-            count++;
-            totalRestored++;
-            if (count >= 400) {
-              await batch.commit();
-              batch = writeBatch(db);
-              count = 0;
-            }
-          }
-          if (count > 0) {
-            await batch.commit();
-          }
-        }
-      }
-
-      toast.success(`Khôi phục thành công ${totalRestored} bản ghi lên hệ thống Cloud!`, { id: toastId });
-    } catch (err: any) {
-      console.error("Restore error:", err);
-      toast.error(`Khôi phục thất bại: ${err.message}`, { id: toastId });
-    } finally {
-      event.target.value = '';
-    }
-  };
-
   const handleBackupFullDataToSheets = async () => {
     setIsBackingUp(true);
-    setBackupStatus("Đang đọc toàn bộ danh mục dữ liệu...");
-    const toastId = toast.loading("Đang sao lưu toàn bộ dữ liệu ra Google Sheets...");
+    setBackupStatus("Đang thu thập dữ liệu từ hệ thống...");
+    setBackupUrl(null);
+    const toastId = toast.loading('Đang khởi tạo sao lưu dữ liệu...');
 
     try {
       let token = await getAccessToken();
       if (!token) {
-        token = localStorage.getItem('google_access_token') || '';
+        token = await ensureGoogleToken([
+          'https://www.googleapis.com/auth/spreadsheets',
+          'https://www.googleapis.com/auth/drive.file'
+        ]);
       }
 
-      const [
-        customers,
-        suppliers,
-        contacts,
-        products,
-        pricing,
-        poHeaders,
-        poLines,
-        deliveries,
-        deliveryPlans,
-        specs,
-        fileStorage
-      ] = await Promise.all([
-        fetchCollectionData('customers', CUSTOMER_DATA),
-        fetchCollectionData('suppliers', SUPPLIER_DATA),
-        fetchCollectionData('contacts', CONTACT_DATA),
-        fetchCollectionData('products', PRODUCT_DATA),
-        fetchCollectionData('pricing', PRICING_DATA),
-        fetchCollectionData('po_headers', PO_HEADER_DATA),
-        fetchCollectionData('po_lines', PO_LINES_DATA),
-        fetchCollectionData('deliveries', DELIVERY_DATA),
-        fetchCollectionData('delivery_plans', DELIVERY_PLAN_DATA),
-        fetchCollectionData('specs'),
-        fetchCollectionData('file_storage')
-      ]);
-
-      // Attempt 1: Try Serverless Backend Endpoint (/api/sheets/sync)
-      setBackupStatus("Đang khởi tạo Bảng tính Google Sheets...");
-      try {
-        const syncRes = await fetch('/api/sheets/sync', {
-          method: 'POST',
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            spreadsheetId: localStorage.getItem('google_spreadsheet_id') || '',
-            customers,
-            poLines,
-            deliveries
-          })
-        });
-
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (syncData.spreadsheetId) {
-            localStorage.setItem('google_spreadsheet_id', syncData.spreadsheetId);
-          }
-          const url = syncData.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${syncData.spreadsheetId}/edit`;
-          setBackupUrl(url);
-          setBackupStatus("Sao lưu toàn bộ dữ liệu thành công!");
-          toast.success("Sao lưu dữ liệu ra Google Sheets thành công!", { id: toastId });
-          window.open(url, "_blank");
-          setIsBackingUp(false);
-          return;
-        }
-      } catch (backendErr) {
-        console.warn("Backend API sync failed, trying browser Google API:", backendErr);
-      }
-
-      // Attempt 2: Direct browser OAuth API
       if (!token) {
-        try {
-          const result = await googleSignIn();
-          if (result) {
-            setUser(result.user);
-            setNeedsAuth(false);
-            token = result.accessToken;
-          }
-        } catch (err: any) {
-          console.warn("Google Signin failed:", err);
-          toast.error("Đang mở Tab mới để đăng nhập Google...", { id: toastId, duration: 4000 });
-          openGoogleAuthTab();
-          setIsBackingUp(false);
-          return;
-        }
+        throw new Error('Chưa kết nối tài khoản Google. Vui lòng đăng nhập Google trước.');
       }
 
-      const nowStr = new Date().toLocaleString('vi-VN');
-      const sheetsConfig = [
-        { title: "Tổng quan Sao Lưu", data: [
-          ["THÔNG TIN SAO LƯU DỮ LIỆU HỆ THỐNG TSG"],
-          ["Thời gian sao lưu", nowStr],
-          ["Tài khoản thực hiện", user?.email || "Chưa xác định"],
-          ["Trạng thái sao lưu", "Thành công hoàn tất"],
-          [""],
-          ["DANH MỤC BẢNG DỮ LIỆU", "SỐ LƯỢNG BẢN GHI SAO LƯU"],
-          ["1. Khách hàng", customers.length],
-          ["2. Nhà cung cấp", suppliers.length],
-          ["3. Danh bạ liên hệ", contacts.length],
-          ["4. Danh mục sản phẩm", products.length],
-          ["5. Bảng giá & Báo giá", pricing.length],
-          ["6. Đơn đặt hàng (PO Header)", poHeaders.length],
-          ["7. Chi tiết đơn hàng (PO Lines)", poLines.length],
-          ["8. Nhật ký giao hàng", deliveries.length],
-          ["9. Lịch kế hoạch giao hàng", deliveryPlans.length],
-          ["10. Quy cách kỹ thuật (Specs)", specs.length],
-          ["11. Lưu trữ tài liệu & tệp", fileStorage.length],
-        ]},
-        { title: "Khách hàng", data: prepareSheetValues(customers) },
-        { title: "Nhà cung cấp", data: prepareSheetValues(suppliers) },
-        { title: "Danh bạ liên hệ", data: prepareSheetValues(contacts) },
-        { title: "Danh mục sản phẩm", data: prepareSheetValues(products) },
-        { title: "Bảng giá", data: prepareSheetValues(pricing) },
-        { title: "Đơn hàng (PO Header)", data: prepareSheetValues(poHeaders) },
-        { title: "Chi tiết đơn hàng (PO Lines)", data: prepareSheetValues(poLines) },
-        { title: "Nhật ký giao hàng", data: prepareSheetValues(deliveries) },
-        { title: "Kế hoạch giao hàng", data: prepareSheetValues(deliveryPlans) },
-        { title: "Quy cách kỹ thuật", data: prepareSheetValues(specs) },
-        { title: "Lưu trữ tài liệu", data: prepareSheetValues(fileStorage) }
+      setBackupStatus("Đang truy vấn các danh mục dữ liệu...");
+
+      const tableNames = [
+        { name: 'contacts', title: 'Danh bạ' },
+        { name: 'customers', title: 'Khách hàng' },
+        { name: 'suppliers', title: 'Nhà cung cấp' },
+        { name: 'products', title: 'Sản phẩm' },
+        { name: 'pricing', title: 'Bảng giá' },
+        { name: 'po_headers', title: 'Đơn hàng (PO)' },
+        { name: 'po_lines', title: 'Chi tiết PO (Lines)' },
+        { name: 'deliveries', title: 'Nhật ký giao hàng' },
+        { name: 'delivery_plans', title: 'Kế hoạch giao hàng' },
       ];
 
-      const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
-        method: "POST",
+      const allTableData: { title: string; values: string[][] }[] = [];
+
+      for (const t of tableNames) {
+        try {
+          const snap = await getDocs(collection(db, t.name));
+          const docs = snap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+          const values = prepareSheetValues(docs);
+          allTableData.push({ title: t.title, values });
+        } catch (e) {
+          console.warn(`Lỗi lấy bảng ${t.name}:`, e);
+          allTableData.push({ title: t.title, values: [["Lỗi"], ["Không thể truy xuất dữ liệu"]] });
+        }
+      }
+
+      setBackupStatus("Đang tạo tệp Google Sheets...");
+
+      const now = new Date();
+      const timestamp = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const spreadsheetTitle = `[TSG ERP] Sao lưu Toàn bộ Dữ liệu - ${timestamp}`;
+
+      const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+        method: 'POST',
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           properties: {
-            title: `[SAO LƯU DỮ LIỆU TSG] ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}`
+            title: spreadsheetTitle
           },
-          sheets: sheetsConfig.map(s => ({
-            properties: { title: s.title }
+          sheets: allTableData.map(t => ({
+            properties: {
+              title: t.title
+            }
           }))
         })
       });
 
-      const createData = await createRes.json();
-      if (createData.error) throw new Error(createData.error.message || "Lỗi tạo file Google Sheets");
-
-      const spreadsheetId = createData.spreadsheetId;
-      if (spreadsheetId) {
-        localStorage.setItem('google_spreadsheet_id', spreadsheetId);
-        const valueData = sheetsConfig.map(s => ({
-          range: `'${s.title}'!A1`,
-          values: s.data
-        }));
-
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            valueInputOption: "USER_ENTERED",
-            data: valueData
-          })
-        });
-
-        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-        setBackupUrl(url);
-        setBackupStatus("Sao lưu toàn bộ dữ liệu thành công!");
-        toast.success("Sao lưu toàn bộ dữ liệu ra Google Sheets thành công!", { id: toastId });
-        window.open(url, "_blank");
+      if (!createRes.ok) {
+        const err = await createRes.json();
+        throw new Error(err.error?.message || 'Không thể tạo tệp Google Sheets mới.');
       }
-    } catch (error: any) {
-      console.error("Backup error:", error);
-      setBackupStatus(`Lỗi sao lưu: ${error.message}`);
-      toast.error(`Sao lưu thất bại: ${error.message}`, { id: toastId });
+
+      const createdSheet = await createRes.json();
+      const spreadsheetId = createdSheet.spreadsheetId;
+
+      setBackupStatus("Đang đồng bộ dữ liệu vào từng trang tính...");
+
+      const updateData = allTableData.map(t => ({
+        range: `'${t.title}'!A1`,
+        values: t.values
+      }));
+
+      const batchUpdateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          valueInputOption: 'USER_ENTERED',
+          data: updateData
+        })
+      });
+
+      if (!batchUpdateRes.ok) {
+        const err = await batchUpdateRes.json();
+        throw new Error(err.error?.message || 'Không thể ghi dữ liệu vào Google Sheets.');
+      }
+
+      const fileUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+      setBackupUrl(fileUrl);
+      setBackupStatus(`Sao lưu thành công: ${spreadsheetTitle}`);
+      toast.success("Sao lưu toàn bộ dữ liệu ra Google Sheets thành công!", { id: toastId });
+
+    } catch (err: any) {
+      console.error("Backup to Google Sheets error:", err);
+      setBackupStatus(`Lỗi: ${err.message || err}`);
+      toast.error(`Sao lưu thất bại: ${err.message || err}`, { id: toastId });
     } finally {
       setIsBackingUp(false);
     }
   };
 
+  const handleDownloadOfflineBackup = async () => {
+    const toastId = toast.loading('Đang xuất tệp JSON sao lưu hệ thống...');
+    try {
+      const collections = ["customers", "suppliers", "pricing", "po_headers", "po_lines", "deliveries", "contacts", "products", "delivery_plans", "specs"];
+      const backupData: Record<string, any[]> = {};
+      
+      for (const colName of collections) {
+        try {
+          const snap = await getDocs(collection(db, colName));
+          backupData[colName] = snap.docs.map(d => d.data());
+        } catch (e) {
+          console.warn(`Lỗi xuất bảng ${colName}:`, e);
+          backupData[colName] = [];
+        }
+      }
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TSG_ERP_Full_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Đã tải xuống tệp JSON sao lưu an toàn!', { id: toastId });
+    } catch (err: any) {
+      toast.error('Lỗi khi tải bản sao lưu: ' + err.message, { id: toastId });
+    }
+  };
+
+  const masterSpreadsheetId = getStoredMasterSpreadsheetId();
+
   return (
-    <div className="flex-1 p-8 bg-gray-50 overflow-y-auto">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Cài đặt & Quản lý Dữ liệu</h2>
-          <p className="text-sm text-gray-500 mt-1">Quản lý kết nối Google Workspace, nạp dữ liệu chuẩn và sao lưu dữ liệu toàn hệ thống</p>
-        </div>
-
-        {/* GOOGLE BACKUP MAIN SECTION */}
-        <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 rounded-2xl text-white p-6 md:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
-             <FileSpreadsheet size={320} />
+    <div className="flex-1 bg-[#F5F5F7] min-h-screen text-[#1D1D1F] flex flex-col font-sans">
+      
+      {/* Apple macOS Top Bar / Window Header */}
+      <div className="bg-white/80 backdrop-blur-xl border-b border-black/[0.06] sticky top-0 z-20 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Traffic Lights */}
+          <div className="flex items-center gap-1.5 mr-2">
+            <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/50 shadow-xs inline-block" />
+            <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/50 shadow-xs inline-block" />
+            <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/50 shadow-xs inline-block" />
           </div>
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-             <div className="space-y-3 max-w-xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-semibold uppercase tracking-wider">
-                   <Sparkles size={14} className="text-emerald-300" /> Tính năng Sao lưu tự động
-                </div>
-                <h3 className="text-2xl font-bold text-white tracking-tight">
-                   Sao lưu toàn bộ Dữ liệu ra Google Sheet
-                </h3>
-                <p className="text-emerald-100/90 text-sm leading-relaxed">
-                   Xuất đồng bộ tất cả các bảng dữ liệu: <strong>Khách hàng, Nhà cung cấp, Bảng giá, Đơn đặt hàng (PO), Nhật ký giao hàng, Danh bạ, Sản phẩm</strong> ra một sổ tay Google Sheets chuyên nghiệp với từng trang tính (Sheet) riêng biệt.
-                </p>
-                {needsAuth ? (
-                  <p className="text-xs text-amber-200 bg-amber-500/20 border border-amber-400/30 px-3 py-2 rounded-lg">
-                    ⚠️ Yêu cầu kết nối tài khoản Google để tải trực tiếp lên Google Drive của bạn.
-                  </p>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-emerald-200 bg-emerald-950/40 px-3 py-2 rounded-lg border border-emerald-500/20 w-fit">
-                    <CheckCircle size={15} className="text-emerald-400" />
-                    Tài khoản sẵn sàng: <strong>{user?.email}</strong>
-                  </div>
-                )}
-             </div>
-
-             <div className="w-full md:w-auto flex flex-col items-center gap-3">
-                <button
-                  onClick={handleBackupFullDataToSheets}
-                  disabled={isBackingUp}
-                  className="w-full md:w-auto px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg hover:shadow-emerald-500/25 flex items-center justify-center gap-3 text-base active:scale-98 disabled:opacity-75 disabled:cursor-not-allowed"
-                >
-                  {isBackingUp ? (
-                     <>
-                        <RefreshCw className="animate-spin" size={20} />
-                        <span>Đang sao lưu...</span>
-                     </>
-                  ) : (
-                     <>
-                        <FileSpreadsheet size={20} />
-                        <span>Sao lưu ngay ra Google Sheet</span>
-                     </>
-                  )}
-                </button>
-
-                <div className="flex flex-wrap gap-2 w-full justify-center">
-                  <button
-                    onClick={handleDownloadLocalJsonBackup}
-                    className="flex-1 md:flex-none px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-200 border border-emerald-500/30 font-medium rounded-lg transition-all text-xs flex items-center justify-center gap-1.5"
-                    title="Tải tập tin sao lưu JSON chứa toàn bộ dữ liệu về máy vi tính"
-                  >
-                    <Download size={14} />
-                    <span>Tải sao lưu JSON (Offline)</span>
-                  </button>
-
-                  <label 
-                    className="flex-1 md:flex-none px-3.5 py-2 bg-blue-950/60 hover:bg-blue-900/80 text-blue-200 border border-blue-500/30 font-medium rounded-lg transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    title="Khôi phục dữ liệu từ tập tin JSON đã sao lưu trước đó"
-                  >
-                    <UploadCloud size={14} />
-                    <span>Khôi phục từ file JSON</span>
-                    <input 
-                      type="file" 
-                      accept=".json" 
-                      onChange={handleRestoreJsonBackup} 
-                      className="hidden" 
-                    />
-                  </label>
-                </div>
-
-                {backupStatus && (
-                  <span className="text-xs text-emerald-200 text-center font-medium max-w-xs animate-fade-in">
-                    {backupStatus}
-                  </span>
-                )}
-
-                {backupUrl && (
-                  <a
-                    href={backupUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-emerald-300 hover:text-white underline font-medium"
-                  >
-                    <ExternalLink size={13} /> Mở Bảng tính Google Sheets đã sao lưu
-                  </a>
-                )}
-             </div>
+          <div>
+            <h1 className="text-base font-semibold tracking-[-0.015em] text-[#1D1D1F] flex items-center gap-2">
+              <span>Cài đặt hệ thống</span>
+              <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">macOS Sequoia Style</span>
+            </h1>
+            <p className="text-xs text-slate-500">Quản lý kết nối đám mây, trí tuệ nhân tạo và kho dữ liệu doanh nghiệp</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Google Account Settings */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
-            <div className="flex items-center gap-3 mb-4">
-               <Download className="text-emerald-600" size={24} />
-               <h3 className="font-bold text-gray-900">Kết nối Google Workspace</h3>
+        <div className="flex items-center gap-2">
+          {user?.email && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Google Connected</span>
             </div>
-            <p className="text-sm text-gray-600 mb-6 flex-1">
-               Kết nối tài khoản Google để cấp quyền tạo bảng tính Google Sheets, Slide báo cáo và giao diện tích hợp Google Calendar/Tasks.
-            </p>
-            
-            {needsAuth ? (
-              <div className="space-y-3">
-                <button 
-                  onClick={handleLogin}
-                  disabled={isLoggingIn}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
-                >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
-                  {isLoggingIn ? 'Đang kết nối...' : 'Đăng nhập với Google'}
-                </button>
-
-                <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-[11px] text-blue-900 space-y-1.5">
-                  <div className="font-semibold flex items-center gap-1 text-blue-800">
-                    <span>💡 Hướng dẫn cấp quyền Google OAuth (nếu gặp lỗi 400):</span>
-                  </div>
-                  <p className="text-slate-600">
-                    Thêm <code className="bg-blue-100 px-1 rounded font-mono text-blue-800">https://tsg-business-new.vercel.app</code> vào <strong>Authorized JavaScript origins</strong> trong Google Cloud Console.
-                  </p>
-                  <a
-                    href="https://console.cloud.google.com/apis/credentials?project=gen-lang-client-0509365022"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline pt-0.5"
-                  >
-                    <span>Mở Google Cloud Console Credentials ↗</span>
-                  </a>
-                </div>
-              </div>
-            ) : (
-               <div className="space-y-3">
-                 <div className="flex items-center justify-between bg-emerald-50 px-3.5 py-2.5 rounded-lg border border-emerald-100">
-                    <div className="flex items-center gap-2 text-sm text-emerald-800 font-medium truncate">
-                       <CheckCircle size={16} className="text-emerald-600 flex-shrink-0" />
-                       <span className="truncate">{user?.email}</span>
-                    </div>
-                    <button onClick={logout} className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50" title="Đăng xuất">
-                       <LogOut size={16} />
-                    </button>
-                 </div>
-                 
-                 <button 
-                  onClick={handleBackupFullDataToSheets}
-                  disabled={isBackingUp}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
-                 >
-                    {isBackingUp ? <RefreshCw className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
-                    {isBackingUp ? 'Đang tạo Bảng tính...' : 'Xuất dữ liệu toàn hệ thống'}
-                 </button>
-                </div>
-            )}
-          </div>
-
-          {/* Gemini AI (Google AI Studio) Connection Card */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg text-purple-700">
-                    <Bot size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">Kết nối Gemini AI (Google AI Studio)</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">Mô hình Gemini 2.5 Flash / 2.0 Flash phân tích dữ liệu B2B</p>
-                  </div>
-                </div>
-                {geminiTestResult?.success ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                    <CheckCircle size={12} /> Đã kết nối
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                    <AlertCircle size={12} /> Chưa cấu hình
-                  </span>
-                )}
-              </div>
-
-              <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                Nhập <strong>Gemini API Key</strong> của bạn để kích hoạt Trợ lý ảo AI, đọc chứng từ hình ảnh/PDF (OCR) và tra cứu số liệu tự động.
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-1.5 flex items-center justify-between">
-                    <span>Khóa API Key (Google AI Studio)</span>
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-purple-600 hover:text-purple-700 underline text-[11px]"
-                    >
-                      Lấy API Key miễn phí ↗
-                    </a>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showGeminiKey ? 'text' : 'password'}
-                      value={geminiApiKey}
-                      onChange={(e) => setGeminiApiKey(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 pr-9 text-xs font-mono outline-none focus:border-purple-500 focus:bg-white transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowGeminiKey(!showGeminiKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showGeminiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-
-                {geminiTestResult && (
-                  <div className={`p-2.5 rounded-lg text-xs flex items-center justify-between ${
-                    geminiTestResult.success 
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                      : 'bg-red-50 text-red-800 border border-red-200'
-                  }`}>
-                    <span className="truncate">{geminiTestResult.text || geminiTestResult.error}</span>
-                    {geminiTestResult.model && (
-                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-white/60 rounded">
-                        {geminiTestResult.model}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+          )}
+          {geminiTestResult?.success && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium border border-purple-200">
+              <Sparkles size={13} className="text-purple-600" />
+              <span>Gemini 2.5 Flash</span>
             </div>
-
-            <div className="pt-4 mt-4 border-t border-gray-100 flex gap-2">
-              <button
-                onClick={handleSaveGeminiKey}
-                disabled={isTestingGemini}
-                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
-              >
-                {isTestingGemini ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    <span>Đang kiểm tra kết nối...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={14} />
-                    <span>Lưu & Kiểm tra kết nối AI</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* AI Direct Assistant & Google API Diagnostic Control Card */}
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 rounded-2xl p-6 text-white border border-slate-800 shadow-lg">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-500/20 rounded-xl border border-blue-400/30">
-                  <Sparkles className="text-blue-300 animate-pulse" size={22} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white">Trung Tâm Điều Hành AI & Chẩn Đoán Google API</h3>
-                  <p className="text-slate-300 text-xs mt-0.5">Kết nối trực tiếp với Trợ lý AI và chẩn đoán đường truyền Google Sheets/Drive</p>
-                </div>
-              </div>
-              <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 rounded-full text-xs font-semibold">
-                Sẵn sàng 24/7
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-2">
-                <p className="font-bold text-blue-300 flex items-center gap-1.5 text-sm">
-                  <Sparkles size={14} /> Chỉnh Sửa Trực Tiếp Cùng AI (Antigravity)
-                </p>
-                <p className="text-slate-300 text-xs leading-relaxed">
-                  Bạn có thể ra lệnh bằng tiếng Việt trực tiếp với trợ lý AI tại cửa sổ Chat để:
-                </p>
-                <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-1 font-mono bg-slate-950/60 p-2.5 rounded border border-slate-800">
-                  <li>"Sửa giao diện bảng sang tối màu Indigo"</li>
-                  <li>"Thêm trường thông tin mới vào Đơn hàng PO"</li>
-                  <li>"Cấu hình tự động báo cáo doanh thu"</li>
-                </ul>
-              </div>
-
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 space-y-3 flex flex-col justify-between">
-                <div>
-                  <p className="font-bold text-emerald-300 text-sm flex items-center gap-1.5">
-                    <Database size={14} /> Google Spreadsheet ID Hiện Tại
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-1 font-mono bg-slate-950 p-2 rounded border border-slate-800 truncate">
-                    {localStorage.getItem('google_spreadsheet_id') || 'Chưa có Bảng tính kết nối (Bấm Đồng bộ Google để tự khởi tạo)'}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const savedId = localStorage.getItem('google_spreadsheet_id');
-                      if (savedId) {
-                        window.open(`https://docs.google.com/spreadsheets/d/${savedId}`, '_blank');
-                      } else {
-                        toast.error('Chưa có Google Spreadsheet ID! Vui lòng ấn Đồng bộ Google trước.');
-                      }
-                    }}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-xs transition-colors flex items-center justify-center gap-1"
-                  >
-                    <ExternalLink size={13} /> Mở Google Sheet ↗
-                  </button>
-                  <button
-                    onClick={handleDownloadLocalJsonBackup}
-                    className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg font-medium text-xs transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Download size={13} /> Tải Sao Lưu JSON
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Main Apple Split-View Settings Container */}
+      <div className="max-w-6xl w-full mx-auto p-4 md:p-6 lg:p-8 flex-1 flex flex-col md:flex-row gap-6">
+        
+        {/* Left Column: Apple Source List Navigation */}
+        <div className="w-full md:w-64 shrink-0 space-y-1">
+          <div className="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            Tài nguyên & Kết nối
+          </div>
+          
+          <button
+            onClick={() => setActiveSection('google')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeSection === 'google'
+                ? 'bg-[#007AFF] text-white shadow-sm font-semibold'
+                : 'text-slate-700 hover:bg-black/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-1.5 rounded-lg ${activeSection === 'google' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'}`}>
+                <Globe size={15} />
+              </div>
+              <span>Google Workspace</span>
+            </div>
+            <ChevronRight size={14} className={activeSection === 'google' ? 'text-white/70' : 'text-slate-400'} />
+          </button>
+
+          <button
+            onClick={() => setActiveSection('gemini')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeSection === 'gemini'
+                ? 'bg-[#007AFF] text-white shadow-sm font-semibold'
+                : 'text-slate-700 hover:bg-black/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-1.5 rounded-lg ${activeSection === 'gemini' ? 'bg-white/20' : 'bg-purple-100 text-purple-700'}`}>
+                <Bot size={15} />
+              </div>
+              <span>Gemini AI Intelligence</span>
+            </div>
+            <ChevronRight size={14} className={activeSection === 'gemini' ? 'text-white/70' : 'text-slate-400'} />
+          </button>
+
+          <button
+            onClick={() => setActiveSection('data')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeSection === 'data'
+                ? 'bg-[#007AFF] text-white shadow-sm font-semibold'
+                : 'text-slate-700 hover:bg-black/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-1.5 rounded-lg ${activeSection === 'data' ? 'bg-white/20' : 'bg-blue-100 text-blue-700'}`}>
+                <HardDrive size={15} />
+              </div>
+              <span>Kho Master Data & Backup</span>
+            </div>
+            <ChevronRight size={14} className={activeSection === 'data' ? 'text-white/70' : 'text-slate-400'} />
+          </button>
+
+          <div className="pt-4 px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            Hệ thống & Cấu hình
+          </div>
+
+          <button
+            onClick={() => setActiveSection('system')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeSection === 'system'
+                ? 'bg-[#007AFF] text-white shadow-sm font-semibold'
+                : 'text-slate-700 hover:bg-black/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-1.5 rounded-lg ${activeSection === 'system' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'}`}>
+                <Sliders size={15} />
+              </div>
+              <span>Nạp dữ liệu chuẩn Demo</span>
+            </div>
+            <ChevronRight size={14} className={activeSection === 'system' ? 'text-white/70' : 'text-slate-400'} />
+          </button>
+
+          <button
+            onClick={() => setActiveSection('about')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeSection === 'about'
+                ? 'bg-[#007AFF] text-white shadow-sm font-semibold'
+                : 'text-slate-700 hover:bg-black/[0.04]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-1.5 rounded-lg ${activeSection === 'about' ? 'bg-white/20' : 'bg-slate-200 text-slate-700'}`}>
+                <Info size={15} />
+              </div>
+              <span>Giới thiệu TSG Business OS</span>
+            </div>
+            <ChevronRight size={14} className={activeSection === 'about' ? 'text-white/70' : 'text-slate-400'} />
+          </button>
+        </div>
+
+        {/* Right Column: Apple Inset Grouped Detail Panes */}
+        <div className="flex-1 space-y-6">
+          
+          {/* SECTION: Google Workspace */}
+          {activeSection === 'google' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div className="p-6 border-b border-black/[0.06] flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                      <Globe size={22} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold text-[#1D1D1F]">Google Workspace & Cloud Hub</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">Tự động đồng bộ 2 chiều với Google Drive, Google Sheets và Calendar</p>
+                    </div>
+                  </div>
+                  {user ? (
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full flex items-center gap-1.5">
+                      <CheckCircle size={13} /> Đã kích hoạt
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full">
+                      Chưa kết nối
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {user ? (
+                    <div className="bg-[#F5F5F7] rounded-xl p-4 flex items-center justify-between border border-black/[0.04]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
+                          G
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-[#1D1D1F]">{user.email || 'Tài khoản Google đã kết nối'}</p>
+                          <p className="text-[11px] text-emerald-700 mt-0.5 font-medium">Quyền truy cập: Google Drive & Google Sheets Master Data</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={logout}
+                        className="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                      >
+                        Ngắt kết nối
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleLogin}
+                        disabled={isLoggingIn}
+                        className="w-full py-3 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#0051A8] text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4 bg-white rounded-full p-0.5" />
+                        <span>{isLoggingIn ? 'Đang xác thực Google...' : 'Đăng nhập & Cấp quyền Google Workspace'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Actions Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <button
+                      onClick={handleBackupFullDataToSheets}
+                      disabled={isBackingUp}
+                      className="p-4 rounded-xl border border-black/[0.08] hover:border-[#007AFF] hover:bg-blue-50/40 text-left transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700">
+                          <FileSpreadsheet size={18} />
+                        </div>
+                        <ArrowUpRight size={16} className="text-slate-400 group-hover:text-[#007AFF] transition-colors" />
+                      </div>
+                      <h4 className="text-xs font-semibold text-[#1D1D1F]">Tạo Bản Sao Toàn Diện</h4>
+                      <p className="text-[11px] text-slate-500 mt-1">Xuất toàn bộ 9 bảng danh mục ra một tệp Google Sheets mới độc lập.</p>
+                    </button>
+
+                    <button
+                      onClick={() => exportMasterDataToExcelDirectly()}
+                      className="p-4 rounded-xl border border-black/[0.08] hover:border-[#007AFF] hover:bg-blue-50/40 text-left transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                          <Download size={18} />
+                        </div>
+                        <ArrowUpRight size={16} className="text-slate-400 group-hover:text-[#007AFF] transition-colors" />
+                      </div>
+                      <h4 className="text-xs font-semibold text-[#1D1D1F]">Tải Excel Master (.xlsx)</h4>
+                      <p className="text-[11px] text-slate-500 mt-1">Tải trực tiếp file Excel 9 trang tính để lưu vào máy hoặc Google Drive.</p>
+                    </button>
+                  </div>
+
+                  {backupUrl && (
+                    <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs flex items-center justify-between">
+                      <span className="text-emerald-800 font-medium truncate">{backupStatus}</span>
+                      <a 
+                        href={backupUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold flex items-center gap-1 shrink-0 ml-2"
+                      >
+                        <span>Mở Sheets</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Developer / Advanced Settings Inset Card */}
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cấu hình nâng cao (OAuth Client ID)</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Nếu bạn sử dụng tài khoản Google Cloud riêng hoặc muốn tùy biến Client ID, bạn có thể dán ID bên dưới:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customClientId}
+                    onChange={(e) => setCustomClientId(e.target.value)}
+                    placeholder="779403158794-...apps.googleusercontent.com"
+                    className="flex-1 bg-[#F5F5F7] border border-black/[0.08] rounded-xl px-3.5 py-2 text-xs font-mono outline-none focus:border-[#007AFF] focus:bg-white"
+                  />
+                  <button
+                    onClick={handleSaveCustomClientId}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold"
+                  >
+                    Lưu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: Gemini AI */}
+          {activeSection === 'gemini' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div className="p-6 border-b border-black/[0.06] flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
+                      <Bot size={22} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold text-[#1D1D1F]">Google Gemini AI Intelligence</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">Mô hình AI đa phương thức: Phân tích báo cáo B2B, OCR đọc chứng từ, tính giá</p>
+                    </div>
+                  </div>
+                  {geminiTestResult?.success ? (
+                    <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full flex items-center gap-1.5">
+                      <CheckCircle size={13} /> Sẵn sàng ({geminiTestResult.model})
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full flex items-center gap-1.5">
+                      <AlertCircle size={13} /> Dùng AI tích hợp
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-[#1D1D1F]">
+                        Google AI Studio API Key
+                      </label>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-semibold text-[#007AFF] hover:underline flex items-center gap-1"
+                      >
+                        <span>Lấy API Key chính thức miễn phí ↗</span>
+                      </a>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showGeminiKey ? 'text' : 'password'}
+                        value={geminiApiKey}
+                        onChange={(e) => setGeminiApiKey(e.target.value)}
+                        placeholder="Dán mã API Key dạng AIzaSy..."
+                        className="w-full bg-[#F5F5F7] border border-black/[0.08] rounded-xl px-4 py-2.5 pr-10 text-xs font-mono outline-none focus:border-purple-500 focus:bg-white transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowGeminiKey(!showGeminiKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showGeminiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {geminiTestResult && (
+                    <div className={`p-3.5 rounded-xl text-xs flex items-center justify-between ${
+                      geminiTestResult.success 
+                        ? 'bg-purple-50 text-purple-900 border border-purple-200' 
+                        : 'bg-red-50 text-red-900 border border-red-200'
+                    }`}>
+                      <span className="truncate">{geminiTestResult.text || geminiTestResult.error}</span>
+                      {geminiTestResult.model && (
+                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-white rounded-md shadow-xs ml-2">
+                          {geminiTestResult.model}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      onClick={handleSaveGeminiKey}
+                      disabled={isTestingGemini}
+                      className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-xl font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isTestingGemini ? (
+                        <>
+                          <RefreshCw size={15} className="animate-spin" />
+                          <span>Đang kiểm tra kết nối Google AI Studio...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={15} />
+                          <span>Lưu & Kiểm tra kết nối Gemini</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Features Checklist Card */}
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-3">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Khả năng AI đã được kích hoạt</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
+                  <div className="p-3 bg-[#F5F5F7] rounded-xl flex items-start gap-2.5">
+                    <span className="text-purple-600 font-bold">✓</span>
+                    <div>
+                      <p className="font-semibold text-[#1D1D1F]">Trợ lý Báo cáo Tức thì</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Tra cứu tiến độ PO, doanh thu, lợi nhuận NCC theo ngôn ngữ tự nhiên.</p>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-[#F5F5F7] rounded-xl flex items-start gap-2.5">
+                    <span className="text-purple-600 font-bold">✓</span>
+                    <div>
+                      <p className="font-semibold text-[#1D1D1F]">OCR Chứng từ Đa định dạng</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Kéo thả ảnh hóa đơn, phiếu xuất kho để trích xuất tự động vào hệ thống.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: Kho Master Data & Backup */}
+          {activeSection === 'data' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-6">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                    <HardDrive size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-[#1D1D1F]">Kho Lưu Trữ & Bản Sao Dự Phòng</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Đảm bảo an toàn 100% dữ liệu danh bạ, khách hàng, nhà cung cấp và đơn hàng</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-[#F5F5F7] border border-black/[0.04] space-y-3 flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#1D1D1F] flex items-center gap-2">
+                        <Download size={16} className="text-blue-600" />
+                        <span>Sao lưu Ngoại tuyến (JSON)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1">Tải về toàn bộ cơ sở dữ liệu dạng tệp JSON tiêu chuẩn có thể khôi phục bất cứ khi nào.</p>
+                    </div>
+                    <button
+                      onClick={handleDownloadOfflineBackup}
+                      className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-black/[0.08] rounded-xl text-xs font-semibold transition-all shadow-xs"
+                    >
+                      Tải tệp JSON về máy
+                    </button>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-[#F5F5F7] border border-black/[0.04] space-y-3 flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#1D1D1F] flex items-center gap-2">
+                        <FileSpreadsheet size={16} className="text-emerald-600" />
+                        <span>Sổ Bảng Tính Excel (.xlsx)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1">Tạo file Excel 9 trang tính chuẩn hóa format tương thích 100% với Google Sheets.</p>
+                    </div>
+                    <button
+                      onClick={() => exportMasterDataToExcelDirectly()}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
+                    >
+                      Xuất Sổ Bảng Tính Excel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: Nạp Dữ liệu chuẩn Demo */}
+          {activeSection === 'system' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-6">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                    <Database size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-[#1D1D1F]">Nạp Cơ Sở Dữ Liệu Chuẩn TSG</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Khởi tạo dữ liệu mẫu gốc gồm đầy đủ Khách hàng, NCC, Bảng giá và Đơn hàng PO</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-2">
+                  <p className="font-semibold">⚠️ Lưu ý quan trọng:</p>
+                  <p>Hành động này sẽ ghi đè các bản ghi trùng mã ID với bộ dữ liệu mẫu chuẩn của Tâm Sen Group. Hãy chỉ bấm khi bạn muốn reset về trạng thái ban đầu.</p>
+                </div>
+
+                <button
+                  onClick={handleSyncFirebase}
+                  disabled={isSyncingFirebase}
+                  className="w-full py-3 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSyncingFirebase ? (
+                    <>
+                      <RefreshCw size={15} className="animate-spin" />
+                      <span>{syncStatus || 'Đang nạp dữ liệu...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Database size={15} />
+                      <span>Nạp toàn bộ dữ liệu mẫu vào Firebase</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: About TSG Business OS */}
+          {activeSection === 'about' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
+                  <Laptop size={32} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#1D1D1F] tracking-[-0.015em]">TSG Business OS</h2>
+                  <p className="text-xs text-slate-500 mt-1">Phiên bản 2.5 • Thiết kế theo chuẩn Apple Human Interface Guidelines (macOS Sequoia)</p>
+                </div>
+                <div className="max-w-md mx-auto p-4 bg-[#F5F5F7] rounded-xl text-xs text-slate-600 leading-relaxed border border-black/[0.04] text-left space-y-1.5 font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Kiến trúc:</span>
+                    <span className="font-semibold text-slate-800">React 19 + TypeScript + Vite</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Đồng bộ Cloud:</span>
+                    <span className="font-semibold text-emerald-700">Google Drive & Sheets API v4</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Trí tuệ nhân tạo:</span>
+                    <span className="font-semibold text-purple-700">Google Gemini 2.5 Flash</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Cơ sở dữ liệu:</span>
+                    <span className="font-semibold text-slate-800">Firebase Firestore Cloud Database</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
     </div>
   );
 }

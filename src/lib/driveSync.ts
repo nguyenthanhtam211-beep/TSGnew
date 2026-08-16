@@ -319,3 +319,51 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
 
   return { contactsCount, customersCount, suppliersCount };
 }
+
+export const getStoredMasterSpreadsheetId = getStoredSpreadsheetId;
+
+export async function exportMasterDataToExcelDirectly(): Promise<void> {
+  const toastId = toast.loading('Đang khởi tạo sổ bảng tính Excel Master Data...');
+  try {
+    const XLSX = await import('xlsx');
+    const { getDocs } = await import('firebase/firestore');
+
+    const collections = [
+      { name: 'contacts', title: 'Danh_Ba' },
+      { name: 'customers', title: 'Khach_Hang' },
+      { name: 'suppliers', title: 'Nha_Cung_Cap' },
+      { name: 'products', title: 'San_Pham' },
+      { name: 'pricing', title: 'Bang_Gia' },
+      { name: 'po_headers', title: 'Don_Hang_PO' },
+      { name: 'po_lines', title: 'Chi_Tiet_PO' },
+      { name: 'deliveries', title: 'Giao_Hang_PXK' },
+      { name: 'delivery_plans', title: 'Ke_Hoach_Giao' },
+    ];
+
+    const wb = XLSX.utils.book_new();
+
+    for (const col of collections) {
+      try {
+        const snap = await getDocs(collection(db, col.name));
+        const docs = snap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+        if (docs.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(docs);
+          XLSX.utils.book_append_sheet(wb, ws, col.title);
+        } else {
+          const ws = XLSX.utils.aoa_to_sheet([['(Chưa có dữ liệu)']]);
+          XLSX.utils.book_append_sheet(wb, ws, col.title);
+        }
+      } catch (e) {
+        console.warn(`Lỗi xuất bảng ${col.name}:`, e);
+      }
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `TSG_Master_Data_${dateStr}.xlsx`);
+    toast.success('Đã tải xuống Sổ Bảng Tính Excel Master Data thành công!', { id: toastId });
+  } catch (err: any) {
+    console.error('Export Excel Master error:', err);
+    toast.error(`Lỗi xuất Excel: ${err.message || err}`, { id: toastId });
+  }
+}
+

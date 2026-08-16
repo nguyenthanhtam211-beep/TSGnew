@@ -679,45 +679,56 @@ export default function App() {
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/80 flex-col text-slate-300 shadow-2xl print:hidden relative z-20 shrink-0">
-        <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/40">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6] animate-pulse" />
-              <h1 className="text-lg font-black text-white tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">TSG BUSINESS OS</h1>
+      {/* Desktop macOS Sequoia Sidebar */}
+      <div className="hidden lg:flex w-64 bg-[#F5F5F7]/95 backdrop-blur-2xl border-r border-black/[0.06] flex-col text-[#1D1D1F] shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none">
+        
+        {/* macOS Window Controls & Title */}
+        <div className="p-4 pt-3.5 border-b border-black/[0.06] bg-white/40">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 shadow-2xs inline-block" />
+            <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 shadow-2xs inline-block" />
+            <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 shadow-2xs inline-block" />
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#007AFF] to-[#5856D6] text-white flex items-center justify-center font-black text-xs shadow-sm shadow-blue-500/20">
+              TSG
             </div>
-            <p className="text-[11px] font-medium text-slate-400 mt-1 pl-4">Tâm Sen Group • ERP 2026</p>
+            <div>
+              <h1 className="text-xs font-bold text-[#1D1D1F] tracking-[-0.015em] leading-tight">TSG Business OS</h1>
+              <p className="text-[10px] text-slate-500 font-medium">Tâm Sen Group • ERP 2026</p>
+            </div>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar">
-          <div className="px-5 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tổng quan</div>
-          <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-          <NavItem icon={<TrendingUp size={18} />} label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
+
+        {/* Apple Source List Navigation */}
+        <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 custom-scrollbar px-2">
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tổng quan</div>
+          <NavItem icon={<LayoutDashboard size={15} />} iconBg="bg-blue-500" label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
           
-          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quy trình kinh doanh</div>
-          <NavItem icon={<Users size={18} />} label="Khách hàng" isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
-          <NavItem icon={<Package size={18} />} label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
-          <NavItem icon={<FileText size={18} />} label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
-          <NavItem icon={<FileText size={18} />} label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
-          <NavItem icon={<CheckCircle size={18} />} label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
-          <NavItem icon={<Truck size={18} />} label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
-          <NavItem icon={<TrendingUp size={18} />} label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
+          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>
+          <NavItem icon={<Users size={15} />} iconBg="bg-sky-500" label="Khách hàng" isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
+          <NavItem icon={<Package size={15} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
+          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
+          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
+          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
+          <NavItem icon={<Truck size={15} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
+          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
           
-          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Dữ liệu nền tảng</div>
-          <NavItem icon={<Package size={18} />} label="Sản phẩm" isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
-          <NavItem icon={<ShieldCheck size={18} />} label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
-          <NavItem icon={<BookUser size={18} />} label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
-          <NavItem icon={<Users size={18} />} label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
+          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dữ liệu nền tảng</div>
+          <NavItem icon={<Package size={15} />} iconBg="bg-purple-500" label="Sản phẩm" isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
+          <NavItem icon={<ShieldCheck size={15} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
+          <NavItem icon={<BookUser size={15} />} iconBg="bg-amber-600" label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
+          <NavItem icon={<Users size={15} />} iconBg="bg-red-500" label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
           
-          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Công cụ hỗ trợ</div>
-          <NavItem icon={<Bot size={18} />} label="Trợ lý AI" isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
-          <NavItem icon={<Camera size={18} />} label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
-          <NavItem icon={<CheckCircle size={18} />} label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
-          <NavItem icon={<HardDrive size={18} />} label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
+          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trí tuệ nhân tạo & Tiện ích</div>
+          <NavItem icon={<Bot size={15} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
+          <NavItem icon={<Camera size={15} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
+          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-green-600" label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
+          <NavItem icon={<HardDrive size={15} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
           
-          <div className="px-5 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hệ thống</div>
-          <NavItem icon={<Settings size={18} />} label="Cài đặt" isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
+          <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hệ thống</div>
+          <NavItem icon={<Settings size={15} />} iconBg="bg-slate-600" label="Cài đặt" isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
         </nav>
       </div>
 
@@ -959,10 +970,21 @@ export default function App() {
   );
 }
 
-function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
+function NavItem({ 
+  icon, 
+  iconBg = "bg-blue-500", 
+  label, 
+  isActive, 
+  onClick 
+}: { 
+  icon: React.ReactNode, 
+  iconBg?: string, 
+  label: string, 
+  isActive: boolean, 
+  onClick: () => void 
+}) {
   return (
     <motion.button
-      whileHover={{ x: 4, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={clsx(
