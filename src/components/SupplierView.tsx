@@ -18,6 +18,8 @@ import { cleanCompanyName, isNameRepetitive } from '../lib/companyUtils';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
+import MacTrafficLights from './MacTrafficLights';
+import clsx from 'clsx';
 
 export const getSupplierLogo = (s: any) => {
   if (!s) return '';
@@ -57,6 +59,7 @@ export default function SupplierView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
   const [selectedSupplierDetail, setSelectedSupplierDetail] = useState<any>(null);
+  const [isSupplierModalMaximized, setIsSupplierModalMaximized] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
@@ -1285,14 +1288,15 @@ export default function SupplierView({
       {/* Supplier Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                <X size={18} />
-              </button>
+          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-3.5">
+                <MacTrafficLights onClose={() => setIsModalOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-xs font-bold text-[#1D1D1F]">
+                  {editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
+                </h3>
+              </div>
             </div>
 
             <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
@@ -1484,14 +1488,15 @@ export default function SupplierView({
       {/* Supplier Contact Modal */}
       {isContactModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingContact ? 'Chỉnh sửa đầu mối nhà cung cấp' : 'Thêm đầu mối cung ứng'}
-              </h3>
-              <button onClick={() => setIsContactModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                <X size={18} />
-              </button>
+          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-3.5">
+                <MacTrafficLights onClose={() => setIsContactModalOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-xs font-bold text-[#1D1D1F]">
+                  {editingContact ? 'Chỉnh sửa đầu mối nhà cung cấp' : 'Thêm đầu mối cung ứng'}
+                </h3>
+              </div>
             </div>
 
             <form onSubmit={handleSaveContact} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
@@ -1608,28 +1613,36 @@ export default function SupplierView({
       {/* Supplier Detail Modal */}
       {selectedSupplierDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
-              <div className="flex items-center gap-3.5">
-                <CompanyLogo 
-                  name={selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"]} 
-                  size="md" 
-                  className="rounded-2xl shadow-2xs" 
-                  logoUrl={getSupplierLogo(selectedSupplierDetail)} 
-                  logoFit={selectedSupplierDetail.logoFit} 
+          <div className={clsx(
+            "bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
+            isSupplierModalMaximized ? "max-w-6xl h-[94vh]" : "max-w-3xl max-h-[88vh]"
+          )}>
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex justify-between items-center bg-[#F5F5F7]">
+              <div className="flex items-center gap-4">
+                <MacTrafficLights 
+                  onClose={() => setSelectedSupplierDetail(null)} 
+                  onMaximize={() => setIsSupplierModalMaximized(!isSupplierModalMaximized)}
+                  isMaximized={isSupplierModalMaximized}
                 />
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {cleanCompanyName(selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"])}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-mono">
-                    {selectedSupplierDetail["Mã nhà cung cấp"]} • {selectedSupplierDetail["Loại hình"] || "Nhà sản xuất"} • {selectedSupplierDetail["Nhóm hàng"] || "Cung ứng"}
-                  </p>
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <div className="flex items-center gap-3">
+                  <CompanyLogo 
+                    name={selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"]} 
+                    size="md" 
+                    className="rounded-xl shadow-2xs" 
+                    logoUrl={getSupplierLogo(selectedSupplierDetail)} 
+                    logoFit={selectedSupplierDetail.logoFit} 
+                  />
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1D1D1F]">
+                      {cleanCompanyName(selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"])}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {selectedSupplierDetail["Mã nhà cung cấp"]} • {selectedSupplierDetail["Loại hình"] || "Nhà sản xuất"} • {selectedSupplierDetail["Nhóm hàng"] || "Cung ứng"}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedSupplierDetail(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
-                <X size={18} />
-              </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
@@ -1705,7 +1718,7 @@ export default function SupplierView({
                   </span>
                   <button
                     onClick={() => handleOpenContactModal(null, selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"])}
-                    className="text-xs font-semibold text-[#0071E3] hover:underline"
+                    className="text-xs font-semibold text-[#007AFF] hover:underline"
                   >
                     + Thêm đầu mối cho NCC này
                   </button>
@@ -1758,24 +1771,25 @@ export default function SupplierView({
       {/* Supplier Contact Detail Inspector Modal */}
       {selectedContactDetail && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
-              <div className="flex items-center gap-3.5">
-                <div className="h-10 w-10 rounded-full bg-purple-100 text-purple-800 font-bold flex items-center justify-center text-sm shadow-2xs">
-                  {getAvatarInitials(selectedContactDetail["Tên"] || "")}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{formatContactFullName(selectedContactDetail["Tên"] || "")}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
-                  </p>
+          <div className="bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-4">
+                <MacTrafficLights onClose={() => setSelectedContactDetail(null)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-purple-100 text-purple-800 font-bold flex items-center justify-center text-xs shadow-2xs">
+                    {getAvatarInitials(selectedContactDetail["Tên"] || "")}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1D1D1F]">
+                      {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{formatContactFullName(selectedContactDetail["Tên"] || "")}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedContactDetail(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
-                <X size={18} />
-              </button>
             </div>
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

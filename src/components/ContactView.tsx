@@ -17,6 +17,7 @@ import { getItemKey } from '../hooks/useFirestoreCollection';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import { toast } from 'react-hot-toast';
+import MacTrafficLights from './MacTrafficLights';
 
 interface ContactViewProps {
   contacts: any[];
@@ -1222,14 +1223,13 @@ export default function ContactView({
       {/* Contact Add/Edit Dialog */}
       {isContactModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <h3 className="text-base font-bold text-slate-900">
+          <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
+              <MacTrafficLights onClose={() => setIsContactModalOpen(false)} />
+              <div className="h-4 w-px bg-black/[0.08]" />
+              <h3 className="text-sm font-bold text-[#1D1D1F]">
                 {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
               </h3>
-              <button onClick={() => setIsContactModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                <X size={18} />
-              </button>
             </div>
 
             <form onSubmit={handleSaveContact} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">

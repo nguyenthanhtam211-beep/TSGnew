@@ -21,6 +21,8 @@ import { getItemKey } from '../hooks/useFirestoreCollection';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, formatShortCompanyName } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
+import MacTrafficLights from './MacTrafficLights';
+import clsx from 'clsx';
 
 export const getCustomerLogo = (c: any) => {
   if (!c) return '';
@@ -61,6 +63,7 @@ export default function CustomerView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any>(null);
+  const [isCustomerModalMaximized, setIsCustomerModalMaximized] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
@@ -280,7 +283,8 @@ export default function CustomerView({
     "Điện thoại": '',
     "Email": '',
     "Mức độ quan hệ": '3',
-    "Phụ trách": ''
+    "Phụ trách": '',
+    "Ghi chú": ''
   });
 
   const handleOpenModal = (customer: any = null) => {
@@ -350,7 +354,8 @@ export default function CustomerView({
         "Điện thoại": contact["Điện thoại"] || '',
         "Email": contact["Email"] || '',
         "Mức độ quan hệ": contact["Mức độ quan hệ"] || '3',
-        "Phụ trách": contact["Phụ trách"] || ''
+        "Phụ trách": contact["Phụ trách"] || '',
+        "Ghi chú": contact["Ghi chú"] || ''
       });
     } else {
       const matchCust = customers.find(c => 
@@ -371,7 +376,8 @@ export default function CustomerView({
         "Điện thoại": '',
         "Email": '',
         "Mức độ quan hệ": '3',
-        "Phụ trách": ''
+        "Phụ trách": '',
+        "Ghi chú": ''
       });
     }
     setIsContactModalOpen(true);
@@ -1430,14 +1436,15 @@ export default function CustomerView({
       {/* Customer Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingCustomer ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng mới'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                <X size={18} />
-              </button>
+          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-3.5">
+                <MacTrafficLights onClose={() => setIsModalOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-xs font-bold text-[#1D1D1F]">
+                  {editingCustomer ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng mới'}
+                </h3>
+              </div>
             </div>
 
             <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
@@ -1638,14 +1645,15 @@ export default function CustomerView({
       {/* Contact Add/Edit Modal */}
       {isContactModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingContact ? 'Chỉnh sửa nhân sự khách hàng' : 'Thêm nhân sự vào danh bạ'}
-              </h3>
-              <button onClick={() => setIsContactModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                <X size={18} />
-              </button>
+          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-3.5">
+                <MacTrafficLights onClose={() => setIsContactModalOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-xs font-bold text-[#1D1D1F]">
+                  {editingContact ? 'Chỉnh sửa nhân sự khách hàng' : 'Thêm nhân sự vào danh bạ'}
+                </h3>
+              </div>
             </div>
 
             <form onSubmit={handleSaveContact} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
@@ -1664,7 +1672,7 @@ export default function CustomerView({
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-1">Danh xưng</label>
                   <select
@@ -1672,26 +1680,25 @@ export default function CustomerView({
                     onChange={(e) => setContactFormData({ ...contactFormData, "Danh xưng": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
                   >
-                    <option value="Mr">Mr (Anh)</option>
-                    <option value="Mrs">Mrs (Chị)</option>
-                    <option value="Ms">Ms (Cô)</option>
+                    <option value="Mr">Mr</option>
+                    <option value="Ms">Ms</option>
+                    <option value="Mrs">Mrs</option>
                   </select>
                 </div>
-
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Họ và Tên</label>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Họ và tên *</label>
                   <input
                     type="text"
                     required
                     value={contactFormData["Tên"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Tên": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="Nguyễn Văn A"
+                    placeholder="VD: Nguyễn Văn A"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-1">Chức vụ</label>
                   <input
@@ -1699,10 +1706,9 @@ export default function CustomerView({
                     value={contactFormData["Chức vụ"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Chức vụ": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="VD: Trưởng phòng vật tư"
+                    placeholder="VD: Trưởng phòng Mua hàng"
                   />
                 </div>
-
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-1">Phòng ban</label>
                   <input
@@ -1710,76 +1716,46 @@ export default function CustomerView({
                     value={contactFormData["Phòng ban"]}
                     onChange={(e) => setContactFormData({ ...contactFormData, "Phòng ban": e.target.value })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="VD: Thu mua / Kế toán"
+                    placeholder="VD: Mua hàng / Kế toán"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Số điện thoại</label>
-                  <input
-                    type="tel"
-                    value={contactFormData["Điện thoại"]}
-                    onChange={(e) => setContactFormData({ ...contactFormData, "Điện thoại": e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
-                    placeholder="0912..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={contactFormData["Email"]}
-                    onChange={(e) => setContactFormData({ ...contactFormData, "Email": e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="name@company.com"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Số điện thoại</label>
+                <input
+                  type="text"
+                  value={contactFormData["Điện thoại"]}
+                  onChange={(e) => setContactFormData({ ...contactFormData, "Điện thoại": e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono"
+                  placeholder="VD: 0987.654.321"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Mức độ quan hệ</label>
-                  <select
-                    value={contactFormData["Mức độ quan hệ"]}
-                    onChange={(e) => setContactFormData({ ...contactFormData, "Mức độ quan hệ": e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                  >
-                    <option value="1">1 sao - Mới quen</option>
-                    <option value="2">2 sao - Thường xuyên liên hệ</option>
-                    <option value="3">3 sao - Tin cậy</option>
-                    <option value="4">4 sao - Đối tác mật thiết</option>
-                    <option value="5">5 sao - Trọng yếu chiến lược</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Ghi chú phụ trách</label>
-                  <input
-                    type="text"
-                    value={contactFormData["Phụ trách"]}
-                    onChange={(e) => setContactFormData({ ...contactFormData, "Phụ trách": e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none"
-                    placeholder="Nhân sự TSG quản lý"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Ghi chú & Quan hệ</label>
+                <textarea
+                  rows={2}
+                  value={contactFormData["Ghi chú"]}
+                  onChange={(e) => setContactFormData({ ...contactFormData, "Ghi chú": e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none resize-none"
+                  placeholder="VD: Liên hệ chính khi đặt hàng, thích tặng quà sinh nhật..."
+                />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                <button 
-                  type="button" 
-                  onClick={() => setIsContactModalOpen(false)} 
-                  className="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsContactModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-medium"
                 >
                   Hủy
                 </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] rounded-xl shadow-xs transition-all"
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs"
                 >
-                  {editingContact ? 'Lưu' : 'Thêm'}
+                  Lưu nhân sự
                 </button>
               </div>
             </form>
@@ -1790,30 +1766,38 @@ export default function CustomerView({
       {/* Customer Detail Drawer / Modal */}
       {selectedCustomerDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
+          <div className={clsx(
+            "bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
+            isCustomerModalMaximized ? "max-w-6xl h-[94vh]" : "max-w-3xl max-h-[88vh]"
+          )}>
             
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
-              <div className="flex items-center gap-3.5">
-                <CompanyLogo 
-                  name={selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]} 
-                  size="md" 
-                  className="rounded-2xl shadow-2xs" 
-                  logoUrl={getCustomerLogo(selectedCustomerDetail)} 
-                  logoFit={selectedCustomerDetail.logoFit} 
+            {/* Modal Header with Mac Traffic Lights */}
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex justify-between items-center bg-[#F5F5F7]">
+              <div className="flex items-center gap-4">
+                <MacTrafficLights 
+                  onClose={() => setSelectedCustomerDetail(null)} 
+                  onMaximize={() => setIsCustomerModalMaximized(!isCustomerModalMaximized)}
+                  isMaximized={isCustomerModalMaximized}
                 />
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {cleanCompanyName(selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"])}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-mono">
-                    {selectedCustomerDetail["Customer_ID"]} • {selectedCustomerDetail["Loại hình"] || "Công ty Cổ phần"} • {selectedCustomerDetail["Phân loại"] || "Bao bì"}
-                  </p>
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <div className="flex items-center gap-3">
+                  <CompanyLogo 
+                    name={selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]} 
+                    size="md" 
+                    className="rounded-xl shadow-2xs" 
+                    logoUrl={getCustomerLogo(selectedCustomerDetail)} 
+                    logoFit={selectedCustomerDetail.logoFit} 
+                  />
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1D1D1F]">
+                      {cleanCompanyName(selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"])}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {selectedCustomerDetail["Customer_ID"]} • {selectedCustomerDetail["Loại hình"] || "Công ty Cổ phần"} • {selectedCustomerDetail["Phân loại"] || "Bao bì"}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedCustomerDetail(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
-                <X size={18} />
-              </button>
             </div>
 
             {/* Modal Body */}
@@ -1860,29 +1844,11 @@ export default function CustomerView({
                   </div>
                 </div>
                 <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-                  <span className="text-[11px] text-slate-400 font-medium block">Email kế toán</span>
-                  <div className="text-blue-600 truncate mt-1">
-                    {selectedCustomerDetail["Email"] || "Chưa cập nhật"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Addresses */}
-              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
-                <div>
-                  <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ trụ sở</span>
+                  <span className="text-[11px] text-slate-400 font-medium block">Nhà máy / Kho nhận</span>
                   <div className="text-slate-700 font-medium mt-0.5">
-                    {selectedCustomerDetail["Địa chỉ"] || "Chưa cập nhật địa chỉ trụ sở"}
+                    {selectedCustomerDetail["Nhà máy"] || "Chưa cập nhật"}
                   </div>
                 </div>
-                {selectedCustomerDetail["Nhà máy"] && (
-                  <div className="pt-2.5 border-t border-slate-200/60">
-                    <span className="text-[11px] text-slate-400 font-medium block">Địa chỉ nhà máy giao hàng</span>
-                    <div className="text-slate-700 font-medium mt-0.5">
-                      {selectedCustomerDetail["Nhà máy"]}
-                    </div>
-                  </div>
-                )}
                 {selectedCustomerDetail["Tài khoản ngân hàng"] && (
                   <div className="pt-2.5 border-t border-slate-200/60">
                     <span className="text-[11px] text-slate-400 font-medium block">Tài khoản ngân hàng thanh toán</span>
@@ -1988,24 +1954,25 @@ export default function CustomerView({
       {/* Contact Detail Inspector Modal */}
       {selectedContactDetail && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/90">
-              <div className="flex items-center gap-3.5">
-                <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-sm shadow-2xs">
-                  {getAvatarInitials(selectedContactDetail["Tên"] || "")}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{selectedContactDetail["Tên"]}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
-                  </p>
+          <div className="bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-4">
+                <MacTrafficLights onClose={() => setSelectedContactDetail(null)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-xs shadow-2xs">
+                    {getAvatarInitials(selectedContactDetail["Tên"] || "")}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1D1D1F]">
+                      {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{selectedContactDetail["Tên"]}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedContactDetail(null)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
-                <X size={18} />
-              </button>
             </div>
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

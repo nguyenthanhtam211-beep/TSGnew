@@ -30,6 +30,8 @@ import {
 import { ProductHoverCard } from './ProductHoverCard';
 import { ProductCombobox } from './ProductCombobox';
 import { PricingCombobox } from './PricingCombobox';
+import clsx from 'clsx';
+import MacTrafficLights from './MacTrafficLights';
 
 interface PODetailModalProps {
   poNumber: string;
@@ -59,6 +61,7 @@ export function PODetailModal({
   onAddPOLine
 }: PODetailModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
+  const [isMaximized, setIsMaximized] = useState(false);
   const [showAddLineForm, setShowAddLineForm] = useState(false);
   const [showDualPOModal, setShowDualPOModal] = useState(false);
   const [newLineData, setNewLineData] = useState<any>({
@@ -271,45 +274,50 @@ export function PODetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 sm:p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className={clsx(
+        "bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-200 animate-in fade-in zoom-in-95",
+        isMaximized ? "max-w-7xl h-[95vh]" : "max-w-5xl max-h-[90vh]"
+      )}>
         
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
+        {/* Apple macOS Window Header */}
+        <div className="px-6 py-4 border-b border-black/[0.06] flex justify-between items-center bg-[#F5F5F7]">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <ShoppingCart size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Chi tiết Đơn hàng: {poHeader['Đơn hàng']}</h2>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                {poHeader['Khách hàng'] && (
-                  <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
-                    Khách hàng: {poHeader['Khách hàng']}
-                  </span>
-                )}
-                {poHeader['Phân loại'] && (
-                  <span className="text-xs font-medium text-gray-500">
-                    {poHeader['Phân loại']}
-                  </span>
-                )}
-                {poHeader['Trạng Thái'] && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    poHeader['Trạng Thái'] === 'Hoàn thành' ? 'bg-green-100 text-green-800' : 
-                    poHeader['Trạng Thái'] === 'Mới nhận' ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {poHeader['Trạng Thái']}
-                  </span>
-                )}
+            <MacTrafficLights 
+              onClose={onClose} 
+              onMaximize={() => setIsMaximized(!isMaximized)}
+              isMaximized={isMaximized}
+            />
+            <div className="h-4 w-px bg-black/[0.08]" />
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs">
+                <ShoppingCart size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#1D1D1F]">Chi tiết Đơn hàng: {poHeader['Đơn hàng']}</h2>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                  {poHeader['Khách hàng'] && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                      Khách hàng: {poHeader['Khách hàng']}
+                    </span>
+                  )}
+                  {poHeader['Phân loại'] && (
+                    <span className="text-xs text-slate-500 font-medium">
+                      {poHeader['Phân loại']}
+                    </span>
+                  )}
+                  {poHeader['Trạng Thái'] && (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                      poHeader['Trạng Thái'] === 'Hoàn thành' ? 'bg-green-100 text-green-800' : 
+                      poHeader['Trạng Thái'] === 'Mới nhận' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {poHeader['Trạng Thái']}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
         </div>
 
         {/* Tab Navigation */}

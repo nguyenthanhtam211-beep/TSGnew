@@ -24,7 +24,7 @@ import {
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
   StorageView, SpecsView, ProductDetailModal, PODetailModal, 
-  ProductHoverCard, ProductCombobox, PricingCombobox 
+  ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
 
@@ -2094,11 +2094,12 @@ function TableView({
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">Thêm mới {title}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
+              <MacTrafficLights onClose={() => setIsModalOpen(false)} />
+              <div className="h-4 w-px bg-black/[0.08]" />
+              <h3 className="text-sm font-bold text-[#1D1D1F]">Thêm mới {title}</h3>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2378,26 +2379,22 @@ function TableView({
           <motion.div 
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col"
+            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-black/[0.08]"
           >
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
+              <MacTrafficLights onClose={() => {
+                setIsEditModalOpen(false);
+                setEditingRow(null);
+                setFormData({});
+              }} />
+              <div className="h-4 w-px bg-black/[0.08]" />
               <div>
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Edit size={24} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+                  <Edit size={16} className="text-blue-600" />
                   Chi tiết & Chỉnh sửa
                 </h3>
-                <p className="text-sm text-gray-500">Cập nhật thông tin cho bản ghi này</p>
+                <p className="text-[11px] text-slate-500 font-medium">Cập nhật thông tin cho bản ghi này</p>
               </div>
-              <button 
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingRow(null);
-                  setFormData({});
-                }} 
-                className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
-              >
-                <X size={24} />
-              </button>
             </div>
             
             <div className="flex-1 overflow-auto p-6 space-y-4">

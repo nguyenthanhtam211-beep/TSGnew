@@ -26,3 +26,4 @@ export { ProductHoverCard } from "./ProductHoverCard";
 export { default as CompanyLogo, TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
 export { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 export { default as UnifiedCalendar } from "./UnifiedCalendar";
+export { default as MacTrafficLights } from "./MacTrafficLights";
