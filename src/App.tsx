@@ -18,6 +18,7 @@ import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
 import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
 import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances } from './lib/business-logic';
 import { SYSTEM_PROMPT } from "./prompt";
+import { sendGeminiPrompt } from "./lib/gemini";
 import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
@@ -2583,45 +2584,14 @@ function AssistantView() {
     setIsLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("model", "gemini-3.6-flash");
-      formData.append("systemInstruction", FULL_SYSTEM_PROMPT);
-      formData.append("messages", JSON.stringify(newMessages.map(m => ({ role: m.role, content: m.content }))));
-      
-      if (fileToSend) {
-        formData.append("files", fileToSend);
-      }
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        body: formData,
+      const responseText = await sendGeminiPrompt({
+        prompt: promptText,
+        systemInstruction: FULL_SYSTEM_PROMPT,
+        history: newMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
+        file: fileToSend || undefined
       });
-
-      const textRes = await res.text();
-
-      if (!res.ok) {
-        let errorMsg = `Lỗi kết nối máy chủ (${res.status})`;
-        try {
-          const errData = JSON.parse(textRes);
-          if (errData && errData.error) {
-            errorMsg = errData.error;
-          }
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-
-      let data;
-      try {
-        data = JSON.parse(textRes);
-      } catch (jsonErr) {
-        console.error("Chat JSON parse error:", jsonErr, "Raw response:", textRes);
-        throw new Error(`Phản hồi từ máy chủ không đúng định dạng JSON. ${textRes ? 'Nội dung: ' + textRes.substring(0, 100) : ''}`);
-      }
       
-      if (!data || !data.text) {
-        throw new Error("Trợ lý không trả về văn bản phản hồi nào.");
-      }
-      setMessages(prev => [...prev, { role: "model", content: data.text }]);
+      setMessages(prev => [...prev, { role: "model", content: responseText }]);
     } catch (err: any) {
       setMessages(prev => [...prev, { role: "model", content: `❌ Lỗi xử lý Trợ lý AI: ${err.message}` }]);
     } finally {

@@ -3,10 +3,11 @@ import { toast } from 'react-hot-toast';
 import { googleSignIn, getAccessToken, logout, initAuth, ensureGoogleToken, openGoogleAuthTab } from '../lib/auth';
 import { app, db } from '../firebase';
 import { collection, writeBatch, doc, getDocs } from 'firebase/firestore';
-import { RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check, UploadCloud } from 'lucide-react';
+import { RefreshCw, Download, Database, CheckCircle, LogOut, FileSpreadsheet, ShieldCheck, ExternalLink, CloudUpload, Sparkles, Check, UploadCloud, Bot, Key, Eye, EyeOff, Cpu, Zap, AlertCircle } from 'lucide-react';
 import { PRICING_DATA, PO_HEADER_DATA, PO_LINES_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA } from '../data';
 import { handleFirestoreError, OperationType } from '../lib/errorHelper';
 import { getItemKey } from '../hooks/useFirestoreCollection';
+import { getStoredGeminiKey, setStoredGeminiKey, testGeminiConnection } from '../lib/gemini';
 import Papa from 'papaparse';
 
 const parseCSV = (csv: string) => {
@@ -55,12 +56,49 @@ export default function SettingsView() {
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [backupUrl, setBackupUrl] = useState<string | null>(null);
 
+  // Gemini AI Connection State
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<any>(null);
+
   useEffect(() => {
     initAuth(
       (u) => { setNeedsAuth(false); setUser(u); },
       () => { setNeedsAuth(true); setUser(null); }
     );
+    const key = getStoredGeminiKey();
+    if (key) {
+      setGeminiApiKey(key);
+      setGeminiTestResult({ success: true, model: 'gemini-2.5-flash', text: 'Đã sẵn sàng' });
+    }
   }, []);
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiApiKey.trim()) {
+      setStoredGeminiKey('');
+      setGeminiTestResult(null);
+      toast.success("Đã xóa khóa Gemini API Key.");
+      return;
+    }
+
+    setIsTestingGemini(true);
+    const toastId = toast.loading("Đang kiểm tra kết nối với Google AI Studio...");
+    try {
+      const result = await testGeminiConnection(geminiApiKey.trim());
+      setGeminiTestResult(result);
+      if (result.success) {
+        setStoredGeminiKey(geminiApiKey.trim());
+        toast.success(`Kết nối thành công với Google Gemini (${result.model})!`, { id: toastId });
+      } else {
+        toast.error(`Kiểm tra thất bại: ${result.error}`, { id: toastId });
+      }
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e.message}`, { id: toastId });
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -587,8 +625,105 @@ export default function SettingsView() {
                     {isBackingUp ? <RefreshCw className="animate-spin" size={16} /> : <FileSpreadsheet size={16} />}
                     {isBackingUp ? 'Đang tạo Bảng tính...' : 'Xuất dữ liệu toàn hệ thống'}
                  </button>
-               </div>
+                </div>
             )}
+          </div>
+
+          {/* Gemini AI (Google AI Studio) Connection Card */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg text-purple-700">
+                    <Bot size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Kết nối Gemini AI (Google AI Studio)</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Mô hình Gemini 2.5 Flash / 2.0 Flash phân tích dữ liệu B2B</p>
+                  </div>
+                </div>
+                {geminiTestResult?.success ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                    <CheckCircle size={12} /> Đã kết nối
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                    <AlertCircle size={12} /> Chưa cấu hình
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                Nhập <strong>Gemini API Key</strong> của bạn để kích hoạt Trợ lý ảo AI, đọc chứng từ hình ảnh/PDF (OCR) và tra cứu số liệu tự động.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1.5 flex items-center justify-between">
+                    <span>Khóa API Key (Google AI Studio)</span>
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-purple-600 hover:text-purple-700 underline text-[11px]"
+                    >
+                      Lấy API Key miễn phí ↗
+                    </a>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showGeminiKey ? 'text' : 'password'}
+                      value={geminiApiKey}
+                      onChange={(e) => setGeminiApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 pr-9 text-xs font-mono outline-none focus:border-purple-500 focus:bg-white transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGeminiKey(!showGeminiKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showGeminiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {geminiTestResult && (
+                  <div className={`p-2.5 rounded-lg text-xs flex items-center justify-between ${
+                    geminiTestResult.success 
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                      : 'bg-red-50 text-red-800 border border-red-200'
+                  }`}>
+                    <span className="truncate">{geminiTestResult.text || geminiTestResult.error}</span>
+                    {geminiTestResult.model && (
+                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-white/60 rounded">
+                        {geminiTestResult.model}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-gray-100 flex gap-2">
+              <button
+                onClick={handleSaveGeminiKey}
+                disabled={isTestingGemini}
+                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                {isTestingGemini ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Đang kiểm tra kết nối...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    <span>Lưu & Kiểm tra kết nối AI</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* AI Direct Assistant & Google API Diagnostic Control Card */}
