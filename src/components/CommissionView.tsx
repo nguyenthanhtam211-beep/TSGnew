@@ -54,6 +54,7 @@ export default function CommissionView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCommission, setSelectedCommission] = useState<CommissionItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
   const [editingCommission, setEditingCommission] = useState<CommissionItem | null>(null);
 
   // Form State
@@ -357,8 +358,8 @@ export default function CommissionView({
             </div>
           </div>
 
-          {/* Table */}
-          <div className="flex-1 overflow-auto">
+          {/* Table / Cards Container */}
+          <div className="flex-1 overflow-y-auto">
             {filteredCommissions.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400">
                 <Percent size={48} className="mb-3 text-slate-300 stroke-[1.5]" />
@@ -374,71 +375,36 @@ export default function CommissionView({
                 </button>
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06] z-10">
-                  <tr>
-                    <th className="py-3 px-4">Khách Hàng</th>
-                    <th className="py-3 px-4">Người Nhận Hoa Hồng</th>
-                    <th className="py-3 px-4">Căn Cứ Chi</th>
-                    <th className="py-3 px-4 text-right">Doanh Thu Cơ Sở</th>
-                    <th className="py-3 px-4 text-center">Tỷ Lệ</th>
-                    <th className="py-3 px-4 text-right">Tiền Hoa Hồng</th>
-                    <th className="py-3 px-4 text-center">Trạng Thái</th>
-                    <th className="py-3 px-4 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04]">
+              <>
+                {/* Mobile Cards Feed (Visible on sm:hidden) */}
+                <div className="block sm:hidden p-3 space-y-3">
                   {filteredCommissions.map((item, index) => {
                     const isSelected = selectedCommission?.id === item.id;
                     return (
-                      <tr
+                      <div
                         key={item.id || index}
-                        onClick={() => setSelectedCommission(item)}
+                        onClick={() => {
+                          setSelectedCommission(item);
+                          setIsMobileDetailOpen(true);
+                        }}
                         className={clsx(
-                          "hover:bg-blue-50/50 cursor-pointer transition-colors",
-                          isSelected ? "bg-blue-50/70" : ""
+                          "bg-white rounded-2xl p-4 border border-black/[0.06] shadow-xs active:scale-[0.99] transition-all cursor-pointer",
+                          isSelected ? "ring-2 ring-purple-500/50 bg-purple-50/20" : ""
                         )}
                       >
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-start justify-between gap-2 mb-2.5">
+                          <div className="flex items-center gap-2.5">
                             <CompanyLogo name={item.customerName} size="sm" />
-                            <span className="truncate max-w-[150px]">{item.customerName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5">
-                            <UserCheck size={14} className="text-purple-600" />
                             <div>
-                              <p className="font-bold text-purple-950">{item.beneficiaryName}</p>
-                              {item.beneficiaryPhone && (
-                                <span className="text-[10px] text-slate-400">{item.beneficiaryPhone}</span>
-                              )}
+                              <h4 className="font-bold text-sm text-[#1D1D1F] leading-snug">{item.customerName}</h4>
+                              <p className="text-xs text-purple-700 font-semibold flex items-center gap-1 mt-0.5">
+                                <UserCheck size={13} className="text-purple-600 shrink-0" />
+                                {item.beneficiaryName}
+                              </p>
                             </div>
                           </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          {item.type === 'Theo đơn hàng' ? (
-                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono font-bold text-[11px]">
-                              PO: {item.poNumber || 'N/A'}
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[11px]">
-                              Tháng {item.period || 'N/A'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right text-slate-600 font-medium">
-                          {formatVND(item.baseRevenue)}
-                        </td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-700">
-                          {item.calculationType === 'percentage' ? `${item.rate}%` : 'Cố định'}
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-purple-700 text-sm">
-                          {formatVND(item.commissionAmount)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
                           <span className={clsx(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 inline-flex items-center gap-1",
                             item.paymentStatus === 'Đã thanh toán' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
                             item.paymentStatus === 'Đã duyệt' ? "bg-blue-50 text-blue-700 border border-blue-200" :
                             "bg-amber-50 text-amber-700 border border-amber-200"
@@ -450,36 +416,177 @@ export default function CommissionView({
                             )} />
                             {item.paymentStatus}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 bg-[#F5F5F7] p-2.5 rounded-xl text-xs mb-3">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Căn cứ chi</span>
+                            <span className="font-bold text-slate-800">
+                              {item.type === 'Theo đơn hàng' ? (
+                                <span className="font-mono text-blue-600">PO: {item.poNumber || 'N/A'}</span>
+                              ) : (
+                                <span className="text-amber-700">Tháng {item.period || 'N/A'}</span>
+                              )}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Tỷ lệ chiết khấu</span>
+                            <span className="font-bold text-slate-800">
+                              {item.calculationType === 'percentage' ? `${item.rate}%` : 'Cố định'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Doanh thu cơ sở</span>
+                            <span className="font-semibold text-slate-700">{formatVND(item.baseRevenue)}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-purple-600 block">Tiền hoa hồng</span>
+                            <span className="font-black text-purple-700 text-sm">{formatVND(item.commissionAmount)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCommission(item);
+                              setIsMobileDetailOpen(true);
+                            }}
+                            className="text-blue-600 font-bold text-xs flex items-center gap-1 hover:underline"
+                          >
+                            Xem chi tiết &rarr;
+                          </button>
+                          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => handleOpenEdit(item)}
-                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              title="Chỉnh sửa"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Sửa"
                             >
-                              <Edit3 size={14} />
+                              <Edit3 size={15} />
                             </button>
                             <button
                               onClick={() => handleDelete(item)}
-                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                               title="Xóa"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={15} />
                             </button>
                           </div>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Desktop Table (Visible on sm and above) */}
+                <table className="hidden sm:table w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06] z-10">
+                    <tr>
+                      <th className="py-3 px-4">Khách Hàng</th>
+                      <th className="py-3 px-4">Người Nhận Hoa Hồng</th>
+                      <th className="py-3 px-4">Căn Cứ Chi</th>
+                      <th className="py-3 px-4 text-right">Doanh Thu Cơ Sở</th>
+                      <th className="py-3 px-4 text-center">Tỷ Lệ</th>
+                      <th className="py-3 px-4 text-right">Tiền Hoa Hồng</th>
+                      <th className="py-3 px-4 text-center">Trạng Thái</th>
+                      <th className="py-3 px-4 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04]">
+                    {filteredCommissions.map((item, index) => {
+                      const isSelected = selectedCommission?.id === item.id;
+                      return (
+                        <tr
+                          key={item.id || index}
+                          onClick={() => setSelectedCommission(item)}
+                          className={clsx(
+                            "hover:bg-blue-50/50 cursor-pointer transition-colors",
+                            isSelected ? "bg-blue-50/70" : ""
+                          )}
+                        >
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <CompanyLogo name={item.customerName} size="sm" />
+                              <span className="truncate max-w-[150px]">{item.customerName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-purple-600" />
+                              <div>
+                                <p className="font-bold text-purple-950">{item.beneficiaryName}</p>
+                                {item.beneficiaryPhone && (
+                                  <span className="text-[10px] text-slate-400">{item.beneficiaryPhone}</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {item.type === 'Theo đơn hàng' ? (
+                              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono font-bold text-[11px]">
+                                PO: {item.poNumber || 'N/A'}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[11px]">
+                                Tháng {item.period || 'N/A'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right text-slate-600 font-medium">
+                            {formatVND(item.baseRevenue)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-700">
+                            {item.calculationType === 'percentage' ? `${item.rate}%` : 'Cố định'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-purple-700 text-sm">
+                            {formatVND(item.commissionAmount)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={clsx(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                              item.paymentStatus === 'Đã thanh toán' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                              item.paymentStatus === 'Đã duyệt' ? "bg-blue-50 text-blue-700 border border-blue-200" :
+                              "bg-amber-50 text-amber-700 border border-amber-200"
+                            )}>
+                              <span className={clsx(
+                                "w-1.5 h-1.5 rounded-full",
+                                item.paymentStatus === 'Đã thanh toán' ? "bg-emerald-500" :
+                                item.paymentStatus === 'Đã duyệt' ? "bg-blue-500" : "bg-amber-500"
+                              )} />
+                              {item.paymentStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={() => handleOpenEdit(item)}
+                                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                title="Chỉnh sửa"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Xóa"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
             )}
           </div>
         </div>
 
-        {/* Right: Commission Detail Panel */}
-        <div className="w-full lg:w-96 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col min-h-[350px] overflow-hidden">
+        {/* Right: Commission Detail Panel (Desktop Only, lg:flex) */}
+        <div className="hidden lg:flex w-96 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex-col overflow-hidden">
           {selectedCommission ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="p-4 border-b border-black/[0.06] bg-[#F5F5F7] flex items-center justify-between">
@@ -496,7 +603,7 @@ export default function CommissionView({
                 </button>
               </div>
 
-              <div className="flex-1 overflow-auto p-5 space-y-5">
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
                 {/* Main Card */}
                 <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 p-4 rounded-2xl text-center space-y-1">
                   <span className="text-xs font-semibold text-purple-700 uppercase">Tiền Hoa Hồng Thực Nhận</span>
@@ -575,6 +682,120 @@ export default function CommissionView({
           )}
         </div>
       </div>
+
+      {/* Mobile Detail Modal Sheet */}
+      {isMobileDetailOpen && selectedCommission && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 border border-black/[0.08]">
+            <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+              <div className="flex items-center gap-3">
+                <MacTrafficLights onClose={() => setIsMobileDetailOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+                  <Percent size={15} className="text-purple-600" />
+                  Chi Tiết Phiếu Hoa Hồng
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsMobileDetailOpen(false);
+                  handleOpenEdit(selectedCommission);
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1"
+              >
+                <Edit3 size={13} />
+                Sửa
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 p-4 rounded-2xl text-center space-y-1">
+                <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Tiền Hoa Hồng Thực Nhận</span>
+                <p className="text-2xl font-black text-purple-900 font-mono">
+                  {formatVND(selectedCommission.commissionAmount)}
+                </p>
+                <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-white/80 text-purple-800 border border-purple-200">
+                  Trạng thái: {selectedCommission.paymentStatus}
+                </span>
+              </div>
+
+              <div className="bg-[#F5F5F7] p-4 rounded-2xl space-y-3 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Khách hàng:</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <CompanyLogo name={selectedCommission.customerName} size="xs" />
+                    {selectedCommission.customerName}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Người nhận:</span>
+                  <span className="font-bold text-purple-950 flex items-center gap-1">
+                    <UserCheck size={13} className="text-purple-600" />
+                    {selectedCommission.beneficiaryName}
+                  </span>
+                </div>
+                {selectedCommission.beneficiaryPhone && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Số điện thoại:</span>
+                    <span className="font-mono text-slate-800">{selectedCommission.beneficiaryPhone}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Hình thức chi:</span>
+                  <span className="font-semibold text-slate-800">{selectedCommission.type}</span>
+                </div>
+                {selectedCommission.poNumber && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Số đơn hàng (PO):</span>
+                    <span className="font-mono font-bold text-blue-600">{selectedCommission.poNumber}</span>
+                  </div>
+                )}
+                {selectedCommission.period && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Kỳ tháng:</span>
+                    <span className="font-bold text-amber-700">Tháng {selectedCommission.period}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Doanh thu cơ sở:</span>
+                  <span className="font-semibold text-slate-800">{formatVND(selectedCommission.baseRevenue)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tỷ lệ chiết khấu:</span>
+                  <span className="font-bold text-purple-700">{selectedCommission.rate}%</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200/60 pt-2.5">
+                  <span className="text-slate-500">Ngày giải ngân:</span>
+                  <span className="font-medium text-slate-800">{formatDateForDisplay(selectedCommission.paymentDate)}</span>
+                </div>
+                {selectedCommission.beneficiaryBank && (
+                  <div className="flex justify-between border-t border-slate-200/60 pt-2.5">
+                    <span className="text-slate-500">Tài khoản NH:</span>
+                    <span className="font-mono text-slate-800 text-right">{selectedCommission.beneficiaryBank}</span>
+                  </div>
+                )}
+              </div>
+
+              {selectedCommission.notes && (
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ghi Chú</h4>
+                  <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+                    {selectedCommission.notes}
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsMobileDetailOpen(false)}
+                className="w-full py-3 bg-[#007AFF] text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-[0.98] transition-all"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {isModalOpen && (

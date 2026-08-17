@@ -646,6 +646,71 @@ export default function DashboardView({
     return supplierStatsAll.slice(0, 5);
   }, [supplierStatsAll]);
 
+  // Helper function for safe month extraction
+  const safeExtractMonth = (d: any): number => {
+    if (d["Tháng"]) {
+      const m = parseInt(String(d["Tháng"]));
+      if (!isNaN(m) && m >= 1 && m <= 12) return m;
+    }
+    const dateStr = d["Ngày giao"] || d["Ngày xuất kho"] || d["Ngày"] || d["Date"] || d["paymentDate"] || d["period"] || "";
+    if (dateStr) {
+      const str = String(dateStr).trim();
+      if (/^\d{4}-\d{2}/.test(str)) {
+        const m = parseInt(str.substring(5, 7));
+        if (!isNaN(m) && m >= 1 && m <= 12) return m;
+      }
+      const parts = str.split(/[-/]/);
+      if (parts.length >= 2) {
+        if (parts[0].length === 4) {
+          const m = parseInt(parts[1]);
+          if (!isNaN(m) && m >= 1 && m <= 12) return m;
+        } else {
+          const m = parseInt(parts[1]);
+          if (!isNaN(m) && m >= 1 && m <= 12) return m;
+        }
+      }
+    }
+    return 1;
+  };
+
+  // Commission Totals & Monthly Map
+  const totalCommission = useMemo(() => {
+    return (commissionData || []).reduce((acc: number, curr: any) => acc + parseNumber(curr.commissionAmount || 0), 0);
+  }, [commissionData]);
+
+  const totalNetProfit = useMemo(() => {
+    return totalProfit - totalCommission;
+  }, [totalProfit, totalCommission]);
+
+  const monthlyCommissionMap = useMemo(() => {
+    const map = new Map<number, number>();
+    (commissionData || []).forEach((c: any) => {
+      let m = 1;
+      if (c.period) {
+        const parts = String(c.period).split(/[-/]/);
+        m = parseInt(parts[parts.length - 1]) || 1;
+      } else if (c.paymentDate) {
+        m = safeExtractMonth({ paymentDate: c.paymentDate });
+      }
+      const amt = parseNumber(c.commissionAmount || 0);
+      map.set(m, (map.get(m) || 0) + amt);
+    });
+    return map;
+  }, [commissionData]);
+
+  const commissionCustomerStats = useMemo(() => {
+    const map = new Map<string, { name: string, commission: number, count: number }>();
+    (commissionData || []).forEach((c: any) => {
+      const cust = c.customerName || 'Khác';
+      const amt = parseNumber(c.commissionAmount || 0);
+      if (!map.has(cust)) map.set(cust, { name: cust, commission: 0, count: 0 });
+      const item = map.get(cust)!;
+      item.commission += amt;
+      item.count += 1;
+    });
+    return Array.from(map.values()).sort((a,b) => b.commission - a.commission);
+  }, [commissionData]);
+
   // --- STATS BY QUARTER (QUÝ 1 -> QUÝ 4) ---
   const quarterlyTrendData = useMemo(() => {
     const quarters = [
@@ -656,17 +721,18 @@ export default function DashboardView({
     ];
 
     filteredDelivery.forEach(d => {
-      const month = parseInt(d["Tháng"]);
-      if (isNaN(month) || month < 1 || month > 12) return;
+      const month = safeExtractMonth(d);
       const qIndex = Math.floor((month - 1) / 3);
-      const rev = parseNumber(d["Doanh thu"]);
-      const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
-      const vol = parseNumber(d["Số lượng giao"]);
+      if (qIndex >= 0 && qIndex < 4) {
+        const rev = parseNumber(d["Doanh thu"]);
+        const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
+        const vol = parseNumber(d["Số lượng giao"]);
 
-      quarters[qIndex].revenue += rev;
-      quarters[qIndex].profit += prof;
-      quarters[qIndex].volume += vol;
-      quarters[qIndex].orders += 1;
+        quarters[qIndex].revenue += rev;
+        quarters[qIndex].profit += prof;
+        quarters[qIndex].volume += vol;
+        quarters[qIndex].orders += 1;
+      }
     });
 
     return quarters;
@@ -678,9 +744,9 @@ export default function DashboardView({
     filteredDelivery.forEach(d => {
        const product = d["Tên sản phẩm"] || "Khác";
        const category = d["Nhóm hàng"] || d["Danh mục"] || "Khác";
-       const rev = parseFloat(String(d["Doanh thu"] || "0").replace(/,/g, '')) || 0;
-       const prof = parseFloat(String(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"] || "0").replace(/,/g, '')) || 0;
-       const vol = parseFloat(String(d["Số lượng giao"] || "0").replace(/,/g, '')) || 0;
+       const rev = parseNumber(d["Doanh thu"]);
+       const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
+       const vol = parseNumber(d["Số lượng giao"]);
        
        if (!map.has(product)) map.set(product, { name: product, category, revenue: 0, profit: 0, volume: 0 });
        const item = map.get(product)!;
@@ -691,48 +757,86 @@ export default function DashboardView({
     return Array.from(map.values()).sort((a,b) => b.revenue - a.revenue).slice(0, 10);
   }, [filteredDelivery]);
 
-  // Chart 2: Revenue & Profit Trend by Month
+  // Chart 2: Revenue, Gross Profit, Commission & Net Profit Trend by Month
   const monthlyTrendData = useMemo(() => {
-    const map = new Map<number, {month: string, revenue: number, profit: number}>();
+    const map = new Map<number, {month: string, revenue: number, grossProfit: number, profit: number, commission: number, netProfit: number}>();
     filteredDelivery.forEach(d => {
-       const month = parseInt(d["Tháng"]);
-       if (isNaN(month)) return;
-       const rev = parseFloat(String(d["Doanh thu"] || "0").replace(/,/g, '')) || 0;
-       const prof = parseFloat(String(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"] || "0").replace(/,/g, '')) || 0;
-       if (!map.has(month)) map.set(month, { month: `Tháng ${month}`, revenue: 0, profit: 0 });
+       const month = safeExtractMonth(d);
+       const rev = parseNumber(d["Doanh thu"]);
+       const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
+       const comm = monthlyCommissionMap.get(month) || 0;
+       if (!map.has(month)) {
+         map.set(month, { 
+           month: `Tháng ${month}`, 
+           revenue: 0, 
+           grossProfit: 0,
+           profit: 0, 
+           commission: comm,
+           netProfit: 0 
+         });
+       }
        const item = map.get(month)!;
        item.revenue += rev;
+       item.grossProfit += prof;
        item.profit += prof;
+       item.netProfit = item.grossProfit - item.commission;
     });
+
+    // Ensure months with commissions are also included
+    monthlyCommissionMap.forEach((comm, month) => {
+      if (!map.has(month)) {
+        map.set(month, {
+          month: `Tháng ${month}`,
+          revenue: 0,
+          grossProfit: 0,
+          profit: 0,
+          commission: comm,
+          netProfit: -comm
+        });
+      }
+    });
+
     return Array.from(map.entries()).sort((a,b) => a[0] - b[0]).map(e => e[1]);
-  }, [filteredDelivery]);
+  }, [filteredDelivery, monthlyCommissionMap]);
 
   // Chart 2b: Completed Orders Revenue & Profit Trend by Month
   const completedMonthlyTrendData = useMemo(() => {
     const completedPoNumbers = new Set(
       poData
-        .filter(po => po["Trạng Thái"] === "Hoàn thành" || po["Trạng thái"] === "Hoàn thành" || po["Status"] === "Hoàn thành")
+        .filter(po => {
+          const st = (po["Trạng Thái"] || po["Trạng thái"] || po["Status"] || "").toLowerCase();
+          return st.includes("hoàn thành") || st.includes("đã giao") || st.includes("đã duyệt") || st === "completed";
+        })
         .map(po => (po["Đơn hàng"] || po["Số PO"] || "").toString().trim())
     );
 
-    const map = new Map<number, {month: string, revenue: number, profit: number}>();
+    const map = new Map<number, {month: string, revenue: number, profit: number, commission: number, netProfit: number}>();
     deliveryData
       .filter(d => {
          const poNumber = (d["Đơn hàng"] || "").toString().trim();
-         return completedPoNumbers.has(poNumber);
+         return completedPoNumbers.size === 0 || completedPoNumbers.has(poNumber) || d["Status"] === "Hoàn thành";
       })
       .forEach(d => {
-         const month = parseInt(d["Tháng"]);
-         if (isNaN(month)) return;
-         const rev = parseFloat(String(d["Doanh thu"] || "0").replace(/,/g, '')) || 0;
-         const prof = parseFloat(String(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"] || "0").replace(/,/g, '')) || 0;
-         if (!map.has(month)) map.set(month, { month: `Tháng ${month}`, revenue: 0, profit: 0 });
+         const month = safeExtractMonth(d);
+         const rev = parseNumber(d["Doanh thu"]);
+         const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
+         const comm = monthlyCommissionMap.get(month) || 0;
+         if (!map.has(month)) {
+           map.set(month, { 
+             month: `Tháng ${month}`, 
+             revenue: 0, 
+             profit: 0, 
+             commission: comm,
+             netProfit: 0 
+           });
+         }
          const item = map.get(month)!;
          item.revenue += rev;
          item.profit += prof;
+         item.netProfit = item.profit - item.commission;
     });
     return Array.from(map.entries()).sort((a,b) => a[0] - b[0]).map(e => e[1]);
-  }, [deliveryData, poData]);
+  }, [deliveryData, poData, monthlyCommissionMap]);
 
   // Chart 4: Delivery Status Breakdown
   const deliveryStatusData = useMemo(() => {
@@ -746,33 +850,47 @@ export default function DashboardView({
     ].filter(d => d.value > 0);
   }, [filteredDelivery]);
 
-  // --- WATERFALL DATA: PROFIT BRIDGE ---
+  // --- WATERFALL DATA: PROFIT BRIDGE WITH COMMISSION ---
   const waterfallData = useMemo(() => {
     const totalRev = totalRevenue;
     const totalProf = totalProfit;
-    const totalCost = totalRev - totalProf;
+    const totalCost = Math.max(0, totalRev - totalProf);
+    const totalComm = totalCommission;
+    const netProf = totalProf - totalComm;
 
     return [
       { 
-        name: 'Doanh thu', 
+        name: 'Doanh thu (+)', 
         range: [0, totalRev], 
         display: totalRev,
         color: '#3b82f6' 
       },
       { 
-        name: 'Giá vốn (NCC)', 
-        range: [totalRev, totalRev - totalCost], 
+        name: 'Giá vốn (-)', 
+        range: [totalRev, Math.max(0, totalRev - totalCost)], 
         display: -totalCost,
         color: '#ef4444' 
       },
       { 
-        name: 'Lợi nhuận gộp', 
+        name: 'LN Gộp (=)', 
         range: [0, totalProf], 
         display: totalProf,
         color: '#10b981' 
       },
+      { 
+        name: 'Hoa hồng (-)', 
+        range: [totalProf, Math.max(0, totalProf - totalComm)], 
+        display: -totalComm,
+        color: '#a855f7' 
+      },
+      { 
+        name: 'LN Ròng (=)', 
+        range: [0, Math.max(0, netProf)], 
+        display: netProf,
+        color: '#059669' 
+      },
     ];
-  }, [totalRevenue, totalProfit]);
+  }, [totalRevenue, totalProfit, totalCommission]);
 
   // --- ADVANCED REVENUE TREND DATA ---
   const revenueGrowthData = useMemo(() => {
@@ -1179,47 +1297,49 @@ export default function DashboardView({
         </div>
 
         {/* Completed Orders Revenue & Profit Chart */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-           <div className="flex items-center justify-between mb-6">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
               <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <BarChart3 size={18} className="text-blue-600" /> Doanh thu & Lợi nhuận (Đơn hàng Hoàn thành)
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                  <BarChart3 size={18} className="text-blue-600 shrink-0" /> Doanh thu, Lợi nhuận & Hoa hồng (Đơn hàng Hoàn thành)
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Biểu đồ tổng doanh thu và lợi nhuận gộp theo từng tháng (chỉ tính đơn hàng đã Hoàn thành)</p>
+                <p className="text-xs text-gray-500 mt-1">Tổng hợp doanh thu, lợi nhuận gộp, chi phí hoa hồng và LN ròng theo tháng</p>
               </div>
-              <div className="text-xs font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded">
+              <div className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg shrink-0 self-start sm:self-auto border border-blue-200/60">
                  COMPLETED ORDERS
               </div>
            </div>
-           <div className="h-[350px] w-full">
-             <ResponsiveContainer width="100%" height="100%">
-               <ComposedChart data={completedMonthlyTrendData} margin={{ top: 10, right: 30, left: 40, bottom: 0 }}>
+           <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+             <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+               <ComposedChart data={completedMonthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                  <XAxis 
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b7280' }} 
+                    tick={{ fontSize: 11, fill: '#6b7280' }} 
                     dy={10} 
                  />
                  <YAxis 
                     yAxisId="left"
-                    width={50}
+                    width={45}
                     tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
                  />
                  <Tooltip 
-                    formatter={(value: number) => numFormatter.format(value) + " đ"}
+                    formatter={(value: number, name: string) => [formatter.format(value), name]}
                     cursor={{fill: '#f1f5f9'}}
                     contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
                     itemStyle={{ color: '#e2e8f0' }}
                     labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
                  />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={60} />
-                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                 <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                 <Bar yAxisId="left" dataKey="commission" name="Chi phí hoa hồng" fill="#a855f7" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                 <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN ròng sau hoa hồng" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} />
                </ComposedChart>
              </ResponsiveContainer>
            </div>
@@ -1227,50 +1347,64 @@ export default function DashboardView({
         </div>
 
         {/* Monthly Profit Analysis Bar Chart */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-           <div className="flex items-center justify-between mb-6">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
               <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <BarChart3 size={18} className="text-emerald-600" /> Phân tích Lợi nhuận ròng Hàng tháng
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                  <BarChart3 size={18} className="text-emerald-600 shrink-0" /> Phân tích Lợi Nhuận Gộp vs Hoa Hồng & LN Ròng Hàng Tháng
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Biểu đồ so sánh hiệu quả kinh doanh qua các tháng trong năm 2026</p>
+                <p className="text-xs text-gray-500 mt-1">So sánh lợi nhuận gộp, chi phí hoa hồng chiết khấu và lợi nhuận ròng thực nhận</p>
               </div>
-              <div className="text-xs font-bold px-2 py-1 bg-emerald-50 text-emerald-600 rounded">
-                 NET PROFIT
+              <div className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg shrink-0 self-start sm:self-auto border border-emerald-200/60">
+                 NET PROFIT & COMMISSION
               </div>
            </div>
-           <div className="h-[350px] w-full">
-             <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 30, left: 40, bottom: 0 }}>
+           <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+             <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                  <XAxis 
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }} 
+                    tick={{ fontSize: 11, fill: '#6b7280', fontWeight: 500 }} 
                     dy={12} 
                  />
                  <YAxis 
-                    width={50}
+                    width={45}
                     tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
                  />
                  <Tooltip 
                     cursor={{ fill: '#f8fafc' }}
-                    formatter={(value: number) => [formatter.format(value), "Lợi nhuận ròng"]}
+                    formatter={(value: number, name: string) => [formatter.format(value), name]}
                     contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
                     itemStyle={{ color: '#e2e8f0' }}
                     labelStyle={{ fontWeight: 'bold', color: '#34d399', marginBottom: '4px' }}
                  />
+                 <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
                  <Bar 
-                    dataKey="profit" 
-                    name="Lợi nhuận ròng" 
+                    dataKey="grossProfit" 
+                    name="Lợi nhuận gộp" 
                     fill="#10b981" 
-                    radius={[6, 6, 0, 0]} 
-                    maxBarSize={80}
-                    animationDuration={1500}
+                    radius={[4, 4, 0, 0]} 
+                    maxBarSize={45}
+                 />
+                 <Bar 
+                    dataKey="commission" 
+                    name="Chi phí hoa hồng" 
+                    fill="#a855f7" 
+                    radius={[4, 4, 0, 0]} 
+                    maxBarSize={45}
+                 />
+                 <Bar 
+                    dataKey="netProfit" 
+                    name="Lợi nhuận ròng thực nhận" 
+                    fill="#059669" 
+                    radius={[4, 4, 0, 0]} 
+                    maxBarSize={45}
                  />
                </BarChart>
              </ResponsiveContainer>
@@ -1395,162 +1529,233 @@ export default function DashboardView({
 
         {/* Charts Row 1: Trend & Category */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
-             <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <TrendingUp size={18} className="text-blue-600" /> Xu hướng Doanh thu & Lợi nhuận
-                </h3>
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <div>
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                    <TrendingUp size={18} className="text-blue-600 shrink-0" /> Xu hướng Doanh thu, Lợi nhuận & Hoa hồng
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Theo dõi 4 chỉ số tài chính chủ chốt qua từng tháng</p>
+                </div>
              </div>
-             <ResponsiveContainer width="100%" height={300}>
-               <LineChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 45, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} dy={10} />
-                 <YAxis 
-                    yAxisId="left"
-                    width={50}
-                    tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
-                 />
-                 <Tooltip 
-                    formatter={(value: number) => formatter.format(value)}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
-                 />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                 <Line yAxisId="left" type="monotone" dataKey="revenue" name="Doanh thu" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                 <Line yAxisId="left" type="monotone" dataKey="profit" name="Lợi nhuận" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-               </LineChart>
-             </ResponsiveContainer>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <LineChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} />
+                   <YAxis 
+                      yAxisId="left"
+                      width={45}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                   />
+                   <Tooltip 
+                      formatter={(value: number, name: string) => [formatter.format(value), name]}
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
+                   />
+                   <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+                   <Line yAxisId="left" type="monotone" dataKey="revenue" name="Doanh thu" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="grossProfit" name="LN Gộp" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="commission" name="Hoa hồng" stroke="#a855f7" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN Ròng" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                 </LineChart>
+               </ResponsiveContainer>
+             </div>
            </div>
 
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <PieChartIcon size={18} className="text-blue-600" /> Cơ cấu Doanh thu theo Nhóm hàng
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                  <PieChartIcon size={18} className="text-blue-600 shrink-0" /> Cơ cấu Doanh thu theo Nhóm hàng
                 </h3>
              </div>
-             <ResponsiveContainer width="100%" height={300}>
-               <PieChart>
-                 <Pie
-                   data={categoryStats}
-                   cx="50%"
-                   cy="50%"
-                   innerRadius={70}
-                   outerRadius={100}
-                   paddingAngle={5}
-                   dataKey="revenue"
-                   label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                   labelLine={false}
-                 >
-                   {categoryStats.map((entry, index) => (
-                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                   ))}
-                 </Pie>
-                 <Tooltip 
-                    formatter={(value: number) => formatter.format(value)}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
-                 />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-               </PieChart>
-             </ResponsiveContainer>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <PieChart>
+                   <Pie
+                     data={categoryStats}
+                     cx="50%"
+                     cy="50%"
+                     innerRadius={65}
+                     outerRadius={95}
+                     paddingAngle={4}
+                     dataKey="revenue"
+                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                     labelLine={false}
+                   >
+                     {categoryStats.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                     ))}
+                   </Pie>
+                   <Tooltip 
+                      formatter={(value: number) => formatter.format(value)}
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
+                   />
+                   <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+                 </PieChart>
+               </ResponsiveContainer>
+             </div>
              <InsightBox content={categoryInsight} />
            </div>
         </div>
 
         {/* Charts Row 2: Customer & Supplier */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <Users size={18} className="text-blue-600" /> Top Khách hàng theo Doanh thu
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                  <Users size={18} className="text-blue-600 shrink-0" /> Top Khách hàng theo Doanh thu & Lợi nhuận
                 </h3>
              </div>
-             <ResponsiveContainer width="100%" height={300}>
-               <BarChart data={customerStats} margin={{ top: 10, right: 15, left: 45, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} interval={0} />
-                 <YAxis 
-                    yAxisId="left"
-                    width={50}
-                    tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
-                 />
-                 <Tooltip 
-                    formatter={(value: number) => formatter.format(value)}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
-                 />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
-               </BarChart>
-             </ResponsiveContainer>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <BarChart data={customerStats} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                   <YAxis 
+                      yAxisId="left"
+                      width={45}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                   />
+                   <Tooltip 
+                      formatter={(value: number, name: string) => [formatter.format(value), name]}
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
+                   />
+                   <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                 </BarChart>
+               </ResponsiveContainer>
+             </div>
              <InsightBox content={customerInsight} />
            </div>
 
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <Briefcase size={18} className="text-indigo-600" /> Top Nhà cung cấp
+                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                  <Briefcase size={18} className="text-indigo-600 shrink-0" /> Top Nhà cung cấp (Giá vốn & Mua hàng)
                 </h3>
              </div>
-             <ResponsiveContainer width="100%" height={300}>
-               <BarChart data={supplierStats} margin={{ top: 10, right: 15, left: 45, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} interval={0} />
-                 <YAxis 
-                    yAxisId="left"
-                    width={50}
-                    tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
-                 />
-                 <Tooltip 
-                    formatter={(value: number) => formatter.format(value)}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#818cf8', marginBottom: '4px' }}
-                 />
-                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-               </BarChart>
-             </ResponsiveContainer>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <BarChart data={supplierStats} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                   <YAxis 
+                      yAxisId="left"
+                      width={45}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                   />
+                   <Tooltip 
+                      formatter={(value: number, name: string) => [formatter.format(value), name]}
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#818cf8', marginBottom: '4px' }}
+                   />
+                   <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                 </BarChart>
+               </ResponsiveContainer>
+             </div>
              <InsightBox content={supplierInsight} />
            </div>
         </div>
 
+        {/* Dedicated Commission Distribution by Customer */}
+        {commissionCustomerStats.length > 0 && (
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <div>
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                    <DollarSign size={18} className="text-purple-600 shrink-0" /> Cơ cấu & Phân bổ Chi phí Hoa hồng theo Khách hàng
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Thống kê chi tiết các khoản chiết khấu/hoa hồng theo từng đối tác và người thụ hưởng</p>
+                </div>
+                <div className="text-xs font-bold px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg shrink-0 self-start sm:self-auto border border-purple-200/60">
+                   COMMISSION BREAKDOWN
+                </div>
+             </div>
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <div className="lg:col-span-7 h-[260px] sm:h-[300px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+                    <BarChart data={commissionCustomerStats.slice(0, 6)} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                      <YAxis 
+                         width={45}
+                         tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
+                         axisLine={false} 
+                         tickLine={false} 
+                         tick={{ fontSize: 11, fill: '#6b7280' }}
+                      />
+                      <Tooltip 
+                         formatter={(value: number) => [formatter.format(value), "Hoa hồng"]}
+                         contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
+                         itemStyle={{ color: '#e2e8f0' }}
+                         labelStyle={{ fontWeight: 'bold', color: '#c084fc', marginBottom: '4px' }}
+                      />
+                      <Bar dataKey="commission" name="Tổng chi hoa hồng" fill="#a855f7" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="lg:col-span-5 flex flex-col gap-3">
+                   <div className="bg-purple-50/60 p-4 rounded-xl border border-purple-100">
+                      <div className="text-xs font-semibold text-purple-700 uppercase tracking-wider">Tổng tiền hoa hồng đã cam kết</div>
+                      <div className="text-2xl font-black text-purple-900 mt-1">{formatter.format(totalCommission)}</div>
+                      <div className="text-[11px] text-purple-600 mt-1">
+                        Chiếm {totalProfit > 0 ? ((totalCommission / totalProfit) * 100).toFixed(1) : 0}% trên tổng lợi nhuận gộp hệ thống
+                      </div>
+                   </div>
+                   <div className="space-y-2">
+                     {commissionCustomerStats.slice(0, 3).map((item, idx) => (
+                       <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                          <span className="font-semibold text-slate-800 truncate max-w-[180px]">{item.name}</span>
+                          <span className="font-mono font-bold text-purple-700">{formatter.format(item.commission)}</span>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+             </div>
+          </div>
+        )}
+
         {/* Charts Row 3: Growth & Financial Bridge */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Activity size={18} className="text-blue-600" /> Phân tích Tăng trưởng Doanh thu
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                    <Activity size={18} className="text-blue-600 shrink-0" /> Phân tích Tăng trưởng Doanh thu
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">Theo dõi doanh thu tích lũy và tỷ lệ tăng trưởng hàng tháng</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Theo dõi doanh thu tích lũy và tỷ lệ tăng trưởng hàng tháng</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded">
+                <div className="flex items-center gap-2 text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200/60">
                    <TrendingUp size={14} /> GROWTH
                 </div>
              </div>
-             <div className="h-[320px] w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                 <ComposedChart data={revenueGrowthData} margin={{ top: 10, right: 15, left: 45, bottom: 0 }}>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <ComposedChart data={revenueGrowthData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} />
                    <YAxis 
                       yAxisId="left"
-                      width={50}
+                      width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
@@ -1559,7 +1764,7 @@ export default function DashboardView({
                    <YAxis 
                       yAxisId="right"
                       orientation="right"
-                      width={40}
+                      width={35}
                       tickFormatter={(value) => `${value}%`} 
                       axisLine={false} 
                       tickLine={false} 
@@ -1574,31 +1779,31 @@ export default function DashboardView({
                       itemStyle={{ color: '#e2e8f0' }}
                       labelStyle={{ fontWeight: 'bold', color: '#fbbf24', marginBottom: '4px' }}
                    />
-                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                   <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
                    <Area yAxisId="left" type="monotone" dataKey="cumulative" name="Doanh thu tích lũy" fill="#eff6ff" stroke="#3b82f6" strokeWidth={2} />
-                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu tháng" fill="#3b82f6" opacity={0.3} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu tháng" fill="#3b82f6" opacity={0.3} radius={[4, 4, 0, 0]} maxBarSize={35} />
                    <Line yAxisId="right" type="stepAfter" dataKey="growth" name="Tăng trưởng" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
                  </ComposedChart>
                </ResponsiveContainer>
              </div>
            </div>
 
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <BarChart3 size={18} className="text-emerald-600" /> Biểu đồ Thác nước: Điểm hòa vốn & Lợi nhuận
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
+                    <BarChart3 size={18} className="text-emerald-600 shrink-0" /> Biểu đồ Thác nước: Điểm hòa vốn & Lợi nhuận ròng
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">Phân tách từ doanh thu tổng đến lợi nhuận gộp sau khi trừ giá vốn</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Phân tách từ doanh thu tổng qua giá vốn, lợi nhuận gộp và hoa hồng đến LN ròng</p>
                 </div>
              </div>
-             <div className="h-[320px] w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={waterfallData} margin={{ top: 20, right: 30, left: 45, bottom: 5 }}>
+             <div className="h-[280px] sm:h-[350px] w-full min-w-0">
+               <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                 <BarChart data={waterfallData} margin={{ top: 20, right: 15, left: 20, bottom: 5 }}>
                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
                    <YAxis 
-                      width={50}
+                      width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
@@ -1618,18 +1823,26 @@ export default function DashboardView({
                  </BarChart>
                </ResponsiveContainer>
              </div>
-             <div className="mt-4 flex justify-center gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-xs text-gray-600 font-medium">Doanh thu (+)</span>
+             <div className="mt-4 flex flex-wrap justify-center gap-4 sm:gap-6">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                  <span className="text-[11px] text-gray-600 font-medium">Doanh thu (+)</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-xs text-gray-600 font-medium">Giá vốn (-)</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                  <span className="text-[11px] text-gray-600 font-medium">Giá vốn (-)</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs text-gray-600 font-medium">Lợi nhuận (=)</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                  <span className="text-[11px] text-gray-600 font-medium">LN Gộp (=)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
+                  <span className="text-[11px] text-gray-600 font-medium">Hoa hồng (-)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-700"></div>
+                  <span className="text-[11px] text-gray-600 font-medium">LN Ròng (=)</span>
                 </div>
              </div>
            </div>
