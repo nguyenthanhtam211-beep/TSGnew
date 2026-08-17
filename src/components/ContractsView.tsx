@@ -228,15 +228,15 @@ export default function ContractsView({
   };
 
   return (
-    <div className="flex-1 bg-[#F5F5F7] flex flex-col h-full overflow-hidden">
+    <div className="flex-1 bg-[#F5F5F7] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
       {/* Top Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-8 py-5 flex items-center justify-between">
+      <div className="bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
               Pháp lý & Kế toán
             </span>
-            <h1 className="text-xl font-bold text-[#1D1D1F] tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Quản lý hồ sơ Hợp đồng kinh tế, Phụ lục đơn giá cam kết làm chứng từ đối chiếu giá kế toán & OCR
@@ -255,51 +255,51 @@ export default function ContractsView({
       </div>
 
       {/* KPI Cards */}
-      <div className="px-8 py-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-2">
-            <span>Tổng Hợp đồng</span>
-            <FileText size={16} className="text-blue-500" />
+      <div className="px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
+            <span className="truncate">Tổng Hợp đồng</span>
+            <FileText size={16} className="text-blue-500 shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-[#1D1D1F]">{stats.total}</p>
-          <span className="text-[11px] text-slate-400">Đã lưu trong hệ thống</span>
+          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-[#1D1D1F]">{stats.total}</p>
+          <span className="text-[10px] sm:text-[11px] text-slate-400">Đã lưu trong hệ thống</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-2">
-            <span>Đang Có Hiệu Lực</span>
-            <CheckCircle2 size={16} className="text-emerald-500" />
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
+            <span className="truncate">Đang Có Hiệu Lực</span>
+            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
-          <span className="text-[11px] text-emerald-600/80">Căn cứ pháp lý chuẩn</span>
+          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600">{stats.active}</p>
+          <span className="text-[10px] sm:text-[11px] text-emerald-600/80">Căn cứ pháp lý chuẩn</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-2">
-            <span>Sắp Hết Hạn (&lt;45 ngày)</span>
-            <Clock size={16} className="text-amber-500" />
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
+            <span className="truncate">Sắp Hết Hạn (&lt;45 ngày)</span>
+            <Clock size={16} className="text-amber-500 shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-amber-600">{stats.expiringSoon}</p>
-          <span className="text-[11px] text-amber-600/80">Cần tái ký / lập phụ lục</span>
+          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-amber-600">{stats.expiringSoon}</p>
+          <span className="text-[10px] sm:text-[11px] text-amber-600/80">Cần tái ký / lập phụ lục</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-2">
-            <span>Tổng Giá Trị Cam Kết</span>
-            <DollarSign size={16} className="text-purple-500" />
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
+            <span className="truncate">Tổng Giá Trị Cam Kết</span>
+            <DollarSign size={16} className="text-purple-500 shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-purple-700">{formatVND(stats.totalVal)}</p>
-          <span className="text-[11px] text-purple-600/80">Quy mô các hợp đồng</span>
+          <p className="text-base sm:text-lg lg:text-2xl font-bold text-purple-700 truncate" title={formatVND(stats.totalVal)}>{formatVND(stats.totalVal)}</p>
+          <span className="text-[10px] sm:text-[11px] text-purple-600/80">Quy mô các hợp đồng</span>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 px-8 pb-8 overflow-hidden flex gap-6">
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
         {/* Left: Contracts Table List */}
-        <div className="flex-1 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col overflow-hidden">
+        <div className="flex-1 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col min-h-[400px] overflow-hidden">
           {/* Filter Bar */}
-          <div className="p-4 border-b border-black/[0.06] flex items-center justify-between gap-4">
-            <div className="flex items-center gap-1 bg-[#F5F5F7] p-1 rounded-xl">
+          <div className="p-3 sm:p-4 border-b border-black/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1 bg-[#F5F5F7] p-1 rounded-xl overflow-x-auto max-w-full">
               <button
                 onClick={() => setActiveTab('all')}
                 className={clsx(
@@ -452,7 +452,7 @@ export default function ContractsView({
         </div>
 
         {/* Right: Contract Detail & Price Matching Panel */}
-        <div className="w-96 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col overflow-hidden">
+        <div className="w-full lg:w-96 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col min-h-[350px] overflow-hidden">
           {selectedContract ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Detail Header */}
