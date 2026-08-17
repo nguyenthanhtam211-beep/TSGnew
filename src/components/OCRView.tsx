@@ -6,7 +6,7 @@ import {
   Trash2, Plus, Sparkles, Save, ArrowRight, Eye, RefreshCw,
   Search, Info, HelpCircle
 } from 'lucide-react';
-import { findPriceRecord, parseNumber } from '../lib/business-logic';
+import { findPriceRecord, parseNumber, parseDateToISO } from '../lib/business-logic';
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
 import MacTrafficLights from './MacTrafficLights';
@@ -319,8 +319,8 @@ export default function OCRView({
             "Mã của khách": item.code || (priceRecord ? priceRecord['Mã sản phẩm'] : "") || "",
             "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái") || "Cái",
             "Số lượng": qty.toString(),
-            "Ngày đặt hàng": dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
-            "Ngày giao": dataToSave.deliveryDate || dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
+            "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
+            "Ngày giao": parseDateToISO(dataToSave.deliveryDate || dataToSave.documentDate) || new Date().toISOString().split('T')[0],
             "Thời gian xử lý": "5",
             "Khách hàng": matchedCust,
             "Đơn vị nhận hàng": matchedCust,
@@ -342,7 +342,7 @@ export default function OCRView({
         // Await all database operations
         await onAddPOHeader({
           "Đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
-          "Ngày đặt hàng": dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
+          "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
           "Khách hàng": matchedCust,
           "Phân loại": "Đơn hàng thường xuyên",
           "Tệp đơn hàng": file?.name || "document_ocr.pdf",

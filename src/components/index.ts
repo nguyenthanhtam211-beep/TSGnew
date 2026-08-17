@@ -11,6 +11,8 @@ export { default as DeliveryView } from "./DeliveryView";
 export { default as DeliveryPlanView } from "./DeliveryPlanView";
 export { default as StorageView } from "./StorageView";
 export { default as SpecsView } from "./SpecsView";
+export { default as ContractsView } from "./ContractsView";
+export { default as CommissionView } from "./CommissionView";
 
 // Modals
 export { DualPODocumentModal } from "./DualPODocumentModal";

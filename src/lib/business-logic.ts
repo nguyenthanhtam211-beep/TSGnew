@@ -297,3 +297,59 @@ export const calculatePOLineFinances = (
     priceCode: priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm']) : (poLine['Mã giá bán'] || 'N/A')
   };
 };
+
+/**
+ * Safely parses any date string (dd/mm/yyyy, yyyy-mm-dd, dd-mm-yyyy, ISO timestamp) into 'YYYY-MM-DD'
+ * for HTML <input type="date" value={...} />
+ */
+export const parseDateToISO = (val: any): string => {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (!str) return '';
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // YYYY/MM/DD
+  const ymdMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Date object or timestamp
+  const dateObj = new Date(str);
+  if (!isNaN(dateObj.getTime())) {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return '';
+};
+
+/**
+ * Formats any date string into standard display format 'DD/MM/YYYY'
+ */
+export const formatDateForDisplay = (val: any): string => {
+  if (!val) return '';
+  const iso = parseDateToISO(val);
+  if (!iso) return String(val);
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+

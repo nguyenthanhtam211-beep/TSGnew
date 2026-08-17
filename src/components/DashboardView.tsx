@@ -12,7 +12,19 @@ import GoogleSheetsSyncModal from './GoogleSheetsSyncModal';
 import PDFExportModal from './PDFExportModal';
 import { sanitizeDocColorsForCanvas } from '../lib/pdf-exporter';
 
-export default function DashboardView({ poData, deliveryData, poLinesData, customersData = [] }: { poData: any[], deliveryData: any[], poLinesData: any[], customersData?: any[] }) {
+export default function DashboardView({ 
+  poData, 
+  deliveryData, 
+  poLinesData, 
+  customersData = [],
+  commissionData = []
+}: { 
+  poData: any[], 
+  deliveryData: any[], 
+  poLinesData: any[], 
+  customersData?: any[],
+  commissionData?: any[]
+}) {
   const [timeFilter, setTimeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isExporting, setIsExporting] = useState(false);
@@ -1105,12 +1117,30 @@ export default function DashboardView({ poData, deliveryData, poLinesData, custo
                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
                  <DollarSign size={20} />
                </div>
-               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng Lợi nhuận</h3>
+               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng Lợi nhuận Gộp</h3>
              </div>
              <p className="text-2xl font-black text-slate-900 mb-1 relative z-10 tracking-tight">{formatter.format(totalProfit)}</p>
-             <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 relative z-10">
-                <span>Biên LN: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%</span>
+             <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 relative z-10 mb-2">
+                <span>Biên LN gộp: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%</span>
              </div>
+
+             {/* Commission Annotation */}
+             {(() => {
+               const totalComm = (commissionData || []).reduce((acc: number, c: any) => acc + (parseFloat(String(c.commissionAmount || 0)) || 0), 0);
+               const netProfit = totalProfit - totalComm;
+               return (
+                 <div className="mt-2 pt-2 border-t border-slate-200/60 relative z-10 space-y-1">
+                   <div className="flex items-center justify-between text-[11px] text-purple-700 font-semibold bg-purple-50/80 px-2 py-0.5 rounded">
+                     <span>Hoa hồng (Commission):</span>
+                     <span className="font-mono font-bold">-{formatter.format(totalComm)}</span>
+                   </div>
+                   <div className="flex items-center justify-between text-[11px] text-emerald-800 font-bold bg-emerald-50/90 px-2 py-0.5 rounded">
+                     <span>LN ròng sau hoa hồng:</span>
+                     <span className="font-mono font-bold">{formatter.format(netProfit)}</span>
+                   </div>
+                 </div>
+               );
+             })()}
           </div>
 
           <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/40 relative overflow-hidden group hover:border-amber-500/50 hover:shadow-[0_10px_30px_rgba(245,158,11,0.15)] transition-all duration-300">

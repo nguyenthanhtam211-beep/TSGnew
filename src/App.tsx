@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -16,14 +16,14 @@ import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, writ
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
 import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
-import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances } from './lib/business-logic';
+import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances, parseDateToISO, formatDateForDisplay } from './lib/business-logic';
 import { SYSTEM_PROMPT } from "./prompt";
 import { sendGeminiPrompt } from "./lib/gemini";
 import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
-  StorageView, SpecsView, ProductDetailModal, PODetailModal, 
+  StorageView, SpecsView, ContractsView, CommissionView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
@@ -111,6 +111,8 @@ export default function App() {
   const deliveryPlanData = useFirestoreCollection('delivery_plans', initialDeliveryPlan);
   const specsData = useFirestoreCollection('specs', INITIAL_SPECS_DATA);
   const fileStorageData = useFirestoreCollection('file_storage', []);
+  const contractsData = useFirestoreCollection('contracts', []);
+  const commissionData = useFirestoreCollection('commissions', []);
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
     return localStorage.getItem('google_access_token');
   });
@@ -771,6 +773,8 @@ export default function App() {
           {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>}
           <NavItem icon={<Users size={15} />} iconBg="bg-sky-500" label="Khách hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
           <NavItem icon={<Package size={15} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isCollapsed={isSidebarCollapsed} isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
+          <NavItem icon={<Scale size={15} />} iconBg="bg-blue-600" label="Hợp đồng & Phụ lục" isCollapsed={isSidebarCollapsed} isActive={activeTab === "contracts"} onClick={() => setActiveTab("contracts")} />
+          <NavItem icon={<Percent size={15} />} iconBg="bg-purple-600" label="Hoa hồng (Commission)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "commissions"} onClick={() => setActiveTab("commissions")} />
           <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
           <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
           <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
@@ -796,7 +800,37 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-20 lg:pb-0">
-        {activeTab === "dashboard" && <DashboardView poData={poHeaderData} deliveryData={enrichedDeliveryData} poLinesData={enrichedPoLinesData} customersData={customerData} />}
+        {activeTab === "dashboard" && (
+          <DashboardView 
+            poData={poHeaderData} 
+            deliveryData={enrichedDeliveryData} 
+            poLinesData={enrichedPoLinesData} 
+            customersData={customerData} 
+            commissionData={commissionData}
+          />
+        )}
+        {activeTab === "contracts" && (
+          <ContractsView
+            contractsData={contractsData}
+            pricingData={pricingData}
+            customerData={customerData}
+            supplierData={supplierData}
+            onAddContract={async (c) => await handleAddToFirestore("contracts", c)}
+            onUpdateContract={async (c) => await handleUpdateToFirestore("contracts", c)}
+            onDeleteContract={async (c) => await handleDeleteFromFirestore("contracts", c)}
+          />
+        )}
+        {activeTab === "commissions" && (
+          <CommissionView
+            commissionData={commissionData}
+            customerData={customerData}
+            contactData={contactData}
+            poHeaderData={poHeaderData}
+            onAddCommission={async (c) => await handleAddToFirestore("commissions", c)}
+            onUpdateCommission={async (c) => await handleUpdateToFirestore("commissions", c)}
+            onDeleteCommission={async (c) => await handleDeleteFromFirestore("commissions", c)}
+          />
+        )}
         {activeTab === "workflow" && (
           <WorkflowView 
             pricingData={pricingData}
@@ -2133,7 +2167,7 @@ function TableView({
                           type="date" 
                           required
                           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                          value={formData[h] || ''}
+                          value={parseDateToISO(formData[h]) || ''}
                           onChange={(e) => handleTextChange(e, h)}
                         />
                       </div>
@@ -2428,7 +2462,7 @@ function TableView({
                         <input 
                           type="date" 
                           className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
-                          value={formData[h] || ""}
+                          value={parseDateToISO(formData[h]) || ""}
                           onChange={(e) => handleTextChange(e, h)}
                         />
                       </div>
