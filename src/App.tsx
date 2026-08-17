@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -1612,12 +1612,17 @@ function TableView({
   const summaries = useMemo(() => {
     if (!data || data.length === 0) return null;
     
-    const moneyCols = headers.filter(h => h.includes('Tổng giá trị') || h.includes('Doanh thu') || h.includes('Thành tiền') || h.includes('Lợi nhuận dòng'));
+    const moneyCols = headers.filter(h => h.includes('Tổng giá trị') || h.includes('Doanh thu') || h.includes('Thành tiền') || h.includes('Lợi nhuận'));
     const statusCols = headers.filter(h => h === 'Trạng Thái' || h === 'Status' || h === 'Trạng thái');
 
-    const metrics: { label: string; value: string | number }[] = [];
+    const metrics: { label: string; value: string | number; color: string; icon: React.ReactNode }[] = [];
     
-    metrics.push({ label: 'Tổng số bản ghi', value: filteredData.length });
+    metrics.push({ 
+      label: 'Tổng số bản ghi', 
+      value: `${filteredData.length} bản ghi`,
+      color: 'bg-blue-500',
+      icon: <Layers size={15} />
+    });
 
     moneyCols.forEach(col => {
        const sum = filteredData.reduce((acc, row) => {
@@ -1630,7 +1635,14 @@ function TableView({
        }, 0);
        
        if (sum > 0) {
-         metrics.push({ label: `Tổng ${col}`, value: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sum) });
+         const isProfit = col.includes('Lợi nhuận');
+         const cleanLabel = col.startsWith('Tổng') ? col : `Tổng ${col}`;
+         metrics.push({ 
+           label: cleanLabel, 
+           value: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(sum),
+           color: isProfit ? 'bg-indigo-500' : 'bg-emerald-500',
+           icon: isProfit ? <TrendingUp size={15} /> : <DollarSign size={15} />
+         });
        }
     });
 
@@ -1638,10 +1650,15 @@ function TableView({
        let completed = 0;
        filteredData.forEach(row => {
           const val = String(row[col] || '');
-          if (val === 'Hoàn thành' || val === 'Đã giao' || val === 'Hoàn tất') completed++;
+          if (val === 'Hoàn thành' || val === 'Đã giao' || val === 'Hoàn tất' || val === 'Đã duyệt' || val === 'Đã thanh toán') completed++;
        });
        if (completed > 0) {
-          metrics.push({ label: `Đã hoàn thành`, value: `${completed} / ${filteredData.length}` });
+          metrics.push({ 
+            label: 'Đã hoàn tất', 
+            value: `${completed} / ${filteredData.length}`,
+            color: 'bg-teal-500',
+            icon: <CheckCircle size={15} />
+          });
        }
     });
 
@@ -1931,24 +1948,41 @@ function TableView({
       </div>
       
       {/* Apple Spotlight Search Capsule & KPI Cards */}
-      <div className="mb-4 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="Tìm kiếm nhanh trong bảng (Spotlight ⌘K)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#E5E5EA]/60 hover:bg-[#E5E5EA] focus:bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-xs font-medium text-[#1D1D1F] focus:border-[#007AFF] outline-none transition-all"
-          />
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Tìm kiếm nhanh trong bảng (Spotlight ⌘K)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[#E5E5EA]/60 hover:bg-[#E5E5EA] focus:bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-xs font-medium text-[#1D1D1F] focus:border-[#007AFF] outline-none transition-all"
+            />
+          </div>
         </div>
         
         {summaries && summaries.length > 0 && (
-          <div className="flex gap-3 overflow-x-auto pb-1 flex-1">
-            {summaries.map((s) => (
-              <div key={s.label} className="bg-white border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.03)] rounded-2xl px-4 py-2.5 min-w-[140px] flex-1">
-                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-0.5 truncate" title={s.label}>{s.label}</p>
-                <p className="text-sm font-bold text-[#1D1D1F] tracking-[-0.015em] truncate" title={String(s.value)}>{s.value}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+            {summaries.map((s, idx) => (
+              <div 
+                key={s.label + idx} 
+                className="bg-white border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 min-w-0"
+              >
+                <div className={clsx(
+                  "w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 text-white shadow-2xs",
+                  s.color || "bg-blue-500"
+                )}>
+                  {s.icon || <Layers size={16} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-slate-500 truncate" title={s.label}>
+                    {s.label}
+                  </p>
+                  <p className="text-xs sm:text-sm font-extrabold text-[#1D1D1F] tracking-tight truncate mt-0.5" title={String(s.value)}>
+                    {s.value}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
