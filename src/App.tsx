@@ -351,11 +351,17 @@ export default function App() {
 
   const handleAddToFirestore = async (colName: string, row: any) => {
     try {
-      const key = getItemKey(row, colName);
+      const cleanedRow: any = {};
+      Object.keys(row || {}).forEach(k => {
+        if (row[k] !== undefined) cleanedRow[k] = row[k];
+      });
+
+      const key = getItemKey(cleanedRow, colName);
       if (key) {
-        await setDoc(doc(db, colName, key), row);
+        const cleanKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
+        await setDoc(doc(db, colName, cleanKey), cleanedRow, { merge: true });
       } else {
-        await addDoc(collection(db, colName), row);
+        await addDoc(collection(db, colName), cleanedRow);
       }
     } catch (err) {
       console.error(`Failed to add to ${colName}`, err);
@@ -368,10 +374,15 @@ export default function App() {
     try {
       const batch = writeBatch(db);
       rows.forEach(row => {
-        const key = getItemKey(row, colName) || row.STT || row.id || `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const cleanKey = String(key).replace(/\//g, '_');
+        const cleanedRow: any = {};
+        Object.keys(row || {}).forEach(k => {
+          if (row[k] !== undefined) cleanedRow[k] = row[k];
+        });
+
+        const key = getItemKey(cleanedRow, colName) || cleanedRow.STT || cleanedRow.id || `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const cleanKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
         const ref = doc(db, colName, cleanKey);
-        batch.set(ref, row, { merge: true });
+        batch.set(ref, cleanedRow, { merge: true });
       });
       await batch.commit();
     } catch (err) {

@@ -277,29 +277,26 @@ export default function OCRView({
     const matchedCust = getMatchedCustomerID(dataToSave.buyerName);
     
     setIsSaving(true);
-    const toastId = toast.loading('Đang lưu vào hệ thống...');
+    const toastId = toast.loading('Đang lưu vào hệ thống database...');
 
     try {
-      // 1. Upload file to Google Drive if connected (in parallel with DB save)
-      let driveUploadPromise = Promise.resolve();
+      // 1. Upload file to Google Drive in background (non-blocking)
       if (onUploadToDrive && file) {
-        driveUploadPromise = onUploadToDrive(file, {
+        onUploadToDrive(file, {
           documentType: dataToSave.documentType,
           documentNumber: dataToSave.documentNumber,
           fileName: file.name
         }).catch(err => {
-          console.error("Auto upload to Drive failed:", err);
-          // Don't throw, just warn
-          toast.error("Không thể tự động sao lưu tệp lên Drive.");
+          console.warn("Background upload to Drive skipped/failed:", err);
         });
       }
 
-      const docType = dataToSave.documentType.toUpperCase();
+      const docType = (dataToSave.documentType || "").toUpperCase();
       
-      if (docType === "PO") {
+      if (docType === "PO" || docType === "ĐƠN ĐẶT HÀNG") {
         // 1. Calculate total order value with real pricing lookup
-        const linesToInsert = dataToSave.items.map((item, idx) => {
-          const lineId = `D_OCR_${Math.floor(1000 + Math.random() * 9000)}`;
+        const linesToInsert = (dataToSave.items || []).map((item, idx) => {
+          const lineId = `D_OCR_${Date.now()}_${idx + 1}`;
           
           const priceRecord = findPriceRecord(pricingData, { 
             sku: item.code, 
@@ -307,19 +304,20 @@ export default function OCRView({
             customer: matchedCust 
           });
 
-          const sellPrice = item.price || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
+          const qty = Number(item.quantity) || 1;
+          const sellPrice = Number(item.price) || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
           const buyPrice = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : 0;
-          const revenue = sellPrice * item.quantity;
-          const profit = (sellPrice - buyPrice) * item.quantity;
+          const revenue = sellPrice * qty;
+          const profit = (sellPrice - buyPrice) * qty;
 
           return {
             "STT": lineId,
             "Số đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
-            "Mã giá bán": priceRecord ? priceRecord['Mã giá'] : "Gsp_N/A",
-            "Tên sản phẩm": priceRecord ? priceRecord['Tên sản phẩm'] : item.name,
-            "Mã của khách": item.code || (priceRecord ? priceRecord['Mã sản phẩm'] : ""),
-            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái"),
-            "Số lượng": item.quantity.toString(),
+            "Mã giá bán": priceRecord ? (priceRecord['Mã giá'] || "Gsp_N/A") : "Gsp_N/A",
+            "Tên sản phẩm": item.name || (priceRecord ? priceRecord['Tên sản phẩm'] : "Sản phẩm OCR"),
+            "Mã của khách": item.code || (priceRecord ? priceRecord['Mã sản phẩm'] : "") || "",
+            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái") || "Cái",
+            "Số lượng": qty.toString(),
             "Ngày đặt hàng": dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
             "Ngày giao": dataToSave.deliveryDate || dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
             "Thời gian xử lý": "5",
@@ -354,32 +352,33 @@ export default function OCRView({
 
         await onAddPOLines(linesToInsert);
 
-      } else if (docType === "PXK" || docType === "INVOICE" || docType === "BIÊN BẢN GIAO HÀNG") {
-        const deliveryRows = dataToSave.items.map((item) => {
+      } else if (docType === "PXK" || docType === "INVOICE" || docType === "BIÊN BẢN GIAO HÀNG" || docType === "PHIẾU XUẤT KHO") {
+        const deliveryRows = (dataToSave.items || []).map((item, idx) => {
           const priceRecord = findPriceRecord(pricingData, { 
             sku: item.code || item.name, 
             customer: matchedCust 
           });
 
-          const sellPrice = item.price || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
+          const qty = Number(item.quantity) || 1;
+          const sellPrice = Number(item.price) || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
           const buyPrice = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : 0;
-          const revenue = sellPrice * item.quantity;
-          const profit = (sellPrice - buyPrice) * item.quantity;
+          const revenue = sellPrice * qty;
+          const profit = (sellPrice - buyPrice) * qty;
           const margin = sellPrice > 0 ? (profit / revenue) * 100 : 0;
 
           const poNumber = dataToSave.documentReference || "PO-REF";
 
           return {
-            "STT": Math.floor(100 + Math.random() * 900).toString(),
-            "Chi tiết đơn hàng": `D_OCR_${Math.floor(100 + Math.random() * 900)}`,
+            "STT": `${Date.now()}_${idx + 1}`,
+            "Chi tiết đơn hàng": `D_OCR_${Date.now()}_${idx + 1}`,
             "Ngày giao": dataToSave.deliveryDate || dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
             "Đơn hàng": poNumber,
-            "Mã sản phẩm": priceRecord ? priceRecord['Mã giá'] : (item.code || "Gsp_N/A"),
-            "Tên sản phẩm": priceRecord ? priceRecord['Tên sản phẩm'] : item.name,
-            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái"),
-            "Số lượng giao": item.quantity.toString(),
-            "Số lượng đặt": item.quantity.toString(),
-            "Đã giao": item.quantity.toString(),
+            "Mã sản phẩm": priceRecord ? (priceRecord['Mã giá'] || "Gsp_N/A") : (item.code || "Gsp_N/A"),
+            "Tên sản phẩm": item.name || (priceRecord ? priceRecord['Tên sản phẩm'] : "Sản phẩm OCR"),
+            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái") || "Cái",
+            "Số lượng giao": qty.toString(),
+            "Số lượng đặt": qty.toString(),
+            "Đã giao": qty.toString(),
             "Còn lại": "0",
             "Tiến độ giao": "100%",
             "Status": "Hoàn thành",
@@ -387,7 +386,7 @@ export default function OCRView({
             "Khách hàng": matchedCust,
             "Sự cố": "",
             "Chi tiết sự cố": "",
-            "Nhà cung cấp": priceRecord ? priceRecord['Tên nhà cung cấp'] : "Tâm Sen",
+            "Nhà cung cấp": priceRecord ? (priceRecord['Tên nhà cung cấp'] || "Tâm Sen") : "Tâm Sen",
             "Nhóm hàng": matchedCust === "Thăng Long" ? "Nguyên liệu" : "Thùng carton",
             "Đơn giá nhập": (buyPrice || 0).toLocaleString("en-US"),
             "Đơn giá bán": (sellPrice || 0).toLocaleString("en-US"),
@@ -400,21 +399,21 @@ export default function OCRView({
 
         await onAddDelivery(deliveryRows);
       } else {
-        const deliveryRows = dataToSave.items.map((item) => ({
-          "STT": Math.floor(100 + Math.random() * 900).toString(),
-          "Chi tiết đơn hàng": "D_GENERIC",
+        const deliveryRows = (dataToSave.items || []).map((item, idx) => ({
+          "STT": `${Date.now()}_${idx + 1}`,
+          "Chi tiết đơn hàng": `D_GENERIC_${idx + 1}`,
           "Ngày giao": dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
           "Đơn hàng": dataToSave.documentNumber || "REF-OCR",
-          "Mã sản phẩm": "GENERIC",
-          "Tên sản phẩm": item.name,
+          "Mã sản phẩm": item.code || "GENERIC",
+          "Tên sản phẩm": item.name || "Sản phẩm OCR",
           "ĐVT": item.unit || "Cái",
-          "Số lượng giao": item.quantity.toString(),
-          "Số lượng đặt": item.quantity.toString(),
+          "Số lượng giao": (item.quantity || 1).toString(),
+          "Số lượng đặt": (item.quantity || 1).toString(),
           "Đã giao": "0",
           "Còn lại": "0",
           "Tiến độ giao": "100%",
           "Status": "Hoàn thành",
-          "Số PXK": dataToSave.documentNumber || "PXK-GEN",
+          "Số PXK": dataToSave.documentNumber || `PXK-${Date.now()}`,
           "Khách hàng": matchedCust,
           "Sự cố": "",
           "Chi tiết sự cố": "",
@@ -429,15 +428,13 @@ export default function OCRView({
         }));
         await onAddDelivery(deliveryRows);
       }
-
-      await driveUploadPromise;
       
       setShowConfirmModal(false);
       setIsSaved(true);
-      toast.success("Đã lưu dữ liệu vào hệ thống!", { id: toastId });
-    } catch (err) {
+      toast.success(`🎉 Đã lưu thành công chứng từ ${dataToSave.documentNumber || ''} vào hệ thống!`, { id: toastId, duration: 5000 });
+    } catch (err: any) {
        console.error("Save to system error:", err);
-       toast.error("Lỗi khi lưu dữ liệu vào hệ thống!", { id: toastId });
+       toast.error(`Lỗi khi lưu dữ liệu: ${err.message || err}`, { id: toastId });
     } finally {
       setIsSaving(false);
     }
@@ -449,12 +446,13 @@ export default function OCRView({
     setStatus("idle");
     setOcrResult(null);
     setIsSaved(false);
+    setShowConfirmModal(false);
   };
 
   return (
-    <div className="flex-1 bg-gray-50 flex flex-col h-full overflow-hidden animate-in fade-in duration-500">
-      {/* View Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
+    <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+      {/* Top Banner / Header */}
+      <div className="bg-white border-b border-gray-200 px-8 py-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Quét OCR Chứng từ & Nhập liệu Tự động</h2>
@@ -476,74 +474,83 @@ export default function OCRView({
 
       {/* Main Workspace */}
       <div className="flex-1 overflow-hidden p-6">
-        {/* Confirmation Modal */}
+        {/* Confirmation Modal - Apple macOS Window Style */}
         {showConfirmModal && ocrResult && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
-              <div className="bg-blue-600 px-6 py-4 flex items-center gap-3">
-                <div className="bg-white/20 p-2 rounded-lg">
-                  <Save className="text-white" size={20} />
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08]">
+              {/* Apple macOS Window Header */}
+              <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-[#FF5F56] shadow-sm" />
+                    <div className="w-3 h-3 rounded-full bg-[#FFBD2E] shadow-sm" />
+                    <div className="w-3 h-3 rounded-full bg-[#27C93F] shadow-sm" />
+                  </div>
+                  <div className="h-4 w-px bg-black/[0.08]" />
+                  <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+                    <Save size={16} className="text-blue-600" />
+                    Xác nhận Lưu Dữ liệu vào Hệ thống
+                  </h3>
                 </div>
-                <h3 className="text-lg font-bold text-white">Xác nhận Lưu Dữ liệu</h3>
               </div>
               
               <div className="p-6">
-                <div className="flex items-start gap-4 mb-6 bg-amber-50 border border-amber-100 p-4 rounded-xl">
-                  <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+                <div className="flex items-start gap-3.5 mb-5 bg-blue-50/70 border border-blue-100 p-4 rounded-2xl">
+                  <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={18} />
                   <div>
-                    <p className="text-sm font-bold text-amber-900">Kiểm tra kỹ thông tin đối chiếu</p>
-                    <p className="text-xs text-amber-700 mt-1">
-                      Dữ liệu sẽ được ghi vào database chính thức. Hãy đảm bảo bạn đã đối chiếu kỹ số lượng và đơn giá với tài liệu gốc.
+                    <p className="text-xs font-bold text-blue-900">Kiểm tra thông tin trước khi ghi vào Database</p>
+                    <p className="text-[11px] text-blue-700/90 mt-0.5">
+                      Dữ liệu sẽ được tạo thành Đơn hàng PO / Phiếu xuất kho chính thức trong hệ thống ERP.
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Loại tài liệu:</span>
-                    <span className="text-sm font-bold text-gray-900">{ocrResult.documentTypeName}</span>
+                <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 text-xs sm:text-sm">
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
+                    <span className="text-slate-500">Loại tài liệu:</span>
+                    <span className="font-bold text-slate-900">{ocrResult.documentTypeName}</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Số hiệu:</span>
-                    <span className="text-sm font-mono font-bold text-blue-700">{ocrResult.documentNumber}</span>
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
+                    <span className="text-slate-500">Số hiệu chứng từ:</span>
+                    <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{ocrResult.documentNumber}</span>
                   </div>
                   {ocrResult.documentReference && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm text-gray-500">Số PO tham chiếu:</span>
-                      <span className="text-sm font-mono font-bold text-green-700">{ocrResult.documentReference}</span>
+                    <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500">Số PO tham chiếu:</span>
+                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{ocrResult.documentReference}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Khách hàng:</span>
-                    <span className="text-sm font-bold text-gray-900 text-right max-w-[200px] truncate">{ocrResult.buyerName}</span>
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
+                    <span className="text-slate-500">Khách hàng:</span>
+                    <span className="font-bold text-slate-900 text-right max-w-[220px] truncate">{ocrResult.buyerName}</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-500">Số mặt hàng:</span>
-                    <span className="text-sm font-bold text-gray-900">{ocrResult.items.length} mặt hàng</span>
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
+                    <span className="text-slate-500">Số mặt hàng trích xuất:</span>
+                    <span className="font-bold text-slate-900">{ocrResult.items.length} mặt hàng</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100 bg-gray-50 -mx-6 px-6">
-                    <span className="text-sm font-bold text-gray-700">Tổng doanh thu dự kiến:</span>
-                    <span className="text-sm font-bold text-blue-600">
+                  <div className="flex justify-between items-center py-2 bg-blue-50/60 -mx-4 -mb-4 px-4 rounded-b-2xl border-t border-blue-100">
+                    <span className="font-bold text-slate-700">Tổng doanh thu dự kiến:</span>
+                    <span className="font-bold text-blue-600 text-base">
                       {((ocrResult?.items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0) || 0).toLocaleString("vi-VN")} đ
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-8">
+                <div className="grid grid-cols-2 gap-3 mt-6">
                   <button
                     onClick={() => setShowConfirmModal(false)}
-                    className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    Hủy, để kiểm tra lại
+                    Hủy, kiểm tra lại
                   </button>
                   <button
                     onClick={() => executeSaveToSystem()}
                     disabled={isSaving}
                     className={clsx(
-                      "px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2",
+                      "px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2",
                       isSaving 
-                        ? "bg-gray-400 cursor-not-allowed text-white" 
-                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
+                        ? "bg-slate-300 cursor-not-allowed text-slate-500" 
+                        : "bg-[#007AFF] hover:bg-[#0062CC] text-white shadow-blue-500/20"
                     )}
                   >
                     {isSaving && <Loader2 size={18} className="animate-spin" />}
