@@ -673,11 +673,11 @@ export default function App() {
             </div>
 
             <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 custom-scrollbar">
-              <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng quan</div>
+              <div className="px-3 py-1.5 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Tổng quan</div>
               <NavItem icon={<LayoutDashboard size={16} />} iconBg="bg-blue-500" label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => navItemClick("dashboard")} />
               <NavItem icon={<TrendingUp size={16} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => navItemClick("workflow")} />
               
-              <div className="px-3 py-1.5 mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>
+              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>
               <NavItem icon={<Users size={16} />} iconBg="bg-sky-500" label="Khách hàng" isActive={activeTab === "customers"} onClick={() => navItemClick("customers")} />
               <NavItem icon={<Package size={16} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => navItemClick("pricing")} />
               <NavItem icon={<Scale size={16} />} iconBg="bg-blue-600" label="Hợp đồng & Phụ lục" isActive={activeTab === "contracts"} onClick={() => navItemClick("contracts")} />
@@ -688,19 +688,19 @@ export default function App() {
               <NavItem icon={<Truck size={16} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => navItemClick("delivery")} />
               <NavItem icon={<TrendingUp size={16} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => navItemClick("profit_report")} />
               
-              <div className="px-3 py-1.5 mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dữ liệu nền tảng</div>
+              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Dữ liệu nền tảng</div>
               <NavItem icon={<Package size={16} />} iconBg="bg-purple-500" label="Sản phẩm" isActive={activeTab === "products"} onClick={() => navItemClick("products")} />
               <NavItem icon={<ShieldCheck size={16} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => navItemClick("specs")} />
               <NavItem icon={<BookUser size={16} />} iconBg="bg-amber-600" label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => navItemClick("suppliers")} />
               <NavItem icon={<Users size={16} />} iconBg="bg-red-500" label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => navItemClick("contacts")} />
               
-              <div className="px-3 py-1.5 mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Công cụ hỗ trợ & AI</div>
+              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Công cụ hỗ trợ & AI</div>
               <NavItem icon={<Bot size={16} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isActive={activeTab === "assistant"} onClick={() => navItemClick("assistant")} />
               <NavItem icon={<Camera size={16} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => navItemClick("ocr")} />
               <NavItem icon={<CheckCircle size={16} />} iconBg="bg-green-600" label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => navItemClick("tasks")} />
               <NavItem icon={<HardDrive size={16} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => navItemClick("storage")} />
               
-              <div className="px-3 py-1.5 mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hệ thống</div>
+              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Hệ thống</div>
               <NavItem icon={<Settings size={16} />} iconBg="bg-slate-600" label="Cài đặt" isActive={activeTab === "settings"} onClick={() => navItemClick("settings")} />
             </nav>
 

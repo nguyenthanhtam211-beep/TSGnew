@@ -935,9 +935,9 @@ export function ProductDetailModal({
                 <div className="grid grid-cols-1 gap-6">
                   {relatedSpecs.map((spec, sidx) => (
                     <div key={sidx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                      <div className="bg-slate-900 px-6 py-3 flex justify-between items-center">
-                        <h4 className="text-white font-bold text-sm">{spec['Tên tiêu chuẩn']}</h4>
-                        <span className="text-[10px] font-mono text-slate-400 px-2 py-0.5 bg-white/10 rounded tracking-wider">
+                      <div className="bg-[#F5F5F7] px-6 py-3 border-b border-black/[0.06] flex justify-between items-center">
+                        <h4 className="text-slate-900 font-bold text-sm">{spec['Tên tiêu chuẩn']}</h4>
+                        <span className="text-[10px] font-mono text-blue-700 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded tracking-wider">
                           {spec['Mã Spec']}
                         </span>
                       </div>

@@ -30,6 +30,7 @@ import { ProductHoverCard } from "./ProductHoverCard";
 import { findPriceRecord, getSellPriceFromRecord, getBuyPriceFromRecord } from "../lib/business-logic";
 import GoogleSheetsSyncModal from "./GoogleSheetsSyncModal";
 import { generateStructuredPDFReport } from "../lib/pdf-exporter";
+import MacTrafficLights from "./MacTrafficLights";
 
 interface DeliveryViewProps {
   deliveryData: any[];
@@ -1486,17 +1487,12 @@ export default function DeliveryView({
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-slate-900 px-6 py-4 text-white flex items-center justify-between">
+            <div className="bg-[#F5F5F7] px-6 py-4 text-slate-900 border-b border-black/[0.06] flex items-center justify-between">
               <h3 className="font-bold text-lg flex items-center gap-2">
-                <Truck size={20} className="text-blue-400" />
+                <Truck size={20} className="text-blue-600" />
                 Tạo Phiếu Xuất Kho (PXK) Mới
               </h3>
-              <button 
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-white transition-all text-sm font-semibold"
-              >
-                Đóng ✕
-              </button>
+              <MacTrafficLights onClose={() => setIsAddModalOpen(false)} />
             </div>
 
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
