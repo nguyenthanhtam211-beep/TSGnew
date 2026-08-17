@@ -85,43 +85,65 @@ export function getItemKey(item: any, collectionName?: string): string {
 }
 
 export function useFirestoreCollection(collectionName: string, fallbackData: any[]) {
-  const [data, setData] = useState<any[]>(fallbackData);
+  const [data, setData] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem(`tsg_cache_${collectionName}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return fallbackData;
+  });
 
   useEffect(() => {
-    const colRef = collection(db, collectionName);
-    const unsubscribe = onSnapshot(colRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const firestoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        
-        // Merge and deduplicate by unique business key, preferring Firestore records
-        const mergedMap = new Map<string, any>();
-        
-        if (Array.isArray(fallbackData)) {
-          fallbackData.forEach(item => {
-            const key = getItemKey(item, collectionName);
-            if (key) mergedMap.set(key, item);
-          });
-        }
-        
-        firestoreData.forEach(item => {
-          const key = getItemKey(item, collectionName);
-          if (key) {
-            if (item.isDeleted === true) {
-              mergedMap.delete(key);
-            } else {
-              mergedMap.set(key, item);
-            }
+    let unsubscribe = () => {};
+
+    try {
+      const colRef = collection(db, collectionName);
+      unsubscribe = onSnapshot(colRef, (snapshot) => {
+        if (!snapshot.empty) {
+          const firestoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          
+          const mergedMap = new Map<string, any>();
+          
+          if (Array.isArray(fallbackData)) {
+            fallbackData.forEach(item => {
+              const key = getItemKey(item, collectionName);
+              if (key) mergedMap.set(key, item);
+            });
           }
-        });
-        
-        setData(Array.from(mergedMap.values()));
-      } else {
-        setData(fallbackData);
-      }
-    }, (error) => {
-      console.error("Firestore snapshot error:", error);
-      setData(fallbackData);
-    });
+          
+          firestoreData.forEach(item => {
+            const key = getItemKey(item, collectionName);
+            if (key) {
+              if (item.isDeleted === true) {
+                mergedMap.delete(key);
+              } else {
+                mergedMap.set(key, item);
+              }
+            }
+          });
+          
+          const result = Array.from(mergedMap.values());
+          setData(result);
+          try {
+            localStorage.setItem(`tsg_cache_${collectionName}`, JSON.stringify(result));
+          } catch (e) {}
+        } else {
+          setData(fallbackData);
+        }
+      }, (error) => {
+        // Silently fallback without crashing UI
+        if (error?.message && !error.message.includes('not found')) {
+          console.warn(`Firestore sync note for ${collectionName}:`, error.message);
+        }
+      });
+    } catch (err) {
+      // Handle missing db or initialization errors gracefully
+    }
 
     return () => unsubscribe();
   }, [collectionName, fallbackData]);

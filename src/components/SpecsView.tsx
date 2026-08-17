@@ -9,6 +9,7 @@ import {
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
+import MacTrafficLights from './MacTrafficLights';
 
 interface SpecParameter {
   criterion: string;
@@ -689,9 +690,9 @@ export default function SpecsView({
       {selectedDetailSpec && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+            <div className="p-5 bg-[#F5F5F7] border-b border-black/[0.06] flex items-center justify-between">
               <div>
-                <span className="px-2.5 py-0.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded text-[10px] font-mono font-bold">
+                <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded text-[10px] font-mono font-bold">
                   {selectedDetailSpec['Mã Spec']} - v{selectedDetailSpec['Phiên bản']}
                 </span>
                 <h3 className="font-bold text-lg text-white mt-1">{selectedDetailSpec['Tên tiêu chuẩn']}</h3>

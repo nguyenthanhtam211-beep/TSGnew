@@ -6,6 +6,7 @@ import {
 import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
+import MacTrafficLights from "./MacTrafficLights";
 
 interface DualPODocumentModalProps {
   isOpen: boolean;
@@ -354,31 +355,26 @@ export function DualPODocumentModal({
       <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden">
         
         {/* Header Modal Bar */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-black/[0.06]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-md">
               <Layers className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white tracking-wide">Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <h2 className="text-lg font-bold text-slate-900 tracking-wide">Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp</h2>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Step 2 - Order Sourcing
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Tâm Sen đặt An Việt Phát (<span className="text-amber-400 font-mono font-bold">{poNumberTamSen}</span>) → An Việt Phát đặt NCC (<span className="text-sky-400 font-mono font-bold">{poNumberAVP}</span>)
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tâm Sen đặt An Việt Phát (<span className="text-amber-700 font-mono font-bold">{poNumberTamSen}</span>) → An Việt Phát đặt NCC (<span className="text-sky-700 font-mono font-bold">{poNumberAVP}</span>)
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <MacTrafficLights onClose={onClose} />
           </div>
         </div>
 

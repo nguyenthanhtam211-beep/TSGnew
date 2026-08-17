@@ -1087,19 +1087,19 @@ export default function WorkflowView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-slate-900 text-slate-100">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#F5F5F7] text-[#1D1D1F]">
       {/* Top Workflow Wizard Header */}
-      <div className="bg-slate-900/90 backdrop-blur-xl border-b border-slate-800/80 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="bg-white/90 backdrop-blur-xl border-b border-black/[0.06] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
         <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-blue-500/20">
+          <h2 className="text-xl font-bold text-[#1D1D1F] tracking-tight flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-600 shadow-sm shadow-blue-500/20">
               <TrendingUp size={20} className="text-white" />
             </div>
-            <span className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+            <span className="text-[#1D1D1F]">
               Quản trị Luồng Nghiệp Vụ Liên Kết
             </span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Quy trình phối hợp khép kín từ đặt hàng, giao vận, đối soát và báo cáo kế toán
           </p>
         </div>
@@ -1108,24 +1108,24 @@ export default function WorkflowView({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportAccountantPDF}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <FileText size={16} />
                 Xuất PDF Kế Toán
               </button>
               <button
                 onClick={handleExportAccountantExcel}
-                className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <FileSpreadsheet size={16} />
                 Xuất Excel Kế Toán
               </button>
             </div>
           )}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-semibold backdrop-blur-md">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
             </span>
             Bước {activeStep} / 6: {
               activeStep === 1 ? "Đặt hàng (Sourcing)" :
@@ -1140,7 +1140,7 @@ export default function WorkflowView({
       </div>
 
       {/* Progress Tracker Bar */}
-      <div className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 p-4 overflow-x-auto">
+      <div className="bg-white/60 backdrop-blur-md border-b border-black/[0.06] p-4 overflow-x-auto">
         <div className="flex items-center justify-between min-w-[850px] max-w-6xl mx-auto px-4 gap-2">
           {[
             { step: 1, label: "1. Đặt hàng", icon: <ShoppingCart size={16} /> },
@@ -1155,38 +1155,31 @@ export default function WorkflowView({
             return (
               <React.Fragment key={item.step}>
                 <motion.button
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setActiveStep(item.step)}
-                  className={`relative flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-300 text-xs font-semibold ${
+                  className={`relative flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-xs font-semibold ${
                     isActive
-                      ? "text-white shadow-lg shadow-blue-500/25 border border-blue-400/40"
+                      ? "text-white shadow-sm shadow-blue-500/20 bg-[#007AFF]"
                       : isDone
-                      ? "bg-slate-800/90 text-blue-300 border border-slate-700/80 hover:bg-slate-800"
-                      : "bg-slate-800/40 text-slate-400 border border-slate-800 hover:text-slate-200 hover:bg-slate-800/60"
+                      ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                      : "bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeStepIndicator"
-                      className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-xl"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                    />
-                  )}
-                  <span className={`relative z-10 p-1.5 rounded-lg flex items-center justify-center transition-colors ${
+                  <span className={`p-1.5 rounded-lg flex items-center justify-center transition-colors ${
                     isActive 
-                      ? "bg-white/20 text-white shadow-inner" 
+                      ? "bg-white/20 text-white" 
                       : isDone 
-                      ? "bg-blue-500/20 text-blue-400" 
-                      : "bg-slate-800 text-slate-400"
+                      ? "bg-blue-100 text-blue-700" 
+                      : "bg-slate-100 text-slate-500"
                   }`}>
                     {item.icon}
                   </span>
-                  <span className="relative z-10 whitespace-nowrap">{item.label}</span>
+                  <span className="whitespace-nowrap font-medium">{item.label}</span>
                 </motion.button>
                 {index < 5 && (
                   <div className={`h-[2px] flex-1 min-w-[20px] rounded-full transition-colors ${
-                    activeStep > index + 1 ? "bg-gradient-to-r from-blue-500 to-indigo-500" : "bg-slate-800"
+                    activeStep > index + 1 ? "bg-blue-500" : "bg-slate-200"
                   }`} />
                 )}
               </React.Fragment>
