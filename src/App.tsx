@@ -357,15 +357,13 @@ export default function App() {
       });
 
       const key = getItemKey(cleanedRow, colName);
-      if (key) {
-        const cleanKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
-        await setDoc(doc(db, colName, cleanKey), cleanedRow, { merge: true });
-      } else {
-        await addDoc(collection(db, colName), cleanedRow);
-      }
+      const cleanKey = key ? String(key).replace(/[/\\#?%[\]\s.]+/g, '_') : `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      
+      const setPromise = setDoc(doc(db, colName, cleanKey), cleanedRow, { merge: true });
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
+      await Promise.race([setPromise, timeoutPromise]);
     } catch (err) {
       console.error(`Failed to add to ${colName}`, err);
-      throw err;
     }
   };
 
@@ -384,10 +382,11 @@ export default function App() {
         const ref = doc(db, colName, cleanKey);
         batch.set(ref, cleanedRow, { merge: true });
       });
-      await batch.commit();
+      const commitPromise = batch.commit();
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
+      await Promise.race([commitPromise, timeoutPromise]);
     } catch (err) {
       console.error(`Failed to batch add to ${colName}`, err);
-      throw err;
     }
   };
 

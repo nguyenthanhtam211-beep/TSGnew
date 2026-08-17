@@ -5,7 +5,9 @@ import { getStorage } from "firebase/storage";
 import firebaseConfig from "../firebase-applet-config.json";
 
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+export const db = (firebaseConfig as any).firestoreDatabaseId 
+  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId) 
+  : getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 

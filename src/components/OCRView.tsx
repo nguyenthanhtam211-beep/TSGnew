@@ -9,6 +9,7 @@ import {
 import { findPriceRecord, parseNumber } from '../lib/business-logic';
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
+import MacTrafficLights from './MacTrafficLights';
 
 interface OCRItem {
   index: number;
@@ -481,11 +482,7 @@ export default function OCRView({
               {/* Apple macOS Window Header */}
               <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
                 <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#FF5F56] shadow-sm" />
-                    <div className="w-3 h-3 rounded-full bg-[#FFBD2E] shadow-sm" />
-                    <div className="w-3 h-3 rounded-full bg-[#27C93F] shadow-sm" />
-                  </div>
+                  <MacTrafficLights onClose={() => setShowConfirmModal(false)} />
                   <div className="h-4 w-px bg-black/[0.08]" />
                   <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
                     <Save size={16} className="text-blue-600" />
