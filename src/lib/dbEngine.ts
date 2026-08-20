@@ -106,62 +106,87 @@ class TSGDataEngine {
    * Load collection from Local Storage into Memory
    */
   private loadCollection(colName: CollectionName, fallbackData: any[] = []): Map<string, any> {
-    // Check if we have active memory cache
-    if (this.memoryCache.has(colName) && (!fallbackData || fallbackData.length === 0)) {
-      return this.memoryCache.get(colName)!;
-    }
-
-    const colMap = new Map<string, any>();
-
-    // 1. Resolve fallback data
-    if (Array.isArray(fallbackData) && fallbackData.length > 0) {
-      this.fallbackStore.set(colName, fallbackData);
-    }
-    const resolvedFallback = (Array.isArray(fallbackData) && fallbackData.length > 0) 
-      ? fallbackData 
-      : (this.fallbackStore.get(colName) || []);
-
-    if (Array.isArray(resolvedFallback)) {
-      resolvedFallback.forEach(item => {
-        const key = getItemKey(item, colName);
-        if (key) colMap.set(key, { ...item });
-      });
-    }
-
-    // 2. Load cached persistent data
     try {
-      const cached = localStorage.getItem(this.getStorageKey(colName));
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach(item => {
+      // Check if we have active memory cache
+      if (this.memoryCache.has(colName) && (!fallbackData || fallbackData.length === 0)) {
+        const cachedMap = this.memoryCache.get(colName);
+        if (cachedMap && cachedMap.size > 0) return cachedMap;
+      }
+
+      const colMap = new Map<string, any>();
+
+      // 1. Resolve fallback data
+      if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+        this.fallbackStore.set(colName, fallbackData);
+      }
+      const resolvedFallback = (Array.isArray(fallbackData) && fallbackData.length > 0) 
+        ? fallbackData 
+        : (this.fallbackStore.get(colName) || []);
+
+      if (Array.isArray(resolvedFallback)) {
+        resolvedFallback.forEach(item => {
+          if (item && typeof item === 'object') {
             const key = getItemKey(item, colName);
-            if (key) {
-              if (item.isDeleted === true) {
-                colMap.delete(key);
-              } else {
-                colMap.set(key, { ...(colMap.get(key) || {}), ...item });
+            if (key) colMap.set(key, { ...item });
+          }
+        });
+      }
+
+      // 2. Load cached persistent data
+      try {
+        const cached = localStorage.getItem(this.getStorageKey(colName));
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsed.forEach(item => {
+              if (item && typeof item === 'object') {
+                const key = getItemKey(item, colName);
+                if (key) {
+                  if (item.isDeleted === true) {
+                    colMap.delete(key);
+                  } else {
+                    colMap.set(key, { ...(colMap.get(key) || {}), ...item });
+                  }
+                }
               }
-            }
-          });
+            });
+          }
         }
+      } catch (e) {
+        console.warn(`Error loading cache for ${colName}:`, e);
       }
-    } catch (e) {
-      console.warn(`Error loading cache for ${colName}:`, e);
+
+      // 3. Apply user-modified overrides (guaranteed win over fallback)
+      try {
+        const userMods = this.getUserModifiedMap(colName);
+        userMods.forEach((item, key) => {
+          if (item && typeof item === 'object') {
+            if (item.isDeleted === true) {
+              colMap.delete(key);
+            } else {
+              colMap.set(key, { ...(colMap.get(key) || {}), ...item });
+            }
+          }
+        });
+      } catch (e) {
+        console.warn(`Error applying user mods for ${colName}:`, e);
+      }
+
+      this.memoryCache.set(colName, colMap);
+      return colMap;
+    } catch (criticalErr) {
+      console.error(`Critical error loading collection ${colName}:`, criticalErr);
+      const fallbackMap = new Map<string, any>();
+      if (Array.isArray(fallbackData)) {
+        fallbackData.forEach(item => {
+          if (item) {
+            const key = getItemKey(item, colName) || item.id || `item_${Math.random()}`;
+            fallbackMap.set(key, item);
+          }
+        });
+      }
+      return fallbackMap;
     }
-
-    // 3. Apply user-modified overrides (guaranteed win over fallback)
-    const userMods = this.getUserModifiedMap(colName);
-    userMods.forEach((item, key) => {
-      if (item.isDeleted === true) {
-        colMap.delete(key);
-      } else {
-        colMap.set(key, { ...(colMap.get(key) || {}), ...item });
-      }
-    });
-
-    this.memoryCache.set(colName, colMap);
-    return colMap;
   }
 
   /**

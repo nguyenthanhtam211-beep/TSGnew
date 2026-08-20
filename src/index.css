@@ -28,8 +28,8 @@ body {
   font-family: var(--font-sans);
   font-size: var(--fluid-body);
   line-height: 1.5;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: #F8F9FA;
+  color: #1E293B;
   overflow-x: hidden;
   min-height: 100vh;
   min-height: -webkit-fill-available;
