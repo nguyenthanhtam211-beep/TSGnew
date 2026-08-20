@@ -4,7 +4,7 @@ import {
   ShoppingCart, FileText, Calendar, Truck, CheckSquare, BarChart3, 
   ArrowRight, Plus, CheckCircle, AlertTriangle, AlertCircle, 
   TrendingUp, DollarSign, Download, Users, Package, RefreshCw, ChevronRight, Calculator, Check, FileSpreadsheet,
-  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award
+  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award, Info, Trash2
 } from "lucide-react";
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
@@ -168,6 +168,7 @@ export default function WorkflowView({
   // Filter for Step 5 & Step 6
   const [reconcileFilter, setReconcileFilter] = useState("all");
   const [accountingFilter, setAccountingFilter] = useState("all");
+  const [vatRate, setVatRate] = useState<number>(8); // Default VAT 8%
 
   const formatCurrency = (value: any) => {
     const num = parseFloat(String(value || "0").replace(/,/g, ''));
@@ -179,58 +180,61 @@ export default function WorkflowView({
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // --------------------------------------------------
-  // STEP 1 calculations
-  // --------------------------------------------------
-  const activePricingOptions = useMemo(() => {
-    if (!calcCustomer) return pricingData;
-    return pricingData.filter(p => p["RP_Khách hàng"] === calcCustomer || p["Giao đến"] === calcCustomer);
-  }, [pricingData, calcCustomer]);
+  // Customer matching helper for Sourcing & Pricing catalog
+  const matchCustomerWithPricing = (customerVal: string, pricingList: any[]): any[] => {
+    if (!customerVal) return pricingList;
+    const custNorm = customerVal.toLowerCase().trim();
 
-  const selectedPriceRecord = useMemo(() => {
-    if (!calcProduct) return null;
-    return pricingData.find(p => p["Mã sản phẩm"] === calcProduct && (!calcCustomer || p["RP_Khách hàng"] === calcCustomer));
-  }, [pricingData, calcProduct, calcCustomer]);
+    // 1. Exact match
+    let matched = pricingList.filter(p => {
+      const rCust = (p["RP_Khách hàng"] || "").toLowerCase().trim();
+      const gCust = (p["Giao đến"] || "").toLowerCase().trim();
+      const kCust = (p["Khách hàng"] || "").toLowerCase().trim();
+      return rCust === custNorm || gCust === custNorm || kCust === custNorm;
+    });
+    if (matched.length > 0) return matched;
 
-  const step1Calculation = useMemo(() => {
-    if (!selectedPriceRecord) return null;
-    const buyPrice = parseNumber(selectedPriceRecord["Đơn giá mua"]);
-    const sellPrice = parseNumber(selectedPriceRecord["Đơn giá bán"] || selectedPriceRecord["Đơn giá bán mới"]);
-    const revenue = sellPrice * calcQty;
-    const cogs = buyPrice * calcQty;
-    const profit = revenue - cogs;
-    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    // 2. Keyword check for well-known customers
+    const keyAliases: Record<string, string[]> = {
+      "thăng long": ["thăng long", "thang long", "tltl"],
+      "thanh hóa": ["thanh hóa", "thanh hoá", "thanh hoa", "tlth"],
+      "bắc sơn": ["bắc sơn", "bac son", "tlbs"],
+      "sài gòn": ["sài gòn", "sai gon", "tlsg"],
+      "bến tre": ["bến tre", "ben tre"],
+      "ngân sơn": ["ngân sơn", "ngan son"],
+      "viện thuốc lá": ["viện thuốc lá", "vien thuoc la"],
+      "diageo": ["diageo"],
+      "tân á": ["tân á", "tan a"]
+    };
 
-    return { buyPrice, sellPrice, revenue, cogs, profit, margin };
-  }, [selectedPriceRecord, calcQty]);
-
-  const handleApplyCalcToPO = () => {
-    if (!selectedPriceRecord || !step1Calculation) return;
-    setPoCustomer(calcCustomer);
-    setNewPoNumber(`PO-${calcCustomer.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
-    setPoLines([
-      {
-        id: `temp-${Date.now()}`,
-        "Mã sản phẩm": selectedPriceRecord["Mã sản phẩm"],
-        "Tên sản phẩm": selectedPriceRecord["Tên sản phẩm"],
-        "ĐVT": selectedPriceRecord["ĐVT"] || "Cái",
-        "Số lượng": calcQty,
-        "Đơn giá bán": step1Calculation.sellPrice,
-        "Đơn giá nhập": step1Calculation.buyPrice,
-        "Mã giá bán": selectedPriceRecord["Mã giá bán"],
-        "Thành tiền dòng": step1Calculation.revenue
+    for (const [_, aliases] of Object.entries(keyAliases)) {
+      const matchCust = aliases.some(alias => custNorm.includes(alias));
+      if (matchCust) {
+        matched = pricingList.filter(p => {
+          const rCust = (p["RP_Khách hàng"] || "").toLowerCase().trim();
+          const gCust = (p["Giao đến"] || "").toLowerCase().trim();
+          const kCust = (p["Khách hàng"] || "").toLowerCase().trim();
+          return aliases.some(alias => rCust.includes(alias) || gCust.includes(alias) || kCust.includes(alias));
+        });
+        if (matched.length > 0) return matched;
       }
-    ]);
-    setActiveStep(2);
-    toast.success("Đã chuyển cấu hình báo giá vào giỏ hàng Đơn hàng (PO)!");
+    }
+
+    // 3. Substring match
+    matched = pricingList.filter(p => {
+      const rCust = (p["RP_Khách hàng"] || "").toLowerCase().trim();
+      const gCust = (p["Giao đến"] || "").toLowerCase().trim();
+      return (rCust && (custNorm.includes(rCust) || rCust.includes(custNorm))) ||
+             (gCust && (custNorm.includes(gCust) || gCust.includes(custNorm)));
+    });
+
+    return matched.length > 0 ? matched : pricingList;
   };
 
-  // --------------------------------------------------
-  // STEP 2 calculations & OCR Handlers
-  // --------------------------------------------------
+  // Filtered pricing catalog for selected customer
   const customerPricingOptions = useMemo(() => {
-    if (!poCustomer) return pricingData;
-    return pricingData.filter(p => p["RP_Khách hàng"] === poCustomer || p["Giao đến"] === poCustomer);
+    if (!poCustomer) return [];
+    return matchCustomerWithPricing(poCustomer, pricingData);
   }, [pricingData, poCustomer]);
 
   const handleLoadSamplePO = (sampleType: 'ThangLong' | 'ThanhHoa' | 'BacSon') => {
@@ -1287,7 +1291,7 @@ export default function WorkflowView({
           {/* ================================================== */}
           {activeStep === 1 && (
             <div className="space-y-6">
-              {/* Header & Mode Selector */}
+              {/* 1. KHỐI TIẾP NHẬN: CHỌN KHÁCH HÀNG & THÔNG TIN ĐƠN HÀNG */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
@@ -1295,255 +1299,489 @@ export default function WorkflowView({
                       <ShoppingCart size={22} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Báo Giá & Khởi Tạo Đơn Hàng Kép (Dual PO Intake)</h3>
-                      <p className="text-xs text-slate-500">Khởi tạo cặp Đơn bán cho Khách (SO) ↔ Đơn mua Nhà cung cấp (PO) qua Quét OCR Thông Minh hoặc Soạn thảo Bảng giá 2026</p>
+                      <h3 className="font-bold text-slate-800 text-lg">1. Tiếp Nhận Đơn Hàng & Chọn Khách Hàng</h3>
+                      <p className="text-xs text-slate-500">Bắt đầu bằng việc chọn Khách hàng để hệ thống tự động bóc tách và lọc danh mục sản phẩm từ Bảng Giá 2026 & Hợp Đồng Gốc</p>
                     </div>
                   </div>
 
-                  {/* Mode Selector Tabs */}
-                  <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-bold">
+                  {/* Mode Selector Tabs & Quick Samples */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-slate-500">Mẫu PO thử:</span>
                     <button
                       type="button"
-                      onClick={() => setCreationMode("ocr")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${
-                        creationMode === "ocr" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                      }`}
+                      onClick={() => handleLoadSamplePO('ThangLong')}
+                      className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
                     >
-                      <Camera size={14} />
-                      📸 Quét OCR Chứng từ PO
+                      📄 PO Thăng Long
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCreationMode("manual")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${
-                        creationMode === "manual" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                      }`}
+                      onClick={() => handleLoadSamplePO('ThanhHoa')}
+                      className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
                     >
-                      <Plus size={14} />
-                      🛒 Soạn Báo Giá Bảng Giá 2026
+                      📄 PO Thanh Hóa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSamplePO('BacSon')}
+                      className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
+                    >
+                      📄 PO Bắc Sơn
                     </button>
                   </div>
                 </div>
 
-                {/* Mode 1: OCR File Upload & Quick Samples */}
-                {creationMode === "ocr" && (
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-5 space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <Sparkles size={14} className="text-amber-500" />
-                          Trích xuất PO thông minh từ Chứng từ
-                        </h4>
-                        <p className="text-xs text-slate-500">Tải tệp ảnh/PDF chứng từ PO của khách hàng hoặc thử nhanh các mẫu PO thực tế bên dưới:</p>
-                      </div>
-
-                      {/* Quick Sample PO Buttons */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-500">Mẫu PO thử:</span>
-                        <button
-                          type="button"
-                          onClick={() => handleLoadSamplePO('ThangLong')}
-                          className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
-                        >
-                          📄 PO Thăng Long (3 SP)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleLoadSamplePO('ThanhHoa')}
-                          className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
-                        >
-                          📄 PO Thanh Hóa (2 SP)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleLoadSamplePO('BacSon')}
-                          className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
-                        >
-                          📄 PO Bắc Sơn (2 SP)
-                        </button>
-                      </div>
+                {/* Drag & drop upload area for OCR */}
+                <div className="border border-slate-200 bg-slate-50/60 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100/70 text-blue-700 rounded-lg">
+                      <Camera size={18} />
                     </div>
-
-                    {/* Drag & drop upload area */}
-                    <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white rounded-xl p-6 text-center cursor-pointer transition relative group">
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOCRUploadInWorkflow(file);
-                        }}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        disabled={isOcrProcessing}
-                      />
-                      {isOcrProcessing ? (
-                        <div className="flex flex-col items-center justify-center py-2 space-y-2">
-                          <Loader2 size={28} className="animate-spin text-blue-600" />
-                          <span className="text-xs font-bold text-blue-700">Trí tuệ nhân tạo Gemini đang OCR trích xuất dữ liệu & đối chiếu giá...</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                          <div className="p-3 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                            <Upload size={22} />
-                          </div>
-                          <div>
-                            <span className="text-sm font-bold text-slate-800">Kéo thả tệp chứng từ PO (PDF hoặc Ảnh) vào đây</span>
-                            <span className="block text-xs text-slate-400 mt-0.5">Hệ thống sẽ tự động bóc tách số PO, tên mặt hàng, số lượng và đối chiếu giá</span>
-                          </div>
-                        </div>
-                      )}
+                    <div>
+                      <span className="text-xs font-bold text-slate-800">Quét OCR Chứng từ PO (PDF / Ảnh)</span>
+                      <p className="text-[11px] text-slate-500">Hệ thống AI Gemini sẽ tự động bóc tách Số PO, Mặt hàng & Số lượng từ ảnh chụp</p>
                     </div>
                   </div>
-                )}
 
-                {/* Order Header Info */}
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleOCRUploadInWorkflow(file);
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isOcrProcessing}
+                    />
+                    <button
+                      type="button"
+                      disabled={isOcrProcessing}
+                      className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-xs"
+                    >
+                      {isOcrProcessing ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin text-blue-600" />
+                          <span>Đang xử lý OCR...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={14} className="text-blue-600" />
+                          <span>Tải tệp chứng từ PO lên</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Header Form */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-xs font-bold text-blue-900 mb-1">
+                      Khách hàng <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={poCustomer}
+                      onChange={(e) => {
+                        setPoCustomer(e.target.value);
+                        setSelectedProductCode("");
+                      }}
+                      className="w-full text-sm border border-blue-300 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 shadow-xs"
+                    >
+                      <option value="">-- Chọn khách hàng --</option>
+                      {customerData.filter(c => !c.isDeleted).map((c, i) => {
+                        const custName = c["Tên đầy đủ"] || c.Customer_ID;
+                        return (
+                          <option key={i} value={custName}>
+                            {custName}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Số đơn hàng Khách hàng (PO)</label>
                     <input
                       type="text"
-                      placeholder="VD: 26/KHVT/0615"
+                      placeholder="VD: 26/KHVT/0899"
                       value={newPoNumber}
                       onChange={(e) => setNewPoNumber(e.target.value)}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Khách hàng</label>
-                    <select
-                      value={poCustomer}
-                      onChange={(e) => setPoCustomer(e.target.value)}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
-                    >
-                      <option value="">-- Chọn khách hàng --</option>
-                      {customerData.filter(c => !c.isDeleted).map((c, i) => (
-                        <option key={i} value={c.Customer_ID}>{c["Tên đầy đủ"] || c.Customer_ID}</option>
-                      ))}
-                    </select>
-                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Phân loại đơn hàng</label>
                     <select
                       value={poType}
                       onChange={(e) => setPoType(e.target.value)}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value="Đơn hàng thường xuyên">Đơn hàng thường xuyên</option>
                       <option value="Đơn hàng khẩn cấp">Đơn hàng khẩn cấp</option>
                       <option value="Đơn hàng dự án">Đơn hàng dự án</option>
                     </select>
                   </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày đặt hàng</label>
                     <input
                       type="date"
                       value={poDate}
                       onChange={(e) => setPoDate(e.target.value)}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
                 </div>
+              </div>
 
-                {/* Manual Item Addition when in Manual mode */}
-                {creationMode === "manual" && (
-                  <div className="space-y-4 border-t border-slate-100 pt-4">
-                    <h4 className="font-bold text-sm text-slate-800">Thêm dòng sản phẩm từ Bảng giá Sourcing 2026</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Chọn sản phẩm (Lọc theo khách hàng)</label>
+              {/* 2. KHỐI GỢI Ý & THÊM SẢN PHẨM CỦA KHÁCH HÀNG (SOURCING CATALOG) */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg font-bold text-xs">
+                      <Sparkles size={16} />
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        2. Danh Mục Sản Phẩm Thuộc {poCustomer ? `"${poCustomer}"` : "Khách Hàng"} ({customerPricingOptions.length} mặt hàng trong Bảng giá 2026)
+                      </h4>
+                      <p className="text-xs text-slate-500">Hệ thống đã tự động lọc các sản phẩm và số hợp đồng kinh tế tương ứng của khách hàng này</p>
+                    </div>
+                  </div>
+                </div>
+
+                {!poCustomer ? (
+                  <div className="bg-amber-50/70 border border-dashed border-amber-200 rounded-xl p-8 text-center text-amber-800">
+                    <Info size={28} className="mx-auto text-amber-500 mb-2" />
+                    <p className="font-bold text-sm">Vui lòng chọn Khách hàng ở khối số 1</p>
+                    <p className="text-xs text-amber-600 mt-0.5">Hệ thống sẽ ngay lập tức tải bảng giá và danh mục sản phẩm riêng của khách hàng đó</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Product selector & quantity input */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="md:col-span-8">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Chọn sản phẩm cần đặt</label>
                         <select
                           value={selectedProductCode}
                           onChange={(e) => setSelectedProductCode(e.target.value)}
-                          className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                          disabled={!poCustomer}
+                          className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-semibold text-slate-800"
                         >
-                          <option value="">{poCustomer ? "-- Chọn sản phẩm --" : "Vui lòng chọn khách hàng ở trên trước"}</option>
-                          {customerPricingOptions.map((p, i) => (
-                            <option key={i} value={p["Mã sản phẩm"]}>
-                              [{p["Mã sản phẩm"]}] {p["Tên sản phẩm"]} - Đơn giá bán: {formatCurrency(p["Đơn giá bán"] || p["Đơn giá bán mới"])}
-                            </option>
-                          ))}
+                          <option value="">-- Chọn sản phẩm trong Bảng giá 2026 của {poCustomer} --</option>
+                          {customerPricingOptions.map((p, i) => {
+                            const sell = parseNumber(p["Đơn giá bán"] || p["Đơn giá bán mới"] || p["Giá bán"]);
+                            const buy = parseNumber(p["Đơn giá mua"] || p["Giá nhập"] || p["Giá vốn"]);
+                            const margin = sell > 0 ? (((sell - buy) / sell) * 100).toFixed(0) : 0;
+                            return (
+                              <option key={i} value={p["Mã sản phẩm"]}>
+                                [{p["Mã sản phẩm"]}] {p["Tên sản phẩm"]} - ĐVT: {p["ĐVT"] || "Cái"} | Giá bán: {formatCurrency(sell)} | HĐ: {p["Số hợp đồng"] || "HĐ 2026"} (Lãi: {margin}%)
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Số lượng đặt</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={lineQty}
-                            onChange={(e) => setLineQty(Math.max(1, parseInt(e.target.value) || 0))}
-                            className="w-full text-sm border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                            min="1"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleAddPOLine}
-                            disabled={!poCustomer}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-1 transition shadow-sm shrink-0"
-                          >
-                            <Plus size={16} />
-                            Thêm
-                          </button>
-                        </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Số lượng</label>
+                        <input
+                          type="number"
+                          value={lineQty}
+                          onChange={(e) => setLineQty(Math.max(1, parseInt(e.target.value) || 0))}
+                          className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-slate-800"
+                          min="1"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <button
+                          type="button"
+                          onClick={handleAddPOLine}
+                          disabled={!selectedProductCode}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <Plus size={16} />
+                          + Thêm Vào Đơn
+                        </button>
                       </div>
                     </div>
+
+                    {/* Quick Click Chips for Products */}
+                    {customerPricingOptions.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Gợi ý sản phẩm nổi bật của {poCustomer} (Bấm chọn nhanh):</span>
+                        <div className="flex flex-wrap gap-2">
+                          {customerPricingOptions.slice(0, 8).map((p, idx) => {
+                            const sell = parseNumber(p["Đơn giá bán"] || p["Đơn giá bán mới"] || p["Giá bán"]);
+                            const isCurrent = selectedProductCode === p["Mã sản phẩm"];
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setSelectedProductCode(p["Mã sản phẩm"])}
+                                className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition ${
+                                  isCurrent
+                                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                    : "bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-200"
+                                }`}
+                              >
+                                <span className="font-mono font-bold">[{p["Mã sản phẩm"]}]</span>
+                                <span className="truncate max-w-[150px]">{p["Tên sản phẩm"]}</span>
+                                <span className="font-bold text-[11px] opacity-80">({formatCurrency(sell)})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Smart Price Reconciliation & Dual PO Panel */}
-              {poLines.length > 0 ? (
-                <PriceReconciliationPanel
-                  customer={poCustomer}
-                  items={poLines}
-                  pricingData={pricingData}
-                  onChangeItem={handleItemChangeInReconciliation}
-                  onApplyAllMasterPrices={handleApplyAllMasterPrices}
-                  isApproved={isPOApproved}
-                  onToggleApproved={setIsPOApproved}
-                  onRemoveItem={(idx) => setPoLines(poLines.filter((_, i) => i !== idx))}
-                />
-              ) : (
-                <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
-                  <FileText size={36} className="mx-auto text-slate-300 mb-2" />
-                  <p className="font-semibold text-sm text-slate-600">Đơn hàng kép chưa có dòng sản phẩm nào</p>
-                  <p className="text-xs text-slate-400 mt-1">Vui lòng chọn <strong>Mẫu PO thử</strong> hoặc tải lên <strong>Tệp chứng từ</strong> ở trên để bóc tách và đối chiếu giá tự động</p>
-                </div>
-              )}
+              {/* 3. KHỐI ĐỐI SOÁT BẢNG GIÁ 2026 & HỢP ĐỒNG GỐC (DUAL PO TABLE) */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-bold text-xs">
+                      <FileText size={16} />
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        3. Bảng Cặp Đơn Hàng Kép & Đối Chiếu Bảng Giá / Hợp Đồng ({poLines.length} mặt hàng)
+                      </h4>
+                      <p className="text-xs text-slate-500">Đối chiếu song phương: Đơn bán khách hàng (SO) ↔ Đơn mua xưởng sản xuất (PO)</p>
+                    </div>
+                  </div>
 
-              {/* Action Buttons */}
-              {poLines.length > 0 && (
-                <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm gap-4">
-                  <div className="text-slate-600 text-sm">
-                    Tổng cộng: <span className="font-bold text-slate-800">{poLines.length} mặt hàng</span> | Doanh thu Khách (SO): <span className="font-extrabold text-blue-700 text-base">{formatCurrency(totalPoValue)}</span>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
+                  {poLines.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => { setPoLines([]); setNewPoNumber(""); }}
-                      className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold px-3.5 py-2.5 rounded-lg text-xs transition"
+                      onClick={() => setPoLines([])}
+                      className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 px-2.5 py-1 rounded hover:bg-red-50 transition"
                     >
-                      Xóa trắng
+                      <Trash2 size={13} />
+                      Xóa trắng danh sách
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowDualPOModal(true)}
-                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <Layers size={16} />
-                      📄 Xem Trước Văn Bản Cặp Đơn Hàng Kép (Dual PO)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSavePO}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <span>Khởi Tạo & Chuyển Sang Bước 2: Phê Duyệt</span>
-                      <ArrowRight size={16} />
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
+
+                {poLines.length === 0 ? (
+                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center text-slate-400 space-y-2">
+                    <ShoppingCart size={36} className="mx-auto text-slate-300" />
+                    <p className="font-bold text-sm text-slate-600">Chưa có sản phẩm nào trong đơn hàng</p>
+                    <p className="text-xs text-slate-400">Chọn sản phẩm ở khối số 2 hoặc bấm vào một trong các Mẫu PO ở trên để nạp nhanh</p>
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
+                          <th className="px-3 py-3 text-center">#</th>
+                          <th className="px-3 py-3">Mặt hàng & Quy cách</th>
+                          <th className="px-3 py-3">Hợp đồng gốc / Mã giá</th>
+                          <th className="px-3 py-3 text-center">Số lượng</th>
+                          <th className="px-3 py-3 text-right bg-blue-50/40 text-blue-900">Đơn giá bán (SO)</th>
+                          <th className="px-3 py-3 text-right bg-blue-50/40 text-blue-900 font-bold">Thành tiền bán (SO)</th>
+                          <th className="px-3 py-3 text-right bg-purple-50/40 text-purple-900">NCC / Giá mua (PO)</th>
+                          <th className="px-3 py-3 text-right bg-purple-50/40 text-purple-900 font-bold">Giá vốn (PO)</th>
+                          <th className="px-3 py-3 text-right text-emerald-800">Lợi nhuận gộp</th>
+                          <th className="px-3 py-3 text-center">Biên LN</th>
+                          <th className="px-3 py-3 text-center">Xóa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {poLines.map((line, idx) => {
+                          const qty = parseNumber(line["Số lượng"] || line.quantity || 1);
+                          const sell = parseNumber(line["Đơn giá bán"] || line.effectivePrice || line.poPrice);
+                          const buy = parseNumber(line["Đơn giá nhập"] || line.buyPrice);
+                          const lineRev = sell * qty;
+                          const lineCost = buy * qty;
+                          const lineProfit = lineRev - lineCost;
+                          const lineMargin = lineRev > 0 ? (lineProfit / lineRev) * 100 : 0;
+                          const prodCode = line["Mã sản phẩm"] || line.code || "-";
+                          const prodName = line["Tên sản phẩm"] || line.name || "Sản phẩm";
+                          const unit = line["ĐVT"] || line.unit || "Cái";
+                          const contractNo = line.contractNo || line["Số hợp đồng"] || "177/HĐ-TLTL";
+                          const priceCode = line.priceCode || line["Mã giá bán"] || "Gsp_082";
+                          const supplier = line.supplier || line["RP_Nhà cung cấp"] || "Tâm Sen";
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-3 py-3 text-center font-mono text-slate-400 font-bold">{idx + 1}</td>
+                              <td className="px-3 py-3">
+                                <div className="font-bold text-slate-900 text-xs">{prodName}</div>
+                                <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">{prodCode}</span>
+                                  <span>ĐVT: {unit}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="font-bold text-blue-700">{contractNo}</div>
+                                <div className="text-[10px] text-slate-500 font-mono">{priceCode}</div>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={qty}
+                                  onChange={(e) => {
+                                    const newQty = Math.max(1, parseInt(e.target.value) || 0);
+                                    const updated = [...poLines];
+                                    updated[idx] = {
+                                      ...updated[idx],
+                                      "Số lượng": newQty,
+                                      quantity: newQty,
+                                      "Thành tiền dòng": sell * newQty
+                                    };
+                                    setPoLines(updated);
+                                  }}
+                                  className="w-20 text-center font-mono font-bold text-slate-800 border border-slate-200 rounded-lg p-1.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-xs"
+                                />
+                              </td>
+                              <td className="px-3 py-3 text-right bg-blue-50/20 font-mono font-bold text-blue-700">
+                                {formatCurrency(sell)}
+                              </td>
+                              <td className="px-3 py-3 text-right bg-blue-50/20 font-mono font-extrabold text-blue-800">
+                                {formatCurrency(lineRev)}
+                              </td>
+                              <td className="px-3 py-3 text-right bg-purple-50/20">
+                                <div className="font-bold text-purple-700 truncate max-w-[100px] text-right ml-auto">{supplier}</div>
+                                <div className="font-mono text-[11px] text-slate-500">{formatCurrency(buy)}</div>
+                              </td>
+                              <td className="px-3 py-3 text-right bg-purple-50/20 font-mono font-bold text-purple-800">
+                                {formatCurrency(lineCost)}
+                              </td>
+                              <td className="px-3 py-3 text-right font-mono font-extrabold text-emerald-600">
+                                {formatCurrency(lineProfit)}
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  lineMargin >= 20 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {lineMargin.toFixed(1)}%
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setPoLines(poLines.filter((_, i) => i !== idx))}
+                                  className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. KHỐI TỔNG HỢP TÀI CHÍNH, THUẾ VAT & HÀNH ĐỘNG DUAL PO */}
+              {poLines.length > 0 && (() => {
+                let subtotalSO = 0;
+                let subtotalPO = 0;
+                poLines.forEach(line => {
+                  const qty = parseNumber(line["Số lượng"] || line.quantity || 1);
+                  const sell = parseNumber(line["Đơn giá bán"] || line.effectivePrice || line.poPrice);
+                  const buy = parseNumber(line["Đơn giá nhập"] || line.buyPrice);
+                  subtotalSO += sell * qty;
+                  subtotalPO += buy * qty;
+                });
+                const vatAmount = subtotalSO * (vatRate / 100);
+                const totalSOWithVat = subtotalSO + vatAmount;
+                const grossProfit = subtotalSO - subtotalPO;
+                const margin = subtotalSO > 0 ? (grossProfit / subtotalSO) * 100 : 0;
+
+                return (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm">4. Tính Toán Quyết Toán Tài Chính & Thuế VAT</h4>
+                        <p className="text-xs text-slate-500">Dự toán doanh thu bán hàng, thuế GTGT, tổng thanh toán và biên lợi nhuận đơn hàng kép</p>
+                      </div>
+
+                      {/* VAT Rate Selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-600">Thuế suất VAT:</span>
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-bold">
+                          {[8, 10, 0].map((rate) => (
+                            <button
+                              key={rate}
+                              type="button"
+                              onClick={() => setVatRate(rate)}
+                              className={`px-2.5 py-1 rounded-md transition ${
+                                vatRate === rate ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                              }`}
+                            >
+                              {rate}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4 Financial KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                        <span className="text-[11px] text-blue-700 font-semibold block">1. Tiền hàng trước thuế (SO)</span>
+                        <span className="text-base font-extrabold text-blue-900 mt-1 block">{formatCurrency(subtotalSO)}</span>
+                      </div>
+
+                      <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
+                        <span className="text-[11px] text-amber-700 font-semibold block">2. Thuế GTGT VAT ({vatRate}%)</span>
+                        <span className="text-base font-extrabold text-amber-900 mt-1 block">{formatCurrency(vatAmount)}</span>
+                      </div>
+
+                      <div className="bg-blue-600 text-white p-4 rounded-xl shadow-sm">
+                        <span className="text-[11px] text-blue-100 font-semibold block">3. Tổng TT Khách (Đã VAT)</span>
+                        <span className="text-base font-extrabold text-white mt-1 block">{formatCurrency(totalSOWithVat)}</span>
+                      </div>
+
+                      <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                        <span className="text-[11px] text-emerald-700 font-semibold block">4. Lãi gộp (Biên: {margin.toFixed(1)}%)</span>
+                        <span className="text-base font-extrabold text-emerald-700 mt-1 block">{formatCurrency(grossProfit)}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                      <div className="text-xs text-slate-500">
+                        Tổng giá vốn Mua xưởng (PO): <strong className="text-purple-700 font-bold">{formatCurrency(subtotalPO)}</strong>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => { setPoLines([]); setNewPoNumber(""); }}
+                          className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold px-3.5 py-2.5 rounded-lg text-xs transition"
+                        >
+                          Xóa trắng
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDualPOModal(true)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <Layers size={16} />
+                          📄 Xem & In Cặp Văn Bản Dual PO
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleSavePO}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-sm shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <span>Lưu Đơn & Chuyển Sang Bước 2: Phê Duyệt ➔</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
