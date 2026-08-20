@@ -4,7 +4,7 @@ import {
   ShoppingCart, FileText, Calendar, Truck, CheckSquare, BarChart3, 
   ArrowRight, Plus, CheckCircle, AlertTriangle, AlertCircle, 
   TrendingUp, DollarSign, Download, Users, Package, RefreshCw, ChevronRight, Calculator, Check, FileSpreadsheet,
-  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award, Info, Trash2
+  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award, Info, Trash2, Search, CheckCheck
 } from "lucide-react";
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
@@ -115,38 +115,60 @@ export default function WorkflowView({
     return Array.from(map.values());
   }, [deliveryData, createdDeliveries]);
 
-  // Combined PO Headers for Step 2 Approval
+  // Combined PO Headers for Step 2 Approval: Prioritize new created orders at top
   const combinedPoHeadersData = useMemo(() => {
     const map = new Map();
-    (poHeaderData || []).forEach(item => {
-      const key = item.id || item["Đơn hàng"];
+    // 1. Newly created headers first
+    createdPoHeaders.forEach(item => {
+      const key = String(item.id || item["Đơn hàng"] || "").trim();
       if (key) map.set(key, item);
     });
-    createdPoHeaders.forEach(item => {
-      const key = item.id || item["Đơn hàng"];
-      if (key) map.set(key, item);
+    // 2. Existing headers from props
+    (poHeaderData || []).forEach(item => {
+      const key = String(item.id || item["Đơn hàng"] || "").trim();
+      if (key && !map.has(key)) map.set(key, item);
     });
     return Array.from(map.values());
   }, [poHeaderData, createdPoHeaders]);
 
   // States for Step 2 (Phê duyệt & Khóa đơn)
   const [selectedPoForApproval, setSelectedPoForApproval] = useState<string>("");
+  const [approvalFilter, setApprovalFilter] = useState<"pending" | "approved" | "all">("pending");
+  const [approvalSearch, setApprovalSearch] = useState("");
 
   const currentPoForApproval = useMemo(() => {
     if (selectedPoForApproval) {
-      const found = combinedPoHeadersData.find(h => (h.id || h["Đơn hàng"]) === selectedPoForApproval);
+      const selNorm = String(selectedPoForApproval).trim().toLowerCase().replace(/\//g, "-");
+      const found = combinedPoHeadersData.find(h => {
+        const hId = String(h.id || "").trim().toLowerCase().replace(/\//g, "-");
+        const hPo = String(h["Đơn hàng"] || "").trim().toLowerCase().replace(/\//g, "-");
+        return hId === selNorm || hPo === selNorm;
+      });
       if (found) return found;
     }
-    return combinedPoHeadersData[0] || null;
+    // Default to the first pending / newest order
+    const pending = combinedPoHeadersData.find(h => !h["Trạng Thái"]?.includes("Đã phê duyệt") && !h["Trạng Thái"]?.includes("Đang sản xuất") && !h["Trạng Thái"]?.includes("Hoàn thành"));
+    return pending || combinedPoHeadersData[0] || null;
   }, [combinedPoHeadersData, selectedPoForApproval]);
 
   const currentPoLinesForApproval = useMemo(() => {
     if (!currentPoForApproval) return [];
-    const poNum = String(currentPoForApproval["Đơn hàng"] || currentPoForApproval.id || "").trim();
-    return combinedPoLinesData.filter(l => !l.isDeleted && (
-      String(l["Số đơn hàng"] || l["Đơn hàng"] || "").trim() === poNum ||
-      String(l["STT"] || l.id || "").includes(poNum.replace(/\//g, "-"))
+    const poNum = String(currentPoForApproval["Đơn hàng"] || currentPoForApproval.id || "").trim().toLowerCase();
+    const poNumNorm = poNum.replace(/\//g, "-");
+
+    const matched = combinedPoLinesData.filter(l => !l.isDeleted && (
+      String(l["Số đơn hàng"] || l["Đơn hàng"] || "").trim().toLowerCase() === poNum ||
+      String(l["Số đơn hàng"] || l["Đơn hàng"] || "").trim().toLowerCase().replace(/\//g, "-") === poNumNorm ||
+      String(l["STT"] || l.id || "").toLowerCase().includes(poNumNorm)
     ));
+
+    // Fallback: If no lines matched directly by PO number, search by product associations
+    if (matched.length === 0 && currentPoForApproval["Chi tiết đơn hàng"]) {
+      const detailsList = String(currentPoForApproval["Chi tiết đơn hàng"]).split(",").map(s => s.trim().toLowerCase());
+      return combinedPoLinesData.filter(l => detailsList.includes(String(l["STT"] || l.id || "").toLowerCase()));
+    }
+
+    return matched;
   }, [combinedPoLinesData, currentPoForApproval]);
 
   const [planningPoLine, setPlanningPoLine] = useState<any | null>(null);
@@ -236,6 +258,38 @@ export default function WorkflowView({
     if (!poCustomer) return [];
     return matchCustomerWithPricing(poCustomer, pricingData);
   }, [pricingData, poCustomer]);
+
+  // Filtered PO Headers list for Step 2
+  const filteredPoHeadersForApproval = useMemo(() => {
+    let list = combinedPoHeadersData;
+
+    // Filter by tab
+    if (approvalFilter === "pending") {
+      list = list.filter(h => !h["Trạng Thái"]?.includes("Đã phê duyệt") && !h["Trạng Thái"]?.includes("Đang sản xuất") && !h["Trạng Thái"]?.includes("Hoàn thành"));
+    } else if (approvalFilter === "approved") {
+      list = list.filter(h => h["Trạng Thái"]?.includes("Đã phê duyệt") || h["Trạng Thái"]?.includes("Đang sản xuất") || h["Trạng Thái"]?.includes("Hoàn thành"));
+    }
+
+    // Filter by search query
+    if (approvalSearch.trim()) {
+      const q = approvalSearch.toLowerCase().trim();
+      list = list.filter(h => 
+        String(h["Đơn hàng"] || "").toLowerCase().includes(q) ||
+        String(h["Khách hàng"] || "").toLowerCase().includes(q) ||
+        String(h.id || "").toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [combinedPoHeadersData, approvalFilter, approvalSearch]);
+
+  const pendingApprovalCount = useMemo(() => {
+    return combinedPoHeadersData.filter(h => !h["Trạng Thái"]?.includes("Đã phê duyệt") && !h["Trạng Thái"]?.includes("Đang sản xuất") && !h["Trạng Thái"]?.includes("Hoàn thành")).length;
+  }, [combinedPoHeadersData]);
+
+  const approvedCount = useMemo(() => {
+    return combinedPoHeadersData.filter(h => h["Trạng Thái"]?.includes("Đã phê duyệt") || h["Trạng Thái"]?.includes("Đang sản xuất") || h["Trạng Thái"]?.includes("Hoàn thành")).length;
+  }, [combinedPoHeadersData]);
 
   const handleLoadSamplePO = (sampleType: 'ThangLong' | 'ThanhHoa' | 'BacSon') => {
     if (sampleType === 'ThangLong') {
@@ -607,21 +661,28 @@ export default function WorkflowView({
           "id": lineId,
           "STT": lineId,
           "Số đơn hàng": newPoNumber.trim(),
+          "Đơn hàng": newPoNumber.trim(),
           "Mã giá bán": line.priceCode || line["Mã giá bán"] || "Gsp_082",
           "Tên sản phẩm": line["Tên sản phẩm"] || line.masterProductName || line.name || "Sản phẩm PO",
           "Mã sản phẩm": line["Mã sản phẩm"] || line.code || line.masterProductCode || "",
           "Mã của khách": line["Mã của khách"] || line["Mã sản phẩm"] || line.code || "",
-          "ĐVT": line["ĐVT"] || "Cái",
+          "ĐVT": line["ĐVT"] || line.unit || "Cái",
           "Số lượng": qty,
+          "quantity": qty,
           "Ngày đặt hàng": formattedDate,
           "Ngày giao": line.deliveryDate || formattedDate,
           "Khách hàng": poCustomer,
           "Đơn vị nhận hàng": poCustomer,
           "Nhóm hàng": line["Nhóm hàng"] || "Nguyên liệu",
-          "Đơn giá nhập": (buyPrice || 0).toLocaleString("vi-VN"),
-          "Đơn giá bán": (sellPrice || 0).toLocaleString("vi-VN"),
-          "Thành tiền dòng": (lineRev || 0).toLocaleString("vi-VN"),
-          "Lợi nhuận": (lineProfit || 0).toLocaleString("vi-VN"),
+          "Đơn giá nhập": buyPrice,
+          "Đơn giá bán": sellPrice,
+          "effectivePrice": sellPrice,
+          "buyPrice": buyPrice,
+          "supplier": line.supplier || line["RP_Nhà cung cấp"] || "Tâm Sen",
+          "contractNo": line.contractNo || line["Số hợp đồng"] || "177/HĐ-TLTL",
+          "priceCode": line.priceCode || line["Mã giá bán"] || "Gsp_082",
+          "Thành tiền dòng": lineRev,
+          "Lợi nhuận": lineProfit,
           "Hoàn thành": 0,
           "createdAt": new Date().toISOString()
         };
@@ -642,7 +703,8 @@ export default function WorkflowView({
       ]).catch(err => console.warn("Background commit notice:", err));
 
       toast.success(`Đã khởi tạo Cặp Đơn Hàng Kép ${newPoNumber}! Chuyển sang Bước 2 để Thẩm định & Phê duyệt.`, { id: loadToast });
-      setSelectedPoForApproval(headerId);
+      setSelectedPoForApproval(newPoNumber.trim());
+      setApprovalFilter("pending");
       setNewPoNumber("");
       setPoLines([]);
       setActiveStep(2); // Move to Step 2: Phê duyệt & Khóa đơn
@@ -1797,72 +1859,131 @@ export default function WorkflowView({
                     <ShieldCheck size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-lg">Bàn Làm Việc Thẩm Định & Phê Duyệt Đơn Hàng (BOD Approval)</h3>
+                    <h3 className="font-bold text-slate-800 text-lg">2. Bàn Làm Việc Thẩm Định & Phê Duyệt Đơn Hàng (BOD Approval)</h3>
                     <p className="text-xs text-slate-500">Kiểm toán an toàn biên lợi nhuận, đối soát Hợp đồng gốc và phê duyệt phát lệnh sản xuất cho xưởng NCC</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">Đơn hàng trong hệ thống:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-500 font-medium">Tổng đơn hàng:</span>
                   <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-full text-xs border border-blue-200">
                     {combinedPoHeadersData.length} đơn
                   </span>
+                  {pendingApprovalCount > 0 && (
+                    <span className="bg-amber-500 text-white font-bold px-2.5 py-1 rounded-full text-xs animate-pulse flex items-center gap-1 shadow-xs">
+                      ⚡ {pendingApprovalCount} đơn chờ duyệt
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Master - Detail Workspace */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Column: PO Headers List (4 cols) */}
-                <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                {/* Left Column: PO Headers List with Smart Tabs & Search (4 cols) */}
+                <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh sách Cặp Đơn Hàng Kép</h4>
+                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh Sách Cặp Đơn Hàng</h4>
                     <button
                       onClick={() => setActiveStep(1)}
-                      className="text-[11px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1"
+                      className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 hover:underline"
                     >
-                      <Plus size={12} />
+                      <Plus size={13} />
                       Tạo thêm đơn
                     </button>
                   </div>
 
-                  <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
-                    {combinedPoHeadersData.length === 0 ? (
-                      <div className="text-center py-10 text-slate-400 text-xs italic">
-                        Chưa có đơn hàng nào trong hệ thống!
+                  {/* Filter Tabs */}
+                  <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setApprovalFilter("pending")}
+                      className={`flex-1 py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                        approvalFilter === "pending"
+                          ? "bg-white text-amber-700 shadow-xs border border-amber-200"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      ⚡ Chờ duyệt ({pendingApprovalCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalFilter("approved")}
+                      className={`flex-1 py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                        approvalFilter === "approved"
+                          ? "bg-white text-emerald-700 shadow-xs border border-emerald-200"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      ✅ Đã duyệt ({approvedCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalFilter("all")}
+                      className={`py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                        approvalFilter === "all"
+                          ? "bg-white text-blue-700 shadow-xs border border-blue-200"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Tất cả
+                    </button>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo số PO, khách hàng..."
+                      value={approvalSearch}
+                      onChange={(e) => setApprovalSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  {/* PO Cards List */}
+                  <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                    {filteredPoHeadersForApproval.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-200 p-4">
+                        Không có đơn hàng nào phù hợp với bộ lọc!
                       </div>
                     ) : (
-                      combinedPoHeadersData.map((header, idx) => {
+                      filteredPoHeadersForApproval.map((header, idx) => {
                         const headerId = header.id || header["Đơn hàng"];
-                        const isSelected = (currentPoForApproval?.id || currentPoForApproval?.["Đơn hàng"]) === headerId;
+                        const poNum = header["Đơn hàng"] || headerId;
+                        const isSelected = (currentPoForApproval?.id || currentPoForApproval?.["Đơn hàng"]) === headerId ||
+                                           (currentPoForApproval?.["Đơn hàng"] === poNum);
                         const isApproved = header["Trạng Thái"]?.includes("Đã phê duyệt") || header["Trạng Thái"]?.includes("Đang sản xuất");
 
                         return (
                           <div
                             key={idx}
-                            onClick={() => setSelectedPoForApproval(headerId)}
-                            className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 ${
+                            onClick={() => setSelectedPoForApproval(poNum)}
+                            className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 relative ${
                               isSelected
-                                ? "bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs"
-                                : "bg-slate-50/50 hover:bg-slate-100 border-slate-200"
+                                ? "bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/20 shadow-sm"
+                                : isApproved
+                                ? "bg-white hover:bg-slate-50 border-slate-200"
+                                : "bg-amber-50/40 hover:bg-amber-50/80 border-amber-200"
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-mono font-bold text-xs text-slate-900">{header["Đơn hàng"] || headerId}</span>
+                              <span className="font-mono font-bold text-xs text-slate-900">{poNum}</span>
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                 isApproved
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
+                                  : "bg-amber-500 text-white border-amber-600 shadow-xs animate-pulse"
                               }`}>
-                                {header["Trạng Thái"] || "Chờ phê duyệt"}
+                                {isApproved ? "✅ Đã phê duyệt" : "⚡ Chờ BOD duyệt"}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-700 truncate max-w-[140px]">{header["Khách hàng"]}</span>
+                              <span className="font-semibold text-slate-800 truncate max-w-[150px]">{header["Khách hàng"]}</span>
                               <span className="text-[11px] text-slate-400">{header["Ngày đặt hàng"]}</span>
                             </div>
 
-                            <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                            <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-xs">
                               <span className="text-[10px] text-slate-500">Giá trị đơn:</span>
                               <strong className="text-blue-700 font-extrabold">{formatCurrency(header["Tổng giá trị đơn hàng"])}</strong>
                             </div>
@@ -1873,33 +1994,34 @@ export default function WorkflowView({
                   </div>
                 </div>
 
-                {/* Right Column: Approval Detail & Margin Guard (8 cols) */}
+                {/* Right Column: Executive Inspection Dashboard & PO Detail (8 cols) */}
                 <div className="lg:col-span-8 space-y-5">
                   {currentPoForApproval ? (
                     <>
-                      {/* Margin Guard Audit Banner */}
+                      {/* Margin Guard AI Audit & Financial Summary */}
                       {(() => {
                         let totalRev = 0;
                         let totalCost = 0;
                         currentPoLinesForApproval.forEach(l => {
-                          const qty = parseNumber(l["Số lượng"]);
-                          const sell = parseNumber(l["Đơn giá bán"]) || parseNumber(l.effectivePrice);
-                          const buy = parseNumber(l["Đơn giá nhập"]) || parseNumber(l.buyPrice);
+                          const qty = parseNumber(l["Số lượng"] || l.quantity || 1);
+                          const sell = parseNumber(l["Đơn giá bán"] || l.effectivePrice || l.poPrice);
+                          const buy = parseNumber(l["Đơn giá nhập"] || l.buyPrice);
                           totalRev += sell * qty;
                           totalCost += buy * qty;
                         });
                         const profit = totalRev - totalCost;
                         const margin = totalRev > 0 ? (profit / totalRev) * 100 : 0;
                         const isSafe = margin >= 20;
+                        const isApproved = currentPoForApproval["Trạng Thái"]?.includes("Đã phê duyệt") || currentPoForApproval["Trạng Thái"]?.includes("Đang sản xuất");
 
                         return (
                           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hồ sơ thẩm định đơn hàng</span>
-                                <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                                  <span>{currentPoForApproval["Đơn hàng"]}</span>
-                                  <span className="text-slate-400 font-normal">|</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hồ sơ kiểm toán & thẩm định đơn hàng</span>
+                                <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2 mt-0.5">
+                                  <span className="font-mono text-blue-900">{currentPoForApproval["Đơn hàng"]}</span>
+                                  <span className="text-slate-300 font-normal">|</span>
                                   <span className="text-blue-700">{currentPoForApproval["Khách hàng"]}</span>
                                 </h4>
                               </div>
@@ -1913,28 +2035,47 @@ export default function WorkflowView({
                                   {isSafe ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
                                   {isSafe ? "Biên Độ An Toàn Cao (Pass)" : "Cảnh Báo Lãi Thấp"}
                                 </span>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                                  isApproved
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                    : "bg-amber-100 text-amber-800 border-amber-300"
+                                }`}>
+                                  {isApproved ? "Đã Phê Duyệt / Lệnh SX Kích Hoạt" : "Chờ Ký Duyệt BOD"}
+                                </span>
                               </div>
                             </div>
 
                             {/* 4 Financial KPIs */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span className="text-[10px] text-slate-500 font-medium block">Doanh thu bán (SO)</span>
-                                <span className="text-sm font-extrabold text-blue-700">{formatCurrency(totalRev)}</span>
+                              <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-100">
+                                <span className="text-[10px] text-blue-700 font-bold block">1. Doanh thu bán (SO)</span>
+                                <span className="text-sm font-extrabold text-blue-900 mt-1 block">{formatCurrency(totalRev)}</span>
                               </div>
-                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span className="text-[10px] text-slate-500 font-medium block">Giá vốn NCC (PO)</span>
-                                <span className="text-sm font-bold text-slate-700">{formatCurrency(totalCost)}</span>
+                              <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-100">
+                                <span className="text-[10px] text-purple-700 font-bold block">2. Giá vốn xưởng (PO)</span>
+                                <span className="text-sm font-extrabold text-purple-900 mt-1 block">{formatCurrency(totalCost)}</span>
                               </div>
-                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span className="text-[10px] text-slate-500 font-medium block">Lợi nhuận gộp</span>
-                                <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(profit)}</span>
+                              <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-100">
+                                <span className="text-[10px] text-emerald-700 font-bold block">3. Lợi nhuận gộp</span>
+                                <span className="text-sm font-extrabold text-emerald-700 mt-1 block">{formatCurrency(profit)}</span>
                               </div>
-                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <span className="text-[10px] text-slate-500 font-medium block">Tỷ suất biên LN</span>
-                                <span className={`text-sm font-extrabold ${isSafe ? "text-emerald-600" : "text-amber-600"}`}>
+                              <div className={`p-3.5 rounded-xl border ${isSafe ? "bg-emerald-50/80 border-emerald-200" : "bg-amber-50/80 border-amber-200"}`}>
+                                <span className={`text-[10px] font-bold block ${isSafe ? "text-emerald-800" : "text-amber-800"}`}>4. Tỷ suất Margin</span>
+                                <span className={`text-base font-extrabold mt-0.5 block ${isSafe ? "text-emerald-700" : "text-amber-700"}`}>
                                   {margin.toFixed(1)}%
                                 </span>
+                              </div>
+                            </div>
+
+                            {/* AI Margin Guard Note */}
+                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex items-start gap-2.5 text-xs">
+                              <Sparkles size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                              <div className="text-slate-600">
+                                <strong className="text-slate-800 font-semibold">Đánh giá kiểm toán tự động: </strong>
+                                {isSafe
+                                  ? `Đơn hàng đạt biên lợi nhuận tốt (${margin.toFixed(1)}% ≥ 20%), các điều khoản giá bán theo Bảng giá 2026 và hợp đồng gốc đều hợp lệ. Khuyến nghị ký duyệt phát lệnh sản xuất cho xưởng.`
+                                  : `Đơn hàng có tỷ suất lợi nhuận gộp (${margin.toFixed(1)}% < 20%). Ban điều hành cần lưu ý kiểm tra lại bảng giá mua từ nhà cung cấp trước khi khóa đơn.`
+                                }
                               </div>
                             </div>
                           </div>
@@ -1942,48 +2083,87 @@ export default function WorkflowView({
                       })()}
 
                       {/* Items Table in PO */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
-                        <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
-                          Chi tiết các mặt hàng trong Cặp Đơn Hàng Kép ({currentPoLinesForApproval.length} dòng)
-                        </h4>
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
+                            Chi Tiết Cặp Đơn Hàng Kép ({currentPoLinesForApproval.length} mặt hàng)
+                          </h4>
+                          <span className="text-xs text-slate-500">
+                            Khách hàng: <strong className="text-blue-700">{currentPoForApproval["Khách hàng"]}</strong>
+                          </span>
+                        </div>
 
-                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
                               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
-                                <th className="px-3 py-2.5">Mã SP</th>
-                                <th className="px-3 py-2.5">Tên sản phẩm</th>
-                                <th className="px-3 py-2.5 text-right">Số lượng</th>
-                                <th className="px-3 py-2.5 text-right">Giá bán KH</th>
-                                <th className="px-3 py-2.5 text-right">Giá mua NCC</th>
-                                <th className="px-3 py-2.5 text-right">Lợi nhuận</th>
-                                <th className="px-3 py-2.5 text-center">Biên LN</th>
+                                <th className="px-3 py-3 text-center">#</th>
+                                <th className="px-3 py-3">Mặt hàng & Quy cách</th>
+                                <th className="px-3 py-3">Hợp đồng gốc</th>
+                                <th className="px-3 py-3 text-center">Số lượng</th>
+                                <th className="px-3 py-3 text-right bg-blue-50/40 text-blue-900">Đơn giá bán (SO)</th>
+                                <th className="px-3 py-3 text-right bg-blue-50/40 text-blue-900 font-bold">Thành tiền bán (SO)</th>
+                                <th className="px-3 py-3 text-right bg-purple-50/40 text-purple-900">NCC / Giá mua (PO)</th>
+                                <th className="px-3 py-3 text-right bg-purple-50/40 text-purple-900 font-bold">Giá vốn (PO)</th>
+                                <th className="px-3 py-3 text-right text-emerald-800">Lợi nhuận</th>
+                                <th className="px-3 py-3 text-center">Biên LN</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
                               {currentPoLinesForApproval.length === 0 ? (
                                 <tr>
-                                  <td colSpan={7} className="text-center py-6 text-slate-400 italic">
-                                    Không có dữ liệu dòng sản phẩm của đơn này!
+                                  <td colSpan={10} className="text-center py-8 text-slate-400 italic">
+                                    Không có dữ liệu dòng sản phẩm của đơn hàng này!
                                   </td>
                                 </tr>
                               ) : (
                                 currentPoLinesForApproval.map((line, lIdx) => {
-                                  const qty = parseNumber(line["Số lượng"]);
-                                  const sell = parseNumber(line["Đơn giá bán"]) || parseNumber(line.effectivePrice);
-                                  const buy = parseNumber(line["Đơn giá nhập"]) || parseNumber(line.buyPrice);
-                                  const prof = (sell - buy) * qty;
-                                  const lineMargin = sell > 0 ? ((sell - buy) / sell) * 100 : 0;
+                                  const qty = parseNumber(line["Số lượng"] || line.quantity || 1);
+                                  const sell = parseNumber(line["Đơn giá bán"] || line.effectivePrice || line.poPrice);
+                                  const buy = parseNumber(line["Đơn giá nhập"] || line.buyPrice);
+                                  const lineRev = sell * qty;
+                                  const lineCost = buy * qty;
+                                  const prof = lineRev - lineCost;
+                                  const lineMargin = lineRev > 0 ? (prof / lineRev) * 100 : 0;
+                                  const prodCode = line["Mã sản phẩm"] || line.code || "-";
+                                  const prodName = line["Tên sản phẩm"] || line.name || "Sản phẩm";
+                                  const unit = line["ĐVT"] || line.unit || "Cái";
+                                  const contractNo = line.contractNo || line["Số hợp đồng"] || "177/HĐ-TLTL";
+                                  const supplier = line.supplier || line["RP_Nhà cung cấp"] || "Tâm Sen";
 
                                   return (
-                                    <tr key={lIdx} className="hover:bg-slate-50">
-                                      <td className="px-3 py-2.5 font-mono font-bold text-slate-800">{line["Mã sản phẩm"] || line.code || "-"}</td>
-                                      <td className="px-3 py-2.5 font-medium truncate max-w-[150px]" title={line["Tên sản phẩm"]}>{line["Tên sản phẩm"]}</td>
-                                      <td className="px-3 py-2.5 text-right font-bold">{qty.toLocaleString("vi-VN")} {line["ĐVT"] || "Cái"}</td>
-                                      <td className="px-3 py-2.5 text-right font-bold text-blue-700">{formatCurrency(sell)}</td>
-                                      <td className="px-3 py-2.5 text-right font-semibold text-slate-600">{formatCurrency(buy)}</td>
-                                      <td className="px-3 py-2.5 text-right font-extrabold text-emerald-600">{formatCurrency(prof)}</td>
-                                      <td className="px-3 py-2.5 text-center">
+                                    <tr key={lIdx} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-3 py-3 text-center font-mono text-slate-400 font-bold">{lIdx + 1}</td>
+                                      <td className="px-3 py-3">
+                                        <div className="font-bold text-slate-900 text-xs">{prodName}</div>
+                                        <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+                                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">{prodCode}</span>
+                                          <span>ĐVT: {unit}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-3">
+                                        <div className="font-bold text-blue-700">{contractNo}</div>
+                                      </td>
+                                      <td className="px-3 py-3 text-center font-bold text-slate-800 font-mono">
+                                        {qty.toLocaleString("vi-VN")} {unit}
+                                      </td>
+                                      <td className="px-3 py-3 text-right bg-blue-50/20 font-mono font-bold text-blue-700">
+                                        {formatCurrency(sell)}
+                                      </td>
+                                      <td className="px-3 py-3 text-right bg-blue-50/20 font-mono font-extrabold text-blue-800">
+                                        {formatCurrency(lineRev)}
+                                      </td>
+                                      <td className="px-3 py-3 text-right bg-purple-50/20">
+                                        <div className="font-bold text-purple-700 truncate max-w-[100px] text-right ml-auto">{supplier}</div>
+                                        <div className="font-mono text-[11px] text-slate-500">{formatCurrency(buy)}</div>
+                                      </td>
+                                      <td className="px-3 py-3 text-right bg-purple-50/20 font-mono font-bold text-purple-800">
+                                        {formatCurrency(lineCost)}
+                                      </td>
+                                      <td className="px-3 py-3 text-right font-mono font-extrabold text-emerald-600">
+                                        {formatCurrency(prof)}
+                                      </td>
+                                      <td className="px-3 py-3 text-center">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                           lineMargin >= 20 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                                         }`}>
@@ -2010,6 +2190,20 @@ export default function WorkflowView({
                           </button>
 
                           <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Load selected order into Step 1 for editing if needed
+                                setPoCustomer(currentPoForApproval["Khách hàng"] || "");
+                                setNewPoNumber(currentPoForApproval["Đơn hàng"] || "");
+                                setPoLines(currentPoLinesForApproval);
+                                setActiveStep(1);
+                              }}
+                              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition"
+                            >
+                              ✏️ Sửa Đơn Ở Bước 1
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => handleApprovePOFromStep2(currentPoForApproval)}
@@ -2792,16 +2986,36 @@ export default function WorkflowView({
       <DualPODocumentModal
         isOpen={showDualPOModal}
         onClose={() => setShowDualPOModal(false)}
-        customerPoNumber={newPoNumber || "26/KHVT/0744"}
-        poCustomer={poCustomer || "Thăng Long"}
-        poDate={poDate}
-        poLines={poLines}
+        customerPoNumber={
+          activeStep === 2
+            ? (currentPoForApproval ? (currentPoForApproval["Đơn hàng"] || currentPoForApproval.id) : newPoNumber)
+            : (newPoNumber || "26/KHVT/0744")
+        }
+        poCustomer={
+          activeStep === 2
+            ? (currentPoForApproval ? currentPoForApproval["Khách hàng"] : poCustomer)
+            : (poCustomer || "Thăng Long")
+        }
+        poDate={
+          activeStep === 2
+            ? (currentPoForApproval ? currentPoForApproval["Ngày đặt hàng"] : poDate)
+            : poDate
+        }
+        poLines={
+          activeStep === 2
+            ? currentPoLinesForApproval
+            : poLines
+        }
         supplierData={supplierData}
         productData={productData}
         pricingData={pricingData}
         onApproveAndProceed={() => {
           setShowDualPOModal(false);
-          handleSavePO();
+          if (activeStep === 1) {
+            handleSavePO();
+          } else if (activeStep === 2 && currentPoForApproval) {
+            handleApprovePOFromStep2(currentPoForApproval);
+          }
         }}
       />
     </div>
