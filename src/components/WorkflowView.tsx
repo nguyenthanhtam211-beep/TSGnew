@@ -114,6 +114,41 @@ export default function WorkflowView({
     });
     return Array.from(map.values());
   }, [deliveryData, createdDeliveries]);
+
+  // Combined PO Headers for Step 2 Approval
+  const combinedPoHeadersData = useMemo(() => {
+    const map = new Map();
+    (poHeaderData || []).forEach(item => {
+      const key = item.id || item["Đơn hàng"];
+      if (key) map.set(key, item);
+    });
+    createdPoHeaders.forEach(item => {
+      const key = item.id || item["Đơn hàng"];
+      if (key) map.set(key, item);
+    });
+    return Array.from(map.values());
+  }, [poHeaderData, createdPoHeaders]);
+
+  // States for Step 2 (Phê duyệt & Khóa đơn)
+  const [selectedPoForApproval, setSelectedPoForApproval] = useState<string>("");
+
+  const currentPoForApproval = useMemo(() => {
+    if (selectedPoForApproval) {
+      const found = combinedPoHeadersData.find(h => (h.id || h["Đơn hàng"]) === selectedPoForApproval);
+      if (found) return found;
+    }
+    return combinedPoHeadersData[0] || null;
+  }, [combinedPoHeadersData, selectedPoForApproval]);
+
+  const currentPoLinesForApproval = useMemo(() => {
+    if (!currentPoForApproval) return [];
+    const poNum = String(currentPoForApproval["Đơn hàng"] || currentPoForApproval.id || "").trim();
+    return combinedPoLinesData.filter(l => !l.isDeleted && (
+      String(l["Số đơn hàng"] || l["Đơn hàng"] || "").trim() === poNum ||
+      String(l["STT"] || l.id || "").includes(poNum.replace(/\//g, "-"))
+    ));
+  }, [combinedPoLinesData, currentPoForApproval]);
+
   const [planningPoLine, setPlanningPoLine] = useState<any | null>(null);
   const [plannedQty, setPlannedQty] = useState<number>(0);
   const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split("T")[0]);
@@ -563,13 +598,43 @@ export default function WorkflowView({
         new Promise(resolve => setTimeout(resolve, 600))
       ]).catch(err => console.warn("Background commit notice:", err));
 
-      toast.success(`Đã tạo & phê duyệt thành công đơn hàng ${newPoNumber}!`, { id: loadToast });
+      toast.success(`Đã khởi tạo Cặp Đơn Hàng Kép ${newPoNumber}! Chuyển sang Bước 2 để Thẩm định & Phê duyệt.`, { id: loadToast });
+      setSelectedPoForApproval(headerId);
       setNewPoNumber("");
       setPoLines([]);
-      setActiveStep(3); // Move immediately to Step 3: Kế hoạch giao
+      setActiveStep(2); // Move to Step 2: Phê duyệt & Khóa đơn
     } catch (err: any) {
       console.error(err);
       toast.error(`Lỗi khi lưu đơn hàng: ${err.message || 'Chưa thể lưu'}`, { id: loadToast });
+    }
+  };
+
+  const handleApprovePOFromStep2 = async (poHeader: any) => {
+    if (!poHeader) return;
+    const headerId = poHeader.id || poHeader["Đơn hàng"];
+    const loadToast = toast.loading(`Đang phê duyệt & khóa đơn hàng ${poHeader["Đơn hàng"] || headerId}...`);
+    try {
+      const updatedPayload = {
+        ...poHeader,
+        "Trạng Thái": "Đã phê duyệt / Đang sản xuất",
+        "approvedAt": new Date().toISOString()
+      };
+      
+      setCreatedPoHeaders(prev => prev.map(h => ((h.id || h["Đơn hàng"]) === headerId ? updatedPayload : h)));
+
+      Promise.race([
+        updateDoc(doc(db, "po_headers", headerId), {
+          "Trạng Thái": "Đã phê duyệt / Đang sản xuất",
+          "approvedAt": new Date().toISOString()
+        }),
+        new Promise(resolve => setTimeout(resolve, 600))
+      ]).catch(err => console.warn("Background header approve update:", err));
+
+      toast.success(`Đã phê duyệt & Khóa đơn hàng ${poHeader["Đơn hàng"]}! Phát lệnh sản xuất xưởng NCC.`, { id: loadToast });
+      setActiveStep(3); // Move to Step 3: Kế hoạch giao
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi khi phê duyệt: ${err.message || 'Chưa thể lưu'}`, { id: loadToast });
     }
   };
 
@@ -1179,163 +1244,20 @@ export default function WorkflowView({
         <div className="max-w-6xl mx-auto space-y-6">
 
           {/* ================================================== */}
-          {/* STEP 1: ĐẶT HÀNG (SOURCING CALCULATOR) */}
+          {/* STEP 1: BÁO GIÁ & TIẾP NHẬN ĐƠN HÀNG KÉP (DUAL PO INTAKE) */}
           {/* ================================================== */}
           {activeStep === 1 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Side: Dynamic Price Calculator */}
-              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-                <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-                  <Calculator className="text-blue-600" size={20} />
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-base">Bộ báo giá & Đặt hàng nhanh</h3>
-                    <p className="text-xs text-slate-500">Tìm kiếm khung giá bán 2026 và tự động tính toán hiệu quả biên lợi nhuận</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Khách hàng yêu cầu</label>
-                    <select
-                      value={calcCustomer}
-                      onChange={(e) => {
-                        setCalcCustomer(e.target.value);
-                        setCalcProduct("");
-                      }}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none"
-                    >
-                      <option value="">-- Tất cả khách hàng --</option>
-                      {customerData.filter(c => !c.isDeleted).map((c, i) => (
-                        <option key={i} value={c.Customer_ID}>{c["Tên đầy đủ"] || c.Customer_ID}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Sản phẩm đối ứng</label>
-                    <select
-                      value={calcProduct}
-                      onChange={(e) => setCalcProduct(e.target.value)}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none"
-                    >
-                      <option value="">-- Chọn sản phẩm có bảng giá --</option>
-                      {activePricingOptions.map((p, i) => (
-                        <option key={i} value={p["Mã sản phẩm"]}>
-                          [{p["Mã sản phẩm"]}] {p["Tên sản phẩm"]} - {p["RP_Khách hàng"]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Số lượng đặt dự kiến (ĐVT: {selectedPriceRecord ? selectedPriceRecord["ĐVT"] : "Cái"})</label>
-                    <input
-                      type="number"
-                      value={calcQty}
-                      onChange={(e) => setCalcQty(Math.max(1, parseInt(e.target.value) || 0))}
-                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none"
-                    />
-                  </div>
-                </div>
-
-                {step1Calculation && selectedPriceRecord && (
-                  <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4">
-                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Thông số báo giá dự tính</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-white p-3 rounded-lg border border-slate-100">
-                        <span className="block text-[10px] font-medium text-slate-500">Đơn giá bán</span>
-                        <span className="text-sm font-bold text-slate-800">{formatCurrency(step1Calculation.sellPrice)}</span>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg border border-slate-100">
-                        <span className="block text-[10px] font-medium text-slate-500">Đơn giá nhập</span>
-                        <span className="text-sm font-bold text-slate-800">{formatCurrency(step1Calculation.buyPrice)}</span>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg border border-slate-100">
-                        <span className="block text-[10px] font-medium text-slate-500">Nhà cung cấp</span>
-                        <span className="text-sm font-bold text-slate-800 truncate block" title={selectedPriceRecord["RP_Nhà cung cấp"]}>
-                          {selectedPriceRecord["RP_Nhà cung cấp"] || "Không rõ"}
-                        </span>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg border border-slate-100">
-                        <span className="block text-[10px] font-medium text-slate-500">Hợp đồng gốc</span>
-                        <span className="text-sm font-bold text-blue-600 truncate block">{selectedPriceRecord["Số hợp đồng"] || "N/A"}</span>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <span className="text-xs text-slate-500">Dự toán doanh thu</span>
-                        <span className="block text-lg font-extrabold text-slate-900">{formatCurrency(step1Calculation.revenue)}</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-slate-500">Ước tính giá vốn</span>
-                        <span className="block text-lg font-bold text-slate-600">{formatCurrency(step1Calculation.cogs)}</span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-slate-500">Lợi nhuận gộp</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-extrabold text-emerald-600">{formatCurrency(step1Calculation.profit)}</span>
-                          <span className="bg-emerald-50 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded-md font-bold">
-                            {step1Calculation.margin.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-3 flex justify-end">
-                      <button
-                        onClick={handleApplyCalcToPO}
-                        disabled={!calcCustomer}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Khởi tạo & Lên đơn PO ngay
-                        <ArrowRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Side: Price references list */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="border-b border-slate-100 pb-2">
-                  <h3 className="font-bold text-slate-800 text-sm">Danh sách bảng giá hiện dụng</h3>
-                  <p className="text-[11px] text-slate-500">Tra cứu nhanh biểu giá bán lẻ và biên lợi nhuận của Tâm Sen Group</p>
-                </div>
-
-                <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                  {pricingData.slice(0, 15).map((price, idx) => (
-                    <div key={idx} className="p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition text-xs space-y-1">
-                      <div className="flex justify-between font-bold text-slate-700">
-                        <span className="truncate max-w-[140px]" title={price["Tên sản phẩm"]}>{price["Tên sản phẩm"]}</span>
-                        <span className="text-blue-700">{formatCurrency(price["Đơn giá bán"] || price["Đơn giá bán mới"])}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-500 text-[10px]">
-                        <span>Khách: {price["RP_Khách hàng"]}</span>
-                        <span>Biên LN: <strong className="text-emerald-600 font-bold">{price["Biên lợi nhuận"] || "N/A"}</strong></span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================================================== */}
-          {/* STEP 2: LÊN ĐƠN HÀNG (PO & PO LINES CREATION + SMART OCR) */}
-          {/* ================================================== */}
-          {activeStep === 2 && (
             <div className="space-y-6">
               {/* Header & Mode Selector */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                      <FileText size={22} />
+                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                      <ShoppingCart size={22} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-lg">Soạn thảo & Đối chiếu Báo giá Đơn hàng PO</h3>
-                      <p className="text-xs text-slate-500">Khởi tạo Đơn hàng qua Quét OCR tự động hoặc Nhập thủ công, đối chiếu trực tiếp với Bảng Giá 2026</p>
+                      <h3 className="font-bold text-slate-800 text-lg">Báo Giá & Khởi Tạo Đơn Hàng Kép (Dual PO Intake)</h3>
+                      <p className="text-xs text-slate-500">Khởi tạo cặp Đơn bán cho Khách (SO) ↔ Đơn mua Nhà cung cấp (PO) qua Quét OCR Thông Minh hoặc Soạn thảo Bảng giá 2026</p>
                     </div>
                   </div>
 
@@ -1359,7 +1281,7 @@ export default function WorkflowView({
                       }`}
                     >
                       <Plus size={14} />
-                      ✍️ Nhập PO Thủ công
+                      🛒 Soạn Báo Giá Bảng Giá 2026
                     </button>
                   </div>
                 </div>
@@ -1384,21 +1306,21 @@ export default function WorkflowView({
                           onClick={() => handleLoadSamplePO('ThangLong')}
                           className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
                         >
-                          📄 PO Thăng Long
+                          📄 PO Thăng Long (3 SP)
                         </button>
                         <button
                           type="button"
                           onClick={() => handleLoadSamplePO('ThanhHoa')}
                           className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
                         >
-                          📄 PO Thanh Hóa
+                          📄 PO Thanh Hóa (2 SP)
                         </button>
                         <button
                           type="button"
                           onClick={() => handleLoadSamplePO('BacSon')}
                           className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition shadow-xs"
                         >
-                          📄 PO Bắc Sơn
+                          📄 PO Bắc Sơn (2 SP)
                         </button>
                       </div>
                     </div>
@@ -1438,7 +1360,7 @@ export default function WorkflowView({
                 {/* Order Header Info */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Số đơn hàng (PO)</label>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Số đơn hàng Khách hàng (PO)</label>
                     <input
                       type="text"
                       placeholder="VD: 26/KHVT/0615"
@@ -1486,7 +1408,7 @@ export default function WorkflowView({
                 {/* Manual Item Addition when in Manual mode */}
                 {creationMode === "manual" && (
                   <div className="space-y-4 border-t border-slate-100 pt-4">
-                    <h4 className="font-bold text-sm text-slate-800">Thêm dòng sản phẩm thủ công</h4>
+                    <h4 className="font-bold text-sm text-slate-800">Thêm dòng sản phẩm từ Bảng giá Sourcing 2026</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                       <div className="md:col-span-2">
                         <label className="block text-xs font-semibold text-slate-600 mb-1">Chọn sản phẩm (Lọc theo khách hàng)</label>
@@ -1530,7 +1452,7 @@ export default function WorkflowView({
                 )}
               </div>
 
-              {/* Smart Price Reconciliation Panel */}
+              {/* Smart Price Reconciliation & Dual PO Panel */}
               {poLines.length > 0 ? (
                 <PriceReconciliationPanel
                   customer={poCustomer}
@@ -1545,8 +1467,8 @@ export default function WorkflowView({
               ) : (
                 <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
                   <FileText size={36} className="mx-auto text-slate-300 mb-2" />
-                  <p className="font-semibold text-sm text-slate-600">Đơn hàng chưa có dòng sản phẩm nào</p>
-                  <p className="text-xs text-slate-400 mt-1">Vui lòng chọn <strong>Mẫu PO thử</strong> hoặc tải lên <strong>Tệp chứng từ</strong> ở trên để trải nghiệm tính năng đối chiếu giá thông minh</p>
+                  <p className="font-semibold text-sm text-slate-600">Đơn hàng kép chưa có dòng sản phẩm nào</p>
+                  <p className="text-xs text-slate-400 mt-1">Vui lòng chọn <strong>Mẫu PO thử</strong> hoặc tải lên <strong>Tệp chứng từ</strong> ở trên để bóc tách và đối chiếu giá tự động</p>
                 </div>
               )}
 
@@ -1554,7 +1476,7 @@ export default function WorkflowView({
               {poLines.length > 0 && (
                 <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm gap-4">
                   <div className="text-slate-600 text-sm">
-                    Tổng số lượng: <span className="font-bold text-slate-800">{poLines.length} mặt hàng</span> | Tổng doanh thu dự kiến: <span className="font-extrabold text-blue-700 text-base">{formatCurrency(totalPoValue)}</span>
+                    Tổng cộng: <span className="font-bold text-slate-800">{poLines.length} mặt hàng</span> | Doanh thu Khách (SO): <span className="font-extrabold text-blue-700 text-base">{formatCurrency(totalPoValue)}</span>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <button
@@ -1562,28 +1484,275 @@ export default function WorkflowView({
                       onClick={() => { setPoLines([]); setNewPoNumber(""); }}
                       className="border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold px-3.5 py-2.5 rounded-lg text-xs transition"
                     >
-                      Xóa trắng đơn
+                      Xóa trắng
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowDualPOModal(true)}
-                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm"
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
                     >
                       <Layers size={16} />
-                      📄 Xem & Duyệt Bộ 2 PO Nhà Cung Cấp (Dual PO)
+                      📄 Xem Trước Văn Bản Cặp Đơn Hàng Kép (Dual PO)
                     </button>
                     <button
                       type="button"
                       onClick={handleSavePO}
-                      disabled={!isPOApproved}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
                     >
-                      <CheckCircle size={16} />
-                      Phê Duyệt & Phát Hành PO
+                      <span>Khởi Tạo & Chuyển Sang Bước 2: Phê Duyệt</span>
+                      <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* STEP 2: PHÊ DUYỆT & KHÓA TIẾN ĐỘ SẢN XUẤT (PO APPROVAL & DISPATCH) */}
+          {/* ================================================== */}
+          {activeStep === 2 && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-lg">Bàn Làm Việc Thẩm Định & Phê Duyệt Đơn Hàng (BOD Approval)</h3>
+                    <p className="text-xs text-slate-500">Kiểm toán an toàn biên lợi nhuận, đối soát Hợp đồng gốc và phê duyệt phát lệnh sản xuất cho xưởng NCC</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">Đơn hàng trong hệ thống:</span>
+                  <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-full text-xs border border-blue-200">
+                    {combinedPoHeadersData.length} đơn
+                  </span>
+                </div>
+              </div>
+
+              {/* Master - Detail Workspace */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: PO Headers List (4 cols) */}
+                <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh sách Cặp Đơn Hàng Kép</h4>
+                    <button
+                      onClick={() => setActiveStep(1)}
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Tạo thêm đơn
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                    {combinedPoHeadersData.length === 0 ? (
+                      <div className="text-center py-10 text-slate-400 text-xs italic">
+                        Chưa có đơn hàng nào trong hệ thống!
+                      </div>
+                    ) : (
+                      combinedPoHeadersData.map((header, idx) => {
+                        const headerId = header.id || header["Đơn hàng"];
+                        const isSelected = (currentPoForApproval?.id || currentPoForApproval?.["Đơn hàng"]) === headerId;
+                        const isApproved = header["Trạng Thái"]?.includes("Đã phê duyệt") || header["Trạng Thái"]?.includes("Đang sản xuất");
+
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => setSelectedPoForApproval(headerId)}
+                            className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 ${
+                              isSelected
+                                ? "bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs"
+                                : "bg-slate-50/50 hover:bg-slate-100 border-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold text-xs text-slate-900">{header["Đơn hàng"] || headerId}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                isApproved
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
+                              }`}>
+                                {header["Trạng Thái"] || "Chờ phê duyệt"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-slate-700 truncate max-w-[140px]">{header["Khách hàng"]}</span>
+                              <span className="text-[11px] text-slate-400">{header["Ngày đặt hàng"]}</span>
+                            </div>
+
+                            <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                              <span className="text-[10px] text-slate-500">Giá trị đơn:</span>
+                              <strong className="text-blue-700 font-extrabold">{formatCurrency(header["Tổng giá trị đơn hàng"])}</strong>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Approval Detail & Margin Guard (8 cols) */}
+                <div className="lg:col-span-8 space-y-5">
+                  {currentPoForApproval ? (
+                    <>
+                      {/* Margin Guard Audit Banner */}
+                      {(() => {
+                        let totalRev = 0;
+                        let totalCost = 0;
+                        currentPoLinesForApproval.forEach(l => {
+                          const qty = parseNumber(l["Số lượng"]);
+                          const sell = parseNumber(l["Đơn giá bán"]) || parseNumber(l.effectivePrice);
+                          const buy = parseNumber(l["Đơn giá nhập"]) || parseNumber(l.buyPrice);
+                          totalRev += sell * qty;
+                          totalCost += buy * qty;
+                        });
+                        const profit = totalRev - totalCost;
+                        const margin = totalRev > 0 ? (profit / totalRev) * 100 : 0;
+                        const isSafe = margin >= 20;
+
+                        return (
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hồ sơ thẩm định đơn hàng</span>
+                                <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                                  <span>{currentPoForApproval["Đơn hàng"]}</span>
+                                  <span className="text-slate-400 font-normal">|</span>
+                                  <span className="text-blue-700">{currentPoForApproval["Khách hàng"]}</span>
+                                </h4>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+                                  isSafe
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                }`}>
+                                  {isSafe ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+                                  {isSafe ? "Biên Độ An Toàn Cao (Pass)" : "Cảnh Báo Lãi Thấp"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 4 Financial KPIs */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <span className="text-[10px] text-slate-500 font-medium block">Doanh thu bán (SO)</span>
+                                <span className="text-sm font-extrabold text-blue-700">{formatCurrency(totalRev)}</span>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <span className="text-[10px] text-slate-500 font-medium block">Giá vốn NCC (PO)</span>
+                                <span className="text-sm font-bold text-slate-700">{formatCurrency(totalCost)}</span>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <span className="text-[10px] text-slate-500 font-medium block">Lợi nhuận gộp</span>
+                                <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(profit)}</span>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <span className="text-[10px] text-slate-500 font-medium block">Tỷ suất biên LN</span>
+                                <span className={`text-sm font-extrabold ${isSafe ? "text-emerald-600" : "text-amber-600"}`}>
+                                  {margin.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Items Table in PO */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+                        <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
+                          Chi tiết các mặt hàng trong Cặp Đơn Hàng Kép ({currentPoLinesForApproval.length} dòng)
+                        </h4>
+
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
+                                <th className="px-3 py-2.5">Mã SP</th>
+                                <th className="px-3 py-2.5">Tên sản phẩm</th>
+                                <th className="px-3 py-2.5 text-right">Số lượng</th>
+                                <th className="px-3 py-2.5 text-right">Giá bán KH</th>
+                                <th className="px-3 py-2.5 text-right">Giá mua NCC</th>
+                                <th className="px-3 py-2.5 text-right">Lợi nhuận</th>
+                                <th className="px-3 py-2.5 text-center">Biên LN</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {currentPoLinesForApproval.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="text-center py-6 text-slate-400 italic">
+                                    Không có dữ liệu dòng sản phẩm của đơn này!
+                                  </td>
+                                </tr>
+                              ) : (
+                                currentPoLinesForApproval.map((line, lIdx) => {
+                                  const qty = parseNumber(line["Số lượng"]);
+                                  const sell = parseNumber(line["Đơn giá bán"]) || parseNumber(line.effectivePrice);
+                                  const buy = parseNumber(line["Đơn giá nhập"]) || parseNumber(line.buyPrice);
+                                  const prof = (sell - buy) * qty;
+                                  const lineMargin = sell > 0 ? ((sell - buy) / sell) * 100 : 0;
+
+                                  return (
+                                    <tr key={lIdx} className="hover:bg-slate-50">
+                                      <td className="px-3 py-2.5 font-mono font-bold text-slate-800">{line["Mã sản phẩm"] || line.code || "-"}</td>
+                                      <td className="px-3 py-2.5 font-medium truncate max-w-[150px]" title={line["Tên sản phẩm"]}>{line["Tên sản phẩm"]}</td>
+                                      <td className="px-3 py-2.5 text-right font-bold">{qty.toLocaleString("vi-VN")} {line["ĐVT"] || "Cái"}</td>
+                                      <td className="px-3 py-2.5 text-right font-bold text-blue-700">{formatCurrency(sell)}</td>
+                                      <td className="px-3 py-2.5 text-right font-semibold text-slate-600">{formatCurrency(buy)}</td>
+                                      <td className="px-3 py-2.5 text-right font-extrabold text-emerald-600">{formatCurrency(prof)}</td>
+                                      <td className="px-3 py-2.5 text-center">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                          lineMargin >= 20 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                        }`}>
+                                          {lineMargin.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Executive Action Buttons */}
+                        <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setShowDualPOModal(true)}
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            <Layers size={16} />
+                            📄 Xem & In Cặp Văn Bản Dual PO
+                          </button>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApprovePOFromStep2(currentPoForApproval)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-sm shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                              <CheckCircle size={16} />
+                              <span>Phê Duyệt & Khóa Đơn Sản Xuất ➔</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-white rounded-xl border border-dashed border-slate-300 p-16 text-center text-slate-400">
+                      <ShieldCheck size={40} className="mx-auto text-slate-300 mb-3" />
+                      <p className="font-semibold text-sm text-slate-600">Vui lòng chọn một đơn hàng bên trái để thẩm định</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
