@@ -2333,7 +2333,7 @@ function TableView({
                     );
                   }
 
-                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp') {
+                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp' || h === 'Mã Nhà Cung Cấp' || h === 'Mã NCC') {
                     return (
                       <div key={h} className="flex flex-col gap-1.5">
                         <label className="text-sm font-medium text-gray-700">{h}</label>
@@ -2626,7 +2626,7 @@ function TableView({
                     );
                   }
 
-                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp') {
+                  if (h === 'Nhà cung cấp' || h === 'Nhà Cung Cấp' || h === 'Mã Nhà Cung Cấp' || h === 'Mã NCC') {
                     return (
                       <div key={h} className="space-y-1.5">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>

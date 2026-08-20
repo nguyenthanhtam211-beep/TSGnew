@@ -4,7 +4,7 @@ import {
   Building2, Users, FileText, ArrowUpRight, ChevronRight, Eye, 
   Edit3, Trash2, Layers, CheckCircle2, AlertCircle, HardDrive, 
   ExternalLink, Sparkles, Truck, ShoppingCart, Tag, Clock, HelpCircle,
-  LayoutGrid, List, Check, X, PlusCircle
+  LayoutGrid, List, Check, X, PlusCircle, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
@@ -170,23 +170,51 @@ export default function ProductsView({
     });
   }, [productData, pricingData, poLinesData, specsData, contractsData]);
 
-  // Categories, Customers, and Suppliers list for filtering
-  const categories = useMemo(() => {
-    const set = new Set(enrichedProducts.map((p) => p.category).filter(Boolean));
-    return ['All', ...Array.from(set)];
+  // Master options list for Customers
+  const allCustomerOptions = useMemo(() => {
+    const set = new Set<string>();
+    (customerData || []).forEach((c: any) => {
+      const name = c['Tên khách hàng'] || c['Customer_ID'] || c.name || c['Khách hàng'];
+      if (name) set.add(String(name).trim());
+    });
+    enrichedProducts.forEach(p => p.relatedCustomers.forEach(c => set.add(c)));
+    ['Thăng Long', 'Bắc Sơn', 'Thanh Hoá', 'Ngân Sơn', 'Sài Gòn', 'Bến Tre', 'Diageo Việt Nam'].forEach(c => set.add(c));
+    return Array.from(set).filter(Boolean).sort();
+  }, [customerData, enrichedProducts]);
+
+  // Master options list for Suppliers
+  const allSupplierOptions = useMemo(() => {
+    const set = new Set<string>();
+    (supplierData || []).forEach((s: any) => {
+      const name = s['Tên nhà cung cấp'] || s['Mã nhà cung cấp'] || s['Mã NCC'] || s.name || s['Nhà cung cấp'];
+      if (name) set.add(String(name).trim());
+    });
+    enrichedProducts.forEach(p => p.relatedSuppliers.forEach(s => set.add(s)));
+    ['YFY', 'Tâm Sen', 'Tuấn Bằng', 'THP', 'Bao bì Đồng Nai', 'Xương Giang'].forEach(s => set.add(s));
+    return Array.from(set).filter(Boolean).sort();
+  }, [supplierData, enrichedProducts]);
+
+  // Master options list for Categories
+  const allCategoryOptions = useMemo(() => {
+    const set = new Set<string>(['Thùng carton', 'Nguyên liệu', 'In ấn', 'Bao bì & Nhãn']);
+    enrichedProducts.forEach(p => {
+      if (p.category && p.category !== 'Chung') set.add(p.category);
+    });
+    return Array.from(set).filter(Boolean).sort();
   }, [enrichedProducts]);
+
+  // Categories, Customers, and Suppliers list for toolbar filtering
+  const categories = useMemo(() => {
+    return ['All', ...allCategoryOptions];
+  }, [allCategoryOptions]);
 
   const customersList = useMemo(() => {
-    const list: string[] = [];
-    enrichedProducts.forEach((p) => p.relatedCustomers.forEach((c) => list.push(c)));
-    return ['All', ...Array.from(new Set(list))];
-  }, [enrichedProducts]);
+    return ['All', ...allCustomerOptions];
+  }, [allCustomerOptions]);
 
   const suppliersList = useMemo(() => {
-    const list: string[] = [];
-    enrichedProducts.forEach((p) => p.relatedSuppliers.forEach((s) => list.push(s)));
-    return ['All', ...Array.from(new Set(list))];
-  }, [enrichedProducts]);
+    return ['All', ...allSupplierOptions];
+  }, [allSupplierOptions]);
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
@@ -229,8 +257,8 @@ export default function ProductsView({
       'Tên sản phẩm': p.name,
       'Nhóm hàng': p.category,
       'Đơn Vị Tính': p.unit,
-      'Khách hàng': p.relatedCustomers[0] || p.raw['Khách hàng'] || '',
-      'Mã Nhà Cung Cấp': p.relatedSuppliers[0] || p.raw['Mã Nhà Cung Cấp'] || '',
+      'Khách hàng': p.relatedCustomers[0] || p.raw['Khách hàng'] || allCustomerOptions[0] || 'Thăng Long',
+      'Mã Nhà Cung Cấp': p.relatedSuppliers[0] || p.raw['Mã Nhà Cung Cấp'] || allSupplierOptions[0] || 'YFY',
       'Thông Số Sản Phẩm': p.primarySpec?.['Mã Spec'] || p.raw['Thông Số Sản Phẩm'] || '',
       'Trọng lượng riêng': p.raw['Trọng lượng riêng'] || '',
       'Tình trạng': p.status || 'Đang kinh doanh'
@@ -312,8 +340,8 @@ export default function ProductsView({
                 'Tên sản phẩm': '',
                 'Nhóm hàng': 'Thùng carton',
                 'Đơn Vị Tính': 'Cái',
-                'Khách hàng': 'Thăng Long',
-                'Mã Nhà Cung Cấp': 'YFY',
+                'Khách hàng': allCustomerOptions[0] || 'Thăng Long',
+                'Mã Nhà Cung Cấp': allSupplierOptions[0] || 'YFY',
                 'Tình trạng': 'Đang kinh doanh'
               });
               setIsAddModalOpen(true);
@@ -838,41 +866,55 @@ export default function ProductsView({
                       <option value="Kg">Kg</option>
                       <option value="Tờ">Tờ</option>
                       <option value="Hộp">Hộp</option>
+                      <option value="Bao">Bao</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Customer Selector Dropdown + Datalist */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
+                    <select
+                      value={editFormData['Khách hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      <option value="">-- Chọn khách hàng --</option>
+                      {allCustomerOptions.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Supplier Selector Dropdown */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
+                    <select
+                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      <option value="">-- Chọn nhà cung cấp --</option>
+                      {allSupplierOptions.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Khách hàng'] || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
                     <label className="font-bold text-slate-700 block mb-1.5">Nhóm hàng:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Nhóm hàng'] || ''}
+                    <select
+                      value={editFormData['Nhóm hàng'] || 'Thùng carton'}
                       onChange={(e) => setEditFormData({ ...editFormData, 'Nhóm hàng': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      {allCategoryOptions.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -895,6 +937,7 @@ export default function ProductsView({
                       value={editFormData['Trọng lượng riêng'] || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, 'Trọng lượng riêng': e.target.value })}
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                      placeholder="VD: 680 (±5%)"
                     />
                   </div>
 
@@ -935,7 +978,7 @@ export default function ProductsView({
         )}
       </AnimatePresence>
 
-      {/* Add Product Modal */}
+      {/* Add Product Modal with Dropdowns */}
       <AnimatePresence>
         {isAddModalOpen && (
           <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -1001,41 +1044,54 @@ export default function ProductsView({
                       <option value="Kg">Kg</option>
                       <option value="Tờ">Tờ</option>
                       <option value="Hộp">Hộp</option>
+                      <option value="Bao">Bao</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Dropdowns for Customer and Supplier */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
+                    <select
+                      value={editFormData['Khách hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      <option value="">-- Chọn khách hàng --</option>
+                      {allCustomerOptions.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
+                    <select
+                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      <option value="">-- Chọn nhà cung cấp --</option>
+                      {allSupplierOptions.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Khách hàng'] || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
                     <label className="font-bold text-slate-700 block mb-1.5">Nhóm hàng:</label>
-                    <input
-                      type="text"
-                      value={editFormData['Nhóm hàng'] || ''}
+                    <select
+                      value={editFormData['Nhóm hàng'] || 'Thùng carton'}
                       onChange={(e) => setEditFormData({ ...editFormData, 'Nhóm hàng': e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
-                    />
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900 cursor-pointer"
+                    >
+                      {allCategoryOptions.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
