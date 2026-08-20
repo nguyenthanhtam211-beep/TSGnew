@@ -14,6 +14,7 @@ import { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 import { DualPODocumentModal } from "./DualPODocumentModal";
 import { findPriceRecord } from "../lib/business-logic";
 import { exportGenericTableToPDF, formatVND } from "../lib/pdf-exporter";
+import { processDocumentOCR } from "../lib/gemini";
 
 interface WorkflowViewProps {
   pricingData: any[];
@@ -321,34 +322,9 @@ export default function WorkflowView({
 
   const handleOCRUploadInWorkflow = async (file: File) => {
     setIsOcrProcessing(true);
-    const toastId = toast.loading("Gemini đang bóc tách chi tiết PO...");
+    const toastId = toast.loading("Gemini AI đang bóc tách chi tiết PO...");
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/ocr", {
-        method: "POST",
-        body: formData,
-      });
-
-      const textRes = await response.text();
-      if (textRes.trim().toLowerCase().startsWith("<!doctype html") || textRes.includes("<html")) {
-        if (response.status === 504 || response.status === 502) {
-          throw new Error("Xử lý OCR quá thời gian cho phép của máy chủ. Vui lòng chọn file PDF/ảnh có dung lượng nhỏ hơn (dưới 5MB).");
-        }
-        throw new Error("Máy chủ phản hồi trang HTML thay vì JSON. Vui lòng thử tải lại trang hoặc mở ứng dụng trong Tab mới.");
-      }
-
-      if (!response.ok) {
-        let errorMsg = `Lỗi máy chủ (${response.status})`;
-        try {
-          const errorData = JSON.parse(textRes);
-          if (errorData && errorData.error) errorMsg = errorData.error;
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-
-      const ocrData = JSON.parse(textRes);
+      const ocrData = await processDocumentOCR(file);
 
       let cust = "Thăng Long";
       const lowerBuyer = (ocrData.buyerName || "").toLowerCase();
