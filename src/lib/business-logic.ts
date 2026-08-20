@@ -462,3 +462,49 @@ export const findUnifiedProductEntity = (params: {
   };
 };
 
+/**
+ * Standardize Supplier Abbreviated Short Code
+ * Tuấn Bằng -> TB
+ * Thuận Hòa Phát -> THP
+ * YFY Hà Nam -> YFY
+ * Tâm Sen -> TSG
+ */
+export function getSupplierShortCode(suppName: string): string {
+  if (!suppName) return "TB";
+  const s = suppName.toLowerCase().trim();
+  if (s.includes("tuấn bằng") || s.includes("tuan bang") || s === "tb") return "TB";
+  if (s.includes("thuận hoà phát") || s.includes("thuận hòa phát") || s.includes("thp")) return "THP";
+  if (s.includes("yfy") || s.includes("vĩnh huê") || s.includes("vinh hue")) return "YFY";
+  if (s.includes("đồng nai") || s.includes("dong nai") || s.includes("bbdn")) return "BBDN";
+  if (s.includes("xương giang") || s.includes("xuong giang")) return "XG";
+  if (s.includes("tâm sen") || s.includes("tam sen") || s.includes("tsg")) return "TSG";
+  return suppName.toUpperCase().replace(/\s+/g, "");
+}
+
+/**
+ * Intelligent default Technical Specification generator
+ */
+export function getDefaultSpecs(name: string = "", code: string = "", unit: string = ""): string {
+  const n = (name || "").toLowerCase();
+  const c = (code || "").toLowerCase();
+  const u = (unit || "").toLowerCase();
+
+  // 1. Nhãn in, tờ in thuốc lá (Tuấn Bằng, Bắc Sơn, Thăng Long...)
+  if (n.includes("nhãn") || n.includes("tờ") || n.includes("decal") || n.includes("label") || u === "tờ" || c.startsWith("nh") || c.startsWith("tu") || c.startsWith("tsbs")) {
+    if (n.includes("tút") || c.startsWith("tu")) {
+      return "Nhãn tút thuốc lá in Offset nhiều màu trên giấy Couche chuyên dụng, cán màng bóng, bế định hình theo TCKT và Ma-két đã duyệt.";
+    }
+    return "Nhãn bao thuốc lá in Offset nhiều màu trên giấy Couche chuyên dụng, phủ vecni/cán bóng, bế định hình theo TCKT và Ma-két đã duyệt.";
+  }
+
+  // 2. Thùng carton, bao bì sóng (YFY, THP, Đồng Nai...)
+  if (n.includes("thùng") || n.includes("carton") || n.includes("hộp") || c.startsWith("th") || c.startsWith("ps-15") || c.startsWith("c48")) {
+    if (n.includes("c48") || n.includes("15kg") || n.includes("xuất khẩu")) {
+      return "Thùng nâu 5 lớp sóng AB (KP250/3M330/KP250). KT trong: 1.140x700x715 (±5mm), 1.120x680x705 (±5mm). Trọng lượng 15kg (±0.4kg). Dập ghim, TCKT đã duyệt.";
+    }
+    return "Thùng carton 5 lớp sóng AB/BC chịu lực cao, in Flexo theo mẫu ma-két, dập ghim tiêu chuẩn TCKT đã duyệt.";
+  }
+
+  return "Sản xuất theo đúng bản vẽ ma-két, quy cách đóng gói và tiêu chuẩn kỹ thuật (TCKT) đã được phê duyệt.";
+}
+

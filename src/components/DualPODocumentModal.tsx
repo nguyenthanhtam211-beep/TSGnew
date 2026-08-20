@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
 import MacTrafficLights from "./MacTrafficLights";
-import { parseNumber } from "../lib/business-logic";
+import { parseNumber, getSupplierShortCode, getDefaultSpecs } from "../lib/business-logic";
 
 interface DualPODocumentModalProps {
   isOpen: boolean;
@@ -93,21 +93,51 @@ export function DualPODocumentModal({
   const poTamSenRef = useRef<HTMLDivElement>(null);
   const poAVPRef = useRef<HTMLDivElement>(null);
 
-  // 1. Identify Supplier Code (e.g. THP, YFY, TB) & Details
+  // 1. Identify Supplier Short Code (e.g. TB, THP, YFY, BBDN, XG)
   const supplierCode = useMemo(() => {
     for (const line of poLines) {
       const supp = line.supplier || line["RP_Nhà cung cấp"] || line["Nhà cung cấp"] || "";
-      if (supp && supp !== "Tâm Sen") return supp.toUpperCase();
+      if (supp && supp !== "Tâm Sen") return getSupplierShortCode(supp);
       const code = line.code || line["Mã sản phẩm"] || "";
       if (code.includes("PS-15") || code.includes("C48") || code.includes("THP")) return "THP";
       if (code.includes("YFY")) return "YFY";
-      if (code.includes("TB")) return "TB";
+      if (code.includes("TB") || code.includes("NH") || code.includes("TU") || code.includes("TSBS")) return "TB";
     }
-    return "THP";
+    return "TB";
   }, [poLines]);
 
   // Supplier Full Info
   const supplierInfo = useMemo(() => {
+    if (supplierCode === "TB") {
+      return {
+        name: "CÔNG TY TNHH THƯƠNG MẠI IN BAO BÌ TUẤN BẰNG",
+        shortName: "TB",
+        address: "Số 18, Ngõ 195, Phố Đội Cấn, Quận Ba Đình, TP. Hà Nội",
+        email: "baobituanbang@gmail.com",
+        phone: "0913 307 970"
+      };
+    }
+
+    if (supplierCode === "YFY") {
+      return {
+        name: "CÔNG TY TNHH BAO BÌ YONG FENG YU (HÀ NAM)",
+        shortName: "YFY",
+        address: "KCN Đồng Văn II, Phường Duy Minh, TX. Duy Tiên, Tỉnh Hà Nam",
+        email: "sales_hn@yfy.com.vn",
+        phone: "0226 3836 888"
+      };
+    }
+
+    if (supplierCode === "THP") {
+      return {
+        name: "CÔNG TY CỔ PHẦN BAO BÌ THUẬN HOÀ PHÁT",
+        shortName: "THP",
+        address: "Xã Chỉ Đạo, Huyện Văn Lâm, Tỉnh Hưng Yên",
+        email: "kinhdoanh@thuanhoaphat.com.vn",
+        phone: "0989 646 663"
+      };
+    }
+
     const found = supplierData.find(s => 
       (s["Mã nhà cung cấp"] || s["Tên ngắn"] || s.id || "").toUpperCase() === supplierCode ||
       (s["Tên Nhà Cung Cấp"] || "").toUpperCase().includes(supplierCode)
@@ -115,24 +145,17 @@ export function DualPODocumentModal({
 
     if (found) {
       return {
-        name: found["Tên Nhà Cung Cấp"] || "CÔNG TY CỔ PHẦN BAO BÌ THUẬN HOÀ PHÁT",
-        address: found["Địa chỉ"] || "Xã Chỉ Đạo, Huyện Văn Lâm, Tỉnh Hưng Yên",
-        email: found["Email"] || "kinhdoanh@thuanhoaphat.com.vn",
-        phone: found["Điện thoại"] || "0989 646 663"
-      };
-    }
-
-    if (supplierCode === "THP") {
-      return {
-        name: "CÔNG TY CỔ PHẦN BAO BÌ THUẬN HOÀ PHÁT",
-        address: "Xã Chỉ Đạo, Huyện Văn Lâm, Tỉnh Hưng Yên",
-        email: "kinhdoanh@thuanhoaphat.com.vn",
-        phone: "0989 646 663"
+        name: found["Tên Nhà Cung Cấp"] || `CÔNG TY CỔ PHẦN BAO BÌ ${supplierCode}`,
+        shortName: supplierCode,
+        address: found["Địa chỉ"] || "Khu Công nghiệp Phố Nối A, Tỉnh Hưng Yên",
+        email: found["Email"] || `sales@${supplierCode.toLowerCase()}.vn`,
+        phone: found["Điện thoại"] || "024 3822 9988"
       };
     }
 
     return {
       name: `CÔNG TY CỔ PHẦN BAO BÌ ${supplierCode}`,
+      shortName: supplierCode,
       address: "Khu Công nghiệp Phố Nối A, Tỉnh Hưng Yên",
       email: `sales@${supplierCode.toLowerCase()}.vn`,
       phone: "024 3822 9988"
@@ -161,7 +184,10 @@ export function DualPODocumentModal({
       const qty = parseNumber(line["Số lượng"] ?? line.quantity ?? line.qty ?? 1);
       const amount = sellPrice * qty;
 
-      const rawSpecs = line.specs || line["Quy cách"] || "Thùng carton sóng theo tiêu chuẩn kỹ thuật đã duyệt.";
+      const prodName = line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm";
+      const prodCode = line.code || line["Mã sản phẩm"] || line.masterProductCode || "-";
+      const prodUnit = line["ĐVT"] || line.unit || "Cái";
+      const rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || getDefaultSpecs(prodName, prodCode, prodUnit);
       
       // Multi-batch delivery date parser
       let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
@@ -185,9 +211,9 @@ export function DualPODocumentModal({
 
       return {
         stt: idx + 1,
-        code: line.code || line["Mã sản phẩm"] || line.masterProductCode || "-",
-        name: line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm",
-        unit: line["ĐVT"] || line.unit || "Cái",
+        code: prodCode,
+        name: prodName,
+        unit: prodUnit,
         specs: rawSpecs,
         deliveryDate: deliverySchedule,
         deliveryBatches,
@@ -206,7 +232,10 @@ export function DualPODocumentModal({
       const qty = parseNumber(line["Số lượng"] ?? line.quantity ?? line.qty ?? 1);
       const amount = buyPrice * qty;
 
-      const rawSpecs = line.specs || line["Quy cách"] || "Thùng carton sóng theo tiêu chuẩn kỹ thuật đã duyệt.";
+      const prodName = line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm";
+      const prodCode = line.code || line["Mã sản phẩm"] || line.masterProductCode || "-";
+      const prodUnit = line["ĐVT"] || line.unit || "Cái";
+      const rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || getDefaultSpecs(prodName, prodCode, prodUnit);
 
       let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
       let deliveryBatches: { batch: number; date: string; qty: number }[] = [];
@@ -229,9 +258,9 @@ export function DualPODocumentModal({
 
       return {
         stt: idx + 1,
-        code: line.code || line["Mã sản phẩm"] || line.masterProductCode || "-",
-        name: line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm",
-        unit: line["ĐVT"] || line.unit || "Cái",
+        code: prodCode,
+        name: prodName,
+        unit: prodUnit,
         specs: rawSpecs,
         deliveryDate: deliverySchedule,
         deliveryBatches,

@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 import { DualPODocumentModal } from "./DualPODocumentModal";
-import { findPriceRecord, parseNumber } from "../lib/business-logic";
+import { findPriceRecord, parseNumber, getSupplierShortCode, getDefaultSpecs } from "../lib/business-logic";
 import { exportGenericTableToPDF, formatVND } from "../lib/pdf-exporter";
 import { processDocumentOCR } from "../lib/gemini";
 
@@ -521,10 +521,15 @@ export default function WorkflowView({
       const prodName = priceRecord ? priceRecord['Tên sản phẩm'] : (line.masterProductName || line.name);
       const qty = parseNumber(line["Số lượng"] || line.quantity || 1);
 
+      const specs = line.specs || priceRecord?.['Quy cách'] || priceRecord?.['Quy cách kỹ thuật'] || getDefaultSpecs(prodName, prodCode, line["ĐVT"] || "Cái");
+
       return {
         ...line,
         code: prodCode,
         name: prodName,
+        specs: specs,
+        "Quy cách": specs,
+        "Quy cách kỹ thuật": specs,
         effectivePrice: masterSell,
         buyPrice: masterBuy,
         "Mã sản phẩm": prodCode,
@@ -563,11 +568,14 @@ export default function WorkflowView({
     const pCode = priceRec["Mã giá bán"] || priceRec["Mã giá"] || "Gsp_082";
     const supplier = priceRec["RP_Nhà cung cấp"] || priceRec["Nhà cung cấp"] || "Tâm Sen";
 
+    const rawSpecs = priceRec["Quy cách"] || priceRec["Quy cách kỹ thuật"] || priceRec["Thông số kỹ thuật"] || getDefaultSpecs(prodName, prodCode, prodUnit);
+
     const newLine = {
       id: `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       code: prodCode,
       name: prodName,
       unit: prodUnit,
+      specs: rawSpecs,
       quantity: qty,
       poPrice: sellPrice,
       effectivePrice: sellPrice,
@@ -581,6 +589,8 @@ export default function WorkflowView({
       "Mã sản phẩm": prodCode,
       "Tên sản phẩm": prodName,
       "ĐVT": prodUnit,
+      "Quy cách": rawSpecs,
+      "Quy cách kỹ thuật": rawSpecs,
       "Số lượng": qty,
       "Đơn giá bán": sellPrice,
       "Đơn giá nhập": buyPrice,
@@ -1687,6 +1697,25 @@ export default function WorkflowView({
                                   <span className="text-slate-400">•</span>
                                   <span>ĐVT: <strong className="text-slate-700">{unit}</strong></span>
                                 </div>
+                                <div className="mt-1.5">
+                                  <input
+                                    type="text"
+                                    value={line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}
+                                    onChange={(e) => {
+                                      const updated = [...poLines];
+                                      updated[idx] = {
+                                        ...updated[idx],
+                                        specs: e.target.value,
+                                        "Quy cách": e.target.value,
+                                        "Quy cách kỹ thuật": e.target.value
+                                      };
+                                      setPoLines(updated);
+                                    }}
+                                    placeholder="Quy cách kỹ thuật (in, sóng, chất liệu...)"
+                                    className="w-full text-[10px] text-slate-600 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-400 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                                    title="Chỉnh sửa quy cách kỹ thuật cho mặt hàng này"
+                                  />
+                                </div>
                               </td>
                               <td className="px-3 py-3 border-r border-slate-100">
                                 <div className="font-bold text-blue-700 font-mono text-xs">{contractNo}</div>
@@ -2219,6 +2248,9 @@ export default function WorkflowView({
                                           <span className="text-slate-400">•</span>
                                           <span>ĐVT: <strong className="text-slate-700">{unit}</strong></span>
                                         </div>
+                                        <p className="text-[10px] text-slate-500 mt-1 italic line-clamp-1" title={line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}>
+                                          ⚙️ {line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}
+                                        </p>
                                       </td>
                                       <td className="px-3 py-3 border-r border-slate-100">
                                         <div className="font-bold text-blue-700 font-mono text-xs">{contractNo}</div>

@@ -9,7 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
 import { toast } from 'react-hot-toast';
-import { formatVND, parseNumber } from '../lib/business-logic';
+import { formatVND, parseNumber, getDefaultSpecs } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import MacTrafficLights from './MacTrafficLights';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
@@ -142,6 +142,8 @@ export default function ProductsView({
       const driveFolder = getDriveFolderPath(latestPO?.['Ngày đặt'] || '2026-01-15', '05_SPECS');
       const shortFileName = formatShortFileName('SPEC', code || 'SP', relatedCustomers[0] || 'TSG', 'pdf');
 
+      const specsDescription = p['Quy cách'] || p['Quy cách kỹ thuật'] || p['Thông số kỹ thuật'] || primarySpec?.['Thông số chi tiết'] || primarySpec?.['Quy cách'] || getDefaultSpecs(name, code, p['Đơn Vị Tính'] || p['ĐVT'] || 'Cái');
+
       return {
         raw: p,
         code,
@@ -149,6 +151,7 @@ export default function ProductsView({
         category: p['Nhóm hàng'] || p['Phân loại'] || 'Chung',
         unit: p['Đơn Vị Tính'] || p['ĐVT'] || 'Cái',
         status: p['Tình trạng'] || 'Đang kinh doanh',
+        specsDescription,
         matchedPricings,
         primaryPricing,
         buyPrice,
@@ -449,9 +452,9 @@ export default function ProductsView({
                   <th className="py-3 px-3 w-[13%]">Nhà Cung Cấp</th>
                   <th className="py-3 px-3 w-[14%] text-right">Đơn Giá & Biên LN</th>
                   <th className="py-3 px-3 w-[12%]">Đơn Gần Nhất</th>
-                  <th className="py-3 px-3 w-[10%]">Specs</th>
+                  <th className="py-3 px-3 w-[15%]">Quy Cách Kỹ Thuật (Specs)</th>
                   <th className="py-3 px-3 w-[10%]">Hợp Đồng</th>
-                  <th className="py-3 px-4 text-center w-[10%]">Thao Tác</th>
+                  <th className="py-3 px-4 text-center w-[8%]">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -567,15 +570,18 @@ export default function ProductsView({
                         )}
                       </td>
 
-                      {/* Technical Specs */}
-                      <td className="py-2.5 px-3">
-                        {p.primarySpec ? (
-                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-[11px] rounded border border-blue-200 inline-block truncate max-w-[90px]">
-                            {p.primarySpec['Mã Spec']}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
+                      {/* Technical Specs & Quy Cách */}
+                      <td className="py-2.5 px-3 max-w-[200px]">
+                        <div className="flex flex-col gap-0.5">
+                          {p.primarySpec ? (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-[10px] rounded border border-blue-200 inline-block w-fit">
+                              {p.primarySpec['Mã Spec']}
+                            </span>
+                          ) : null}
+                          <p className="text-[11px] text-slate-600 truncate line-clamp-1" title={p.specsDescription}>
+                            {p.specsDescription}
+                          </p>
+                        </div>
                       </td>
 
                       {/* Contracts & Drive Link */}
@@ -878,6 +884,17 @@ export default function ProductsView({
                   </div>
                 </div>
 
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">Quy cách kỹ thuật (Specs):</label>
+                  <textarea
+                    rows={2}
+                    value={editFormData['Quy cách'] || editFormData['Quy cách kỹ thuật'] || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, 'Quy cách': e.target.value, 'Quy cách kỹ thuật': e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900 text-xs"
+                    placeholder="VD: Nhãn in Offset nhiều màu, cán bóng, bế định hình theo TCKT đã duyệt..."
+                  />
+                </div>
+
                 <div className="pt-4 border-t border-slate-100 flex gap-3">
                   <button
                     type="submit"
@@ -1022,6 +1039,17 @@ export default function ProductsView({
                       <option value="Tạm dừng">Tạm dừng</option>
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">Quy cách kỹ thuật (Specs):</label>
+                  <textarea
+                    rows={2}
+                    value={editFormData['Quy cách'] || editFormData['Quy cách kỹ thuật'] || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, 'Quy cách': e.target.value, 'Quy cách kỹ thuật': e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900 text-xs"
+                    placeholder="VD: Thùng carton 5 lớp sóng AB dập ghim / Nhãn in Offset cán bóng..."
+                  />
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex gap-3">
