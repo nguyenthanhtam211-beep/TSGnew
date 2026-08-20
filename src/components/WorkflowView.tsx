@@ -1302,7 +1302,7 @@ export default function WorkflowView({
 
       {/* Progress Tracker Bar */}
       <div className="bg-white/60 backdrop-blur-md border-b border-black/[0.06] p-4 overflow-x-auto">
-        <div className="flex items-center justify-between min-w-[850px] max-w-6xl mx-auto px-4 gap-2">
+        <div className="flex items-center justify-between min-w-[850px] max-w-[1720px] mx-auto px-4 gap-2">
           {[
             { step: 1, label: "1. Báo giá & Đơn hàng kép", icon: <ShoppingCart size={16} /> },
             { step: 2, label: "2. Phê duyệt & Khóa đơn", icon: <ShieldCheck size={16} /> },
@@ -1350,8 +1350,8 @@ export default function WorkflowView({
       </div>
 
       {/* Active Wizard Content Panel */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-[1720px] mx-auto space-y-6">
 
           {/* ================================================== */}
           {/* STEP 1: BÁO GIÁ & TIẾP NHẬN ĐƠN HÀNG KÉP (DUAL PO INTAKE) */}
@@ -1971,25 +1971,25 @@ export default function WorkflowView({
 
               {/* Master - Detail Workspace */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Column: PO Headers List with Smart Tabs & Search (4 cols) */}
-                <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh Sách Đơn Hàng Cần Duyệt & Sản Xuất</h4>
+                {/* Left Column: PO Headers List with Smart Tabs & Search (3 cols) */}
+                <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3 flex flex-col">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Đơn Hàng Cần Duyệt</h4>
                     <button
                       onClick={() => setActiveStep(1)}
                       className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 hover:underline"
                     >
                       <Plus size={13} />
-                      Tạo thêm đơn
+                      Tạo thêm
                     </button>
                   </div>
 
                   {/* Filter Tabs */}
-                  <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold gap-1">
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold gap-1">
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("pending")}
-                      className={`flex-1 py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-bold ${
                         approvalFilter === "pending"
                           ? "bg-white text-amber-700 shadow-xs border border-amber-200"
                           : "text-slate-600 hover:text-slate-900"
@@ -2000,7 +2000,7 @@ export default function WorkflowView({
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("approved")}
-                      className={`flex-1 py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-bold ${
                         approvalFilter === "approved"
                           ? "bg-white text-emerald-700 shadow-xs border border-emerald-200"
                           : "text-slate-600 hover:text-slate-900"
@@ -2011,7 +2011,7 @@ export default function WorkflowView({
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("all")}
-                      className={`py-1.5 px-2 rounded-md transition text-center text-[11px] font-bold ${
+                      className={`py-1.5 px-2 rounded-lg transition text-center text-[11px] font-bold ${
                         approvalFilter === "all"
                           ? "bg-white text-blue-700 shadow-xs border border-blue-200"
                           : "text-slate-600 hover:text-slate-900"
@@ -2026,15 +2026,15 @@ export default function WorkflowView({
                     <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Tìm theo số PO, khách hàng..."
+                      placeholder="Tìm số PO, khách hàng..."
                       value={approvalSearch}
                       onChange={(e) => setApprovalSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
 
                   {/* PO Cards List */}
-                  <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                  <div className="space-y-2.5 max-h-[620px] overflow-y-auto pr-1 flex-1">
                     {filteredPoHeadersForApproval.length === 0 ? (
                       <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-200 p-4">
                         Không có đơn hàng nào phù hợp với bộ lọc!
@@ -2066,12 +2066,12 @@ export default function WorkflowView({
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : "bg-amber-500 text-white border-amber-600 shadow-xs animate-pulse"
                               }`}>
-                                {isApproved ? "✅ Đã phê duyệt" : "⚡ Chờ BOD duyệt"}
+                                {isApproved ? "✅ Đã duyệt" : "⚡ Chờ duyệt"}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-800 truncate max-w-[150px]">{header["Khách hàng"]}</span>
+                              <span className="font-semibold text-slate-800 truncate max-w-[140px]">{header["Khách hàng"]}</span>
                               <span className="text-[11px] text-slate-400">{header["Ngày đặt hàng"]}</span>
                             </div>
 
@@ -2086,8 +2086,8 @@ export default function WorkflowView({
                   </div>
                 </div>
 
-                {/* Right Column: Executive Inspection Dashboard & PO Detail (8 cols) */}
-                <div className="lg:col-span-8 space-y-5">
+                {/* Right Column: Executive Inspection Dashboard & PO Detail (9 cols) */}
+                <div className="lg:col-span-9 space-y-6">
                   {currentPoForApproval ? (
                     <>
                       {/* Margin Guard AI Audit & Financial Summary */}
@@ -2107,27 +2107,28 @@ export default function WorkflowView({
                         const isApproved = currentPoForApproval["Trạng Thái"]?.includes("Đã phê duyệt") || currentPoForApproval["Trạng Thái"]?.includes("Đang sản xuất");
 
                         return (
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                            {/* Header Row */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                               <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hồ sơ kiểm toán & thẩm định đơn hàng</span>
-                                <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2 mt-0.5">
-                                  <span className="font-mono text-blue-900">{currentPoForApproval["Đơn hàng"]}</span>
+                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hồ sơ kiểm toán & thẩm định đơn hàng</span>
+                                <h4 className="text-lg font-black text-slate-900 flex items-center gap-3 mt-1">
+                                  <span className="font-mono text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200/80">{currentPoForApproval["Đơn hàng"]}</span>
                                   <span className="text-slate-300 font-normal">|</span>
-                                  <span className="text-blue-700">{currentPoForApproval["Khách hàng"]}</span>
+                                  <span className="text-slate-800">{currentPoForApproval["Khách hàng"]}</span>
                                 </h4>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className={`px-3.5 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
                                   isSafe
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}>
-                                  {isSafe ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+                                  {isSafe ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
                                   {isSafe ? "Biên Độ An Toàn Cao (Pass)" : "Cảnh Báo Lãi Thấp"}
                                 </span>
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                                <span className={`px-3.5 py-1.5 rounded-full text-xs font-bold border ${
                                   isApproved
                                     ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
                                     : "bg-amber-100 text-amber-800 border-amber-300"
@@ -2137,88 +2138,96 @@ export default function WorkflowView({
                               </div>
                             </div>
 
-                            {/* 4 Financial KPIs */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                              <div className="bg-blue-50/50 p-3.5 rounded-xl border border-blue-100">
-                                <span className="text-[10px] text-blue-700 font-bold block">1. Doanh thu bán (SO)</span>
-                                <span className="text-sm font-extrabold text-blue-900 mt-1 block">{formatCurrency(totalRev)}</span>
+                            {/* 4 Financial KPIs Cards - Spacious & Elegant */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                              <div className="bg-blue-50/70 p-4 rounded-2xl border border-blue-100 hover:border-blue-200 transition">
+                                <span className="text-[11px] text-blue-700 font-bold uppercase tracking-wider block">1. Doanh thu bán (SO)</span>
+                                <span className="text-lg sm:text-xl font-black text-blue-900 mt-1.5 block font-mono">{formatCurrency(totalRev)}</span>
                               </div>
-                              <div className="bg-purple-50/50 p-3.5 rounded-xl border border-purple-100">
-                                <span className="text-[10px] text-purple-700 font-bold block">2. Giá vốn xưởng (PO)</span>
-                                <span className="text-sm font-extrabold text-purple-900 mt-1 block">{formatCurrency(totalCost)}</span>
+                              <div className="bg-purple-50/70 p-4 rounded-2xl border border-purple-100 hover:border-purple-200 transition">
+                                <span className="text-[11px] text-purple-700 font-bold uppercase tracking-wider block">2. Giá vốn xưởng (PO)</span>
+                                <span className="text-lg sm:text-xl font-black text-purple-900 mt-1.5 block font-mono">{formatCurrency(totalCost)}</span>
                               </div>
-                              <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-100">
-                                <span className="text-[10px] text-emerald-700 font-bold block">3. Lợi nhuận gộp</span>
-                                <span className="text-sm font-extrabold text-emerald-700 mt-1 block">{formatCurrency(profit)}</span>
+                              <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-100 hover:border-emerald-200 transition">
+                                <span className="text-[11px] text-emerald-700 font-bold uppercase tracking-wider block">3. Lợi nhuận gộp</span>
+                                <span className="text-lg sm:text-xl font-black text-emerald-700 mt-1.5 block font-mono">{formatCurrency(profit)}</span>
                               </div>
-                              <div className={`p-3.5 rounded-xl border ${isSafe ? "bg-emerald-50/80 border-emerald-200" : "bg-amber-50/80 border-amber-200"}`}>
-                                <span className={`text-[10px] font-bold block ${isSafe ? "text-emerald-800" : "text-amber-800"}`}>4. Tỷ suất Margin</span>
-                                <span className={`text-base font-extrabold mt-0.5 block ${isSafe ? "text-emerald-700" : "text-amber-700"}`}>
+                              <div className={`p-4 rounded-2xl border transition ${isSafe ? "bg-emerald-50/80 border-emerald-200" : "bg-amber-50/80 border-amber-200"}`}>
+                                <span className={`text-[11px] font-bold uppercase tracking-wider block ${isSafe ? "text-emerald-800" : "text-amber-800"}`}>4. Tỷ suất Margin</span>
+                                <span className={`text-xl sm:text-2xl font-black mt-1.5 block font-mono ${isSafe ? "text-emerald-700" : "text-amber-700"}`}>
                                   {margin.toFixed(1)}%
                                 </span>
                               </div>
                             </div>
 
-                            {/* AI Margin Guard Note */}
-                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex items-start gap-2.5 text-xs">
-                              <Sparkles size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                              <div className="text-slate-600">
-                                <strong className="text-slate-800 font-semibold">Đánh giá kiểm toán tự động: </strong>
-                                {isSafe
-                                  ? `Đơn hàng đạt biên lợi nhuận tốt (${margin.toFixed(1)}% ≥ 20%), các điều khoản giá bán theo Bảng giá 2026 và hợp đồng gốc đều hợp lệ. Khuyến nghị ký duyệt phát lệnh sản xuất cho xưởng.`
-                                  : `Đơn hàng có tỷ suất lợi nhuận gộp (${margin.toFixed(1)}% < 20%). Ban điều hành cần lưu ý kiểm tra lại bảng giá mua từ nhà cung cấp trước khi khóa đơn.`
-                                }
+                            {/* Margin Guard AI Notice */}
+                            <div className={`p-4 rounded-xl border flex items-start gap-3 text-xs ${
+                              isSafe
+                                ? "bg-emerald-50/50 border-emerald-200 text-emerald-800"
+                                : "bg-amber-50/50 border-amber-200 text-amber-800"
+                            }`}>
+                              <span className="text-base leading-none mt-0.5">✨</span>
+                              <div className="leading-relaxed">
+                                <strong>Đánh giá kiểm toán tự động: </strong>
+                                {isSafe ? (
+                                  <span>Đơn hàng đạt biên lợi nhuận kỳ vọng ({margin.toFixed(1)}% ≥ 20%). Giá bán SO và giá mua PO phù hợp với khung hợp đồng gốc. Đủ điều kiện phát lệnh sản xuất cho xưởng.</span>
+                                ) : (
+                                  <span>Đơn hàng có tỷ suất lợi nhuận gộp ({margin.toFixed(1)}% &lt; 20%). Ban điều hành cần lưu ý kiểm tra lại bảng giá mua từ nhà cung cấp trước khi khóa đơn.</span>
+                                )}
                               </div>
                             </div>
                           </div>
                         );
                       })()}
 
-                      {/* Items Table in PO */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
+                      {/* Detail Products Table Box */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wider">
                             Chi Tiết Sản Phẩm & Định Mức Giá ({currentPoLinesForApproval.length} mặt hàng)
                           </h4>
-                          <span className="text-xs text-slate-500">
-                            Khách hàng: <strong className="text-blue-700">{currentPoForApproval["Khách hàng"]}</strong>
+                          <span className="text-xs text-slate-500 font-medium">
+                            Khách hàng: <strong className="text-blue-700 font-bold">{currentPoForApproval["Khách hàng"]}</strong>
                           </span>
                         </div>
 
-                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                          <table className="w-full text-left border-collapse text-xs">
+                        {/* Grouped Multi-Level Header Table - Full Width & Spacious */}
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+                          <table className="w-full text-left text-xs border-collapse">
                             <thead>
                               {/* Tier 1 Header: Functional Groups */}
-                              <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] uppercase font-extrabold text-slate-700">
-                                <th className="px-3 py-2 text-center border-r border-slate-200 w-10" rowSpan={2}>#</th>
-                                <th className="px-3 py-2 border-r border-slate-200" colSpan={2}>Thông Tin Mặt Hàng & Hợp Đồng</th>
-                                <th className="px-3 py-2 text-center border-r border-slate-200 w-28" rowSpan={2}>Số Lượng</th>
-                                <th className="px-3 py-2 text-center bg-blue-100/70 text-blue-900 border-r border-blue-200" colSpan={2}>
-                                  🛒 Đơn Bán Khách Hàng (SO)
+                              <tr className="bg-slate-100 text-[11px] font-extrabold text-slate-700 border-b border-slate-200">
+                                <th className="px-3.5 py-2.5 text-center w-12 border-r border-slate-200" rowSpan={2}>#</th>
+                                <th className="px-4 py-2.5 border-r border-slate-200" colSpan={3}>
+                                  📦 THÔNG TIN MẶT HÀNG & HỢP ĐỒNG
                                 </th>
-                                <th className="px-3 py-2 text-center bg-purple-100/70 text-purple-900 border-r border-purple-200" colSpan={2}>
-                                  🏭 Đơn Mua Xưởng Sản Xuất (PO)
+                                <th className="px-4 py-2.5 text-center bg-blue-100/70 text-blue-900 border-r border-blue-200 font-black" colSpan={2}>
+                                  🛒 ĐƠN BÁN KHÁCH HÀNG (SO)
                                 </th>
-                                <th className="px-3 py-2 text-center bg-emerald-100/70 text-emerald-900" colSpan={2}>
-                                  📈 Hiệu Quả Tài Chính
+                                <th className="px-4 py-2.5 text-center bg-purple-100/70 text-purple-900 border-r border-purple-200 font-black" colSpan={2}>
+                                  🏭 ĐƠN MUA XƯỞNG SẢN XUẤT (PO)
+                                </th>
+                                <th className="px-4 py-2.5 text-center bg-emerald-100/70 text-emerald-900 font-black" colSpan={2}>
+                                  📈 HIỆU QUẢ TÀI CHÍNH
                                 </th>
                               </tr>
                               {/* Tier 2 Header: Detail Columns */}
                               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500">
-                                <th className="px-3 py-2 border-r border-slate-200">Tên Mặt Hàng & Quy Cách</th>
-                                <th className="px-3 py-2 border-r border-slate-200 w-32">HĐ Gốc / Mã Giá</th>
-                                <th className="px-3 py-2 text-right bg-blue-50/60 text-blue-800 border-r border-slate-200">Đơn Giá Bán</th>
-                                <th className="px-3 py-2 text-right bg-blue-50/60 text-blue-900 font-extrabold border-r border-blue-200">Doanh Thu (SO)</th>
-                                <th className="px-3 py-2 text-right bg-purple-50/60 text-purple-800 border-r border-slate-200">Xưởng / Giá Mua</th>
-                                <th className="px-3 py-2 text-right bg-purple-50/60 text-purple-900 font-extrabold border-r border-purple-200">Giá Vốn (PO)</th>
-                                <th className="px-3 py-2 text-right bg-emerald-50/60 text-emerald-900 font-extrabold border-r border-slate-200">Lãi Gộp</th>
-                                <th className="px-2 py-2 text-center bg-emerald-50/60 text-emerald-800 w-20">Biên LN (%)</th>
+                                <th className="px-4 py-2.5 border-r border-slate-200">Tên Mặt Hàng & Quy Cách</th>
+                                <th className="px-3.5 py-2.5 border-r border-slate-200 w-28">HĐ Gốc / Mã Giá</th>
+                                <th className="px-3.5 py-2.5 text-center border-r border-slate-200 w-28">Số Lượng Đặt</th>
+                                <th className="px-3.5 py-2.5 text-right bg-blue-50/60 text-blue-800 border-r border-slate-200 w-28">Đơn Giá Bán</th>
+                                <th className="px-4 py-2.5 text-right bg-blue-50/60 text-blue-900 font-black border-r border-blue-200 w-36">Doanh Thu (SO)</th>
+                                <th className="px-3.5 py-2.5 text-right bg-purple-50/60 text-purple-800 border-r border-slate-200 w-32">NCC / Giá Mua</th>
+                                <th className="px-4 py-2.5 text-right bg-purple-50/60 text-purple-900 font-black border-r border-purple-200 w-36">Giá Vốn (PO)</th>
+                                <th className="px-4 py-2.5 text-right bg-emerald-50/60 text-emerald-900 font-black border-r border-slate-200 w-36">Lãi Gộp</th>
+                                <th className="px-3 py-2.5 text-center bg-emerald-50/60 text-emerald-800 w-24">Biên LN (%)</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
                               {currentPoLinesForApproval.length === 0 ? (
                                 <tr>
-                                  <td colSpan={10} className="text-center py-8 text-slate-400 italic">
+                                  <td colSpan={10} className="text-center py-10 text-slate-400 italic">
                                     Không có dữ liệu dòng sản phẩm của đơn hàng này!
                                   </td>
                                 </tr>
@@ -2240,45 +2249,43 @@ export default function WorkflowView({
 
                                   return (
                                     <tr key={lIdx} className="hover:bg-slate-50/90 transition-colors">
-                                      <td className="px-3 py-3 text-center font-mono text-slate-400 font-bold border-r border-slate-100">{lIdx + 1}</td>
-                                      <td className="px-3 py-3 border-r border-slate-100">
+                                      <td className="px-3.5 py-3.5 text-center font-mono text-slate-400 font-bold border-r border-slate-100">{lIdx + 1}</td>
+                                      <td className="px-4 py-3.5 border-r border-slate-100">
                                         <div className="font-bold text-slate-900 text-xs">{prodName}</div>
                                         <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 mt-1">
                                           <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold">{prodCode}</span>
                                           <span className="text-slate-400">•</span>
                                           <span>ĐVT: <strong className="text-slate-700">{unit}</strong></span>
                                         </div>
-                                        <p className="text-[10px] text-slate-500 mt-1 italic line-clamp-1" title={line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}>
+                                        <p className="text-[10.5px] text-slate-500 mt-1 italic line-clamp-1" title={line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}>
                                           ⚙️ {line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit)}
                                         </p>
                                       </td>
-                                      <td className="px-3 py-3 border-r border-slate-100">
+                                      <td className="px-3.5 py-3.5 border-r border-slate-100">
                                         <div className="font-bold text-blue-700 font-mono text-xs">{contractNo}</div>
                                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">{priceCode}</div>
                                       </td>
-                                      <td className="px-3 py-3 text-center font-bold text-slate-900 font-mono border-r border-slate-100 bg-slate-50/30">
+                                      <td className="px-3.5 py-3.5 text-center font-bold text-slate-900 font-mono border-r border-slate-100 bg-slate-50/30">
                                         {qty.toLocaleString("vi-VN")} <span className="text-[11px] text-slate-500 font-normal">{unit}</span>
                                       </td>
-                                      <td className="px-3 py-3 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
+                                      <td className="px-3.5 py-3.5 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
                                         {formatCurrency(sell)}
                                       </td>
-                                      <td className="px-3 py-3 text-right bg-blue-50/30 font-mono font-extrabold text-blue-900 border-r border-blue-100 text-xs">
+                                      <td className="px-4 py-3.5 text-right font-mono font-extrabold text-blue-900 bg-blue-50/40 border-r border-blue-100">
                                         {formatCurrency(lineRev)}
                                       </td>
-                                      <td className="px-3 py-3 text-right border-r border-slate-100">
-                                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 mb-0.5">
-                                          {supplier}
-                                        </span>
-                                        <div className="font-mono text-[11px] text-slate-600 font-semibold">{formatCurrency(buy)}</div>
+                                      <td className="px-3.5 py-3.5 text-right border-r border-slate-100">
+                                        <div className="text-[11px] text-purple-700 font-bold truncate">{getSupplierShortCode(supplier)}</div>
+                                        <div className="font-mono text-slate-500 text-[11px] mt-0.5">{formatCurrency(buy)}</div>
                                       </td>
-                                      <td className="px-3 py-3 text-right bg-purple-50/30 font-mono font-bold text-purple-900 border-r border-purple-100 text-xs">
+                                      <td className="px-4 py-3.5 text-right font-mono font-bold text-purple-900 bg-purple-50/40 border-r border-purple-100">
                                         {formatCurrency(lineCost)}
                                       </td>
-                                      <td className="px-3 py-3 text-right bg-emerald-50/30 font-mono font-extrabold text-emerald-700 border-r border-slate-100 text-xs">
+                                      <td className="px-4 py-3.5 text-right font-mono font-black text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
                                         {formatCurrency(prof)}
                                       </td>
-                                      <td className="px-2 py-3 text-center">
-                                        <span className={`px-2 py-1 rounded-full text-[10px] font-extrabold inline-flex items-center gap-0.5 ${
+                                      <td className="px-3 py-3.5 text-center">
+                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold inline-flex items-center gap-0.5 ${
                                           lineMargin >= 20 ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-amber-100 text-amber-800 border border-amber-300"
                                         }`}>
                                           {lineMargin.toFixed(1)}%
@@ -2308,18 +2315,18 @@ export default function WorkflowView({
                               return (
                                 <tfoot>
                                   <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300 text-slate-800 text-xs">
-                                    <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider text-[11px] text-slate-600 border-r border-slate-200">
+                                    <td colSpan={3} className="px-4 py-3.5 text-right uppercase tracking-wider text-[11px] text-slate-600 border-r border-slate-200">
                                       Tổng Cộng ({currentPoLinesForApproval.length} mặt hàng):
                                     </td>
-                                    <td className="px-3 py-3 text-center font-mono font-extrabold text-slate-900 border-r border-slate-200">
+                                    <td className="px-3.5 py-3.5 text-center font-mono font-black text-slate-900 border-r border-slate-200">
                                       {totalQty.toLocaleString("vi-VN")}
                                     </td>
-                                    <td className="px-3 py-3 border-r border-slate-200"></td>
-                                    <td className="px-3 py-3 text-right font-mono font-black text-blue-900 bg-blue-100/50 border-r border-blue-200 text-sm">
+                                    <td className="px-3.5 py-3.5 border-r border-slate-200"></td>
+                                    <td className="px-4 py-3.5 text-right font-mono font-black text-blue-900 bg-blue-100/50 border-r border-blue-200 text-sm">
                                       {formatCurrency(totalRev)}
                                     </td>
-                                    <td className="px-3 py-3 border-r border-slate-200"></td>
-                                    <td className="px-3 py-3 text-right font-mono font-bold text-purple-900 bg-purple-100/50 border-r border-purple-200">
+                                    <td className="px-3.5 py-3.5 border-r border-slate-200"></td>
+                                    <td className="px-4 py-3.5 text-right font-mono font-bold text-purple-900 bg-purple-100/50 border-r border-purple-200">
                                       {formatCurrency(totalCost)}
                                     </td>
                                     <td className="px-3 py-3 text-right font-mono font-black text-emerald-800 bg-emerald-100/50 border-r border-slate-200 text-sm">
@@ -2340,17 +2347,17 @@ export default function WorkflowView({
                         </div>
 
                         {/* Executive Action Buttons */}
-                        <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+                        <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100">
                           <button
                             type="button"
                             onClick={() => setShowDualPOModal(true)}
-                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
                           >
-                            <Layers size={16} />
-                            📄 Xem & In Cặp Văn Bản Dual PO
+                            <Layers size={18} />
+                            <span>📄 Xem & In Cặp Văn Bản PO (Khách & NCC)</span>
                           </button>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-3">
                             <button
                               type="button"
                               onClick={() => {
@@ -2360,7 +2367,7 @@ export default function WorkflowView({
                                 setPoLines(currentPoLinesForApproval);
                                 setActiveStep(1);
                               }}
-                              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition"
+                              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-5 py-3 rounded-xl text-xs sm:text-sm transition"
                             >
                               ✏️ Sửa Đơn Ở Bước 1
                             </button>
@@ -2368,9 +2375,9 @@ export default function WorkflowView({
                             <button
                               type="button"
                               onClick={() => handleApprovePOFromStep2(currentPoForApproval)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-sm shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-md shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
                             >
-                              <CheckCircle size={16} />
+                              <CheckCircle size={18} />
                               <span>Phê Duyệt & Khóa Đơn Sản Xuất ➔</span>
                             </button>
                           </div>
