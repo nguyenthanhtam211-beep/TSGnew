@@ -417,13 +417,16 @@ export async function pushMasterDataToDrive(token: string, data: DriveSyncPayloa
   return { spreadsheetId: targetId, url };
 }
 
+import dbEngine from './dbEngine';
+
 /**
- * 2. PULL (Google Drive ➔ ERP): Đọc trực tiếp từ Google Sheets trên Drive và cập nhật Firestore
+ * 2. PULL (Google Drive ➔ ERP): Đọc trực tiếp từ Google Sheets trên Drive và cập nhật Hệ Thống
  */
 export async function pullMasterDataFromDrive(token: string, spreadsheetId?: string): Promise<{
   contactsCount: number;
   customersCount: number;
   suppliersCount: number;
+  productsCount: number;
 }> {
   const id = spreadsheetId || getStoredSpreadsheetId();
   if (!id) {
@@ -467,16 +470,17 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
     return null;
   };
 
-  const contactsTab = findTabName([/danh.*ba.*nhan.*su/i, /danh.*ba/i, /nhan.*su/i, /contact/i]) || availableSheets[1] || 'Danh_Ba_Nhan_Su';
-  const customersTab = findTabName([/khach.*hang/i, /customer/i]) || availableSheets[2] || 'Khach_Hang';
-  const suppliersTab = findTabName([/nha.*cung.*cap/i, /supplier/i, /ncc/i]) || availableSheets[3] || 'Nha_Cung_Cap';
+  const contactsTab = findTabName([/danh.*ba.*nhan.*su/i, /danh.*ba/i, /nhan.*su/i, /contact/i]);
+  const customersTab = findTabName([/khach.*hang/i, /customer/i]);
+  const suppliersTab = findTabName([/nha.*cung.*cap/i, /supplier/i, /ncc/i]);
+  const productsTab = findTabName([/san.*pham/i, /product/i, /hang.*hoa/i]);
 
-  // Helper đọc dữ liệu một tab
+  // Helper đọc dữ liệu một tab với encode URL chuẩn Google Sheets v4 API
   const readSheetValues = async (tabName: string): Promise<any[]> => {
     if (!tabName) return [];
     try {
-      const encodedTab = encodeURIComponent(tabName);
-      const res = await callGoogleApi(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/'${encodedTab}'!A1:ZZ5000`, {
+      const rangeParam = encodeURIComponent(`${tabName}!A1:ZZ5000`);
+      const res = await callGoogleApi(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${rangeParam}`, {
         method: "GET"
       }, token);
 
@@ -512,64 +516,53 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
   let contactsCount = 0;
   let customersCount = 0;
   let suppliersCount = 0;
+  let productsCount = 0;
 
   // 1. KÉO VÀ ĐỒNG BỘ DANH BẠ (Contacts)
   if (contactsTab) {
     const rawContacts = await readSheetValues(contactsTab);
     console.log(`Đã đọc ${rawContacts.length} dòng từ tab Danh bạ (${contactsTab})`);
     
-    if (rawContacts.length > 0) {
-      let batch = writeBatch(db);
-      let count = 0;
+    for (let i = 0; i < rawContacts.length; i++) {
+      const c = rawContacts[i];
+      const name = c["Tên"] || c["Họ và tên"] || c["Name"] || c["Họ tên"] || '';
+      const company = c["Công ty"] || c["Company"] || c["Mã công ty"] || c["Khách hàng"] || c["Nhà cung cấp"] || '';
+      const phone = c["Điện thoại"] || c["Số điện thoại"] || c["Phone"] || c["SĐT"] || c["SDT"] || '';
+      const role = c["Chức vụ"] || c["Position"] || c["Vị trí"] || '';
+      const dept = c["Phòng ban"] || c["Department"] || c["Bộ phận"] || '';
+      const email = c["Email"] || c["Mail"] || '';
+      const salutation = c["Danh xưng"] || c["Title"] || 'Mr';
+      const relationship = c["Mức độ quan hệ"] || '3';
+      const inCharge = c["Phụ trách"] || '';
+      const notes = c["Ghi chú"] || c["Notes"] || c["Note"] || '';
 
-      for (let i = 0; i < rawContacts.length; i++) {
-        const c = rawContacts[i];
-        
-        // Flexible key extraction
-        const name = c["Tên"] || c["Họ và tên"] || c["Name"] || c["Họ tên"] || '';
-        const company = c["Công ty"] || c["Company"] || c["Mã công ty"] || c["Khách hàng"] || c["Nhà cung cấp"] || '';
-        const phone = c["Điện thoại"] || c["Số điện thoại"] || c["Phone"] || c["SĐT"] || c["SDT"] || '';
-        const role = c["Chức vụ"] || c["Position"] || c["Vị trí"] || '';
-        const dept = c["Phòng ban"] || c["Department"] || c["Bộ phận"] || '';
-        const email = c["Email"] || c["Mail"] || '';
-        const salutation = c["Danh xưng"] || c["Title"] || 'Mr';
-        const relationship = c["Mức độ quan hệ"] || '3';
-        const inCharge = c["Phụ trách"] || '';
-        const notes = c["Ghi chú"] || c["Notes"] || c["Note"] || '';
+      if (name || phone || company) {
+        const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
+        const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        if (name || phone || company) {
-          const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
-          const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
-          const docRef = doc(db, 'contacts', docId);
+        const payload = {
+          id: docId,
+          ID: c.ID || docId,
+          "Danh xưng": salutation,
+          "Tên": name,
+          "Chức vụ": role,
+          "Phòng ban": dept,
+          "Công ty": company,
+          "Điện thoại": phone,
+          "Email": email,
+          "Mức độ quan hệ": relationship,
+          "Phụ trách": inCharge,
+          "Ghi chú": notes,
+          updatedAt: new Date().toISOString()
+        };
 
-          const payload = {
-            id: docId,
-            ID: c.ID || docId,
-            "Danh xưng": salutation,
-            "Tên": name,
-            "Chức vụ": role,
-            "Phòng ban": dept,
-            "Công ty": company,
-            "Điện thoại": phone,
-            "Email": email,
-            "Mức độ quan hệ": relationship,
-            "Phụ trách": inCharge,
-            "Ghi chú": notes,
-            updatedAt: new Date().toISOString()
-          };
-
-          batch.set(docRef, payload, { merge: true });
-          count++;
+        try {
+          await dbEngine.save('contacts', payload);
           contactsCount++;
-
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+        } catch (e) {
+          console.warn('Error saving contact to dbEngine:', e);
         }
       }
-      if (count > 0) await batch.commit();
     }
   }
 
@@ -578,50 +571,41 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
     const rawCustomers = await readSheetValues(customersTab);
     console.log(`Đã đọc ${rawCustomers.length} dòng từ tab Khách hàng (${customersTab})`);
 
-    if (rawCustomers.length > 0) {
-      let batch = writeBatch(db);
-      let count = 0;
+    for (let i = 0; i < rawCustomers.length; i++) {
+      const cust = rawCustomers[i];
+      const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["Mã KH"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
+      const fullName = cust["Tên đầy đủ"] || cust["Tên khách hàng"] || cust["Customer Name"] || custId;
 
-      for (let i = 0; i < rawCustomers.length; i++) {
-        const cust = rawCustomers[i];
-        const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["Mã KH"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
-        const fullName = cust["Tên đầy đủ"] || cust["Tên khách hàng"] || cust["Customer Name"] || custId;
+      if (custId || fullName) {
+        const targetId = custId || `cust_${i + 1}`;
+        const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        if (custId || fullName) {
-          const targetId = custId || `cust_${i + 1}`;
-          const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-          const docRef = doc(db, 'customers', docId);
+        const payload = {
+          ...cust,
+          id: docId,
+          Customer_ID: cust["Customer_ID"] || docId,
+          "Tên đầy đủ": fullName,
+          "Loại hình": cust["Loại hình"] || 'Khách hàng',
+          "Phân loại": cust["Phân loại"] || 'Doanh nghiệp',
+          "Mã số thuế": cust["Mã số thuế"] || '',
+          "Số điện thoại": cust["Số điện thoại"] || cust["Điện thoại"] || '',
+          "Email": cust["Email"] || '',
+          "Địa chỉ": cust["Địa chỉ"] || '',
+          "Nhà máy": cust["Nhà máy"] || '',
+          "Hạn thanh toán": cust["Hạn thanh toán"] || '30 ngày',
+          "Hạn mức nợ": cust["Hạn mức nợ"] || '500,000,000 đ',
+          "Tài khoản ngân hàng": cust["Tài khoản ngân hàng"] || '',
+          "Tình trạng": cust["Tình trạng"] || 'Hoạt động',
+          updatedAt: new Date().toISOString()
+        };
 
-          const payload = {
-            id: docId,
-            Customer_ID: cust["Customer_ID"] || docId,
-            "Tên đầy đủ": fullName,
-            "Loại hình": cust["Loại hình"] || 'Khách hàng',
-            "Phân loại": cust["Phân loại"] || 'Doanh nghiệp',
-            "Mã số thuế": cust["Mã số thuế"] || '',
-            "Số điện thoại": cust["Số điện thoại"] || cust["Điện thoại"] || '',
-            "Email": cust["Email"] || '',
-            "Địa chỉ": cust["Địa chỉ"] || '',
-            "Nhà máy": cust["Nhà máy"] || '',
-            "Hạn thanh toán": cust["Hạn thanh toán"] || '30 ngày',
-            "Hạn mức nợ": cust["Hạn mức nợ"] || '500,000,000 đ',
-            "Tài khoản ngân hàng": cust["Tài khoản ngân hàng"] || '',
-            "Tình trạng": cust["Tình trạng"] || 'Hoạt động',
-            updatedAt: new Date().toISOString()
-          };
-
-          batch.set(docRef, payload, { merge: true });
-          count++;
+        try {
+          await dbEngine.save('customers', payload);
           customersCount++;
-
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+        } catch (e) {
+          console.warn('Error saving customer to dbEngine:', e);
         }
       }
-      if (count > 0) await batch.commit();
     }
   }
 
@@ -630,53 +614,62 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
     const rawSuppliers = await readSheetValues(suppliersTab);
     console.log(`Đã đọc ${rawSuppliers.length} dòng từ tab Nhà cung cấp (${suppliersTab})`);
 
-    if (rawSuppliers.length > 0) {
-      let batch = writeBatch(db);
-      let count = 0;
+    for (let i = 0; i < rawSuppliers.length; i++) {
+      const supp = rawSuppliers[i];
+      const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["Supplier_ID"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
+      const suppName = supp["Tên Nhà Cung Cấp"] || supp["Tên nhà cung cấp"] || supp["Supplier Name"] || suppId;
 
-      for (let i = 0; i < rawSuppliers.length; i++) {
-        const supp = rawSuppliers[i];
-        const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["Supplier_ID"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
-        const suppName = supp["Tên Nhà Cung Cấp"] || supp["Tên nhà cung cấp"] || supp["Supplier Name"] || suppId;
+      if (suppId || suppName) {
+        const targetId = suppId || `supp_${i + 1}`;
+        const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        if (suppId || suppName) {
-          const targetId = suppId || `supp_${i + 1}`;
-          const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-          const docRef = doc(db, 'suppliers', docId);
+        const payload = {
+          ...supp,
+          id: docId,
+          "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId,
+          "Tên Nhà Cung Cấp": suppName,
+          "Nhóm hàng": supp["Nhóm hàng"] || 'Bao bì & Giấy',
+          "Loại hình": supp["Loại hình"] || 'Nhà sản xuất',
+          "Đánh giá": supp["Đánh giá"] || '5',
+          "Mã số thuế": supp["Mã số thuế"] || '',
+          "Số điện thoại": supp["Số điện thoại"] || supp["Điện thoại"] || '',
+          "Email": supp["Email"] || '',
+          "Địa chỉ": supp["Địa chỉ"] || '',
+          "Điều khoản thanh toán": supp["Điều khoản thanh toán"] || '30 ngày',
+          "Tài khoản ngân hàng": supp["Tài khoản ngân hàng"] || '',
+          "Tình trạng": supp["Tình trạng"] || 'Đang hợp tác',
+          updatedAt: new Date().toISOString()
+        };
 
-          const payload = {
-            id: docId,
-            "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId,
-            "Tên Nhà Cung Cấp": suppName,
-            "Nhóm hàng": supp["Nhóm hàng"] || 'Bao bì & Giấy',
-            "Loại hình": supp["Loại hình"] || 'Nhà sản xuất',
-            "Đánh giá": supp["Đánh giá"] || '5',
-            "Mã số thuế": supp["Mã số thuế"] || '',
-            "Số điện thoại": supp["Số điện thoại"] || supp["Điện thoại"] || '',
-            "Email": supp["Email"] || '',
-            "Địa chỉ": supp["Địa chỉ"] || '',
-            "Điều khoản thanh toán": supp["Điều khoản thanh toán"] || '30 ngày',
-            "Tài khoản ngân hàng": supp["Tài khoản ngân hàng"] || '',
-            "Tình trạng": supp["Tình trạng"] || 'Đang hợp tác',
-            updatedAt: new Date().toISOString()
-          };
-
-          batch.set(docRef, payload, { merge: true });
-          count++;
+        try {
+          await dbEngine.save('suppliers', payload);
           suppliersCount++;
-
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+        } catch (e) {
+          console.warn('Error saving supplier to dbEngine:', e);
         }
       }
-      if (count > 0) await batch.commit();
     }
   }
 
-  return { contactsCount, customersCount, suppliersCount };
+  // 4. KÉO VÀ ĐỒNG BỘ SẢN PHẨM (Products)
+  if (productsTab) {
+    const rawProducts = await readSheetValues(productsTab);
+    for (let i = 0; i < rawProducts.length; i++) {
+      const prod = rawProducts[i];
+      const pId = prod["Mã sản phẩm"] || prod["Mã hàng"] || prod.id || prod.ID || '';
+      if (pId) {
+        const docId = String(pId).replace(/[/\\#?%[\]\s.]+/g, '_');
+        try {
+          await dbEngine.save('products', { ...prod, id: docId, "Mã sản phẩm": prod["Mã sản phẩm"] || docId, updatedAt: new Date().toISOString() });
+          productsCount++;
+        } catch (e) {
+          console.warn('Error saving product to dbEngine:', e);
+        }
+      }
+    }
+  }
+
+  return { contactsCount, customersCount, suppliersCount, productsCount };
 }
 
 /**
@@ -704,8 +697,6 @@ export async function importMasterDataFromExcelFile(file: File): Promise<{
 
     // Contacts
     if (sNameLower.includes('danh_ba') || sNameLower.includes('nhan_su') || sNameLower.includes('contact')) {
-      let batch = writeBatch(db);
-      let count = 0;
       for (let i = 0; i < rows.length; i++) {
         const c = rows[i];
         const name = c["Tên"] || c["Họ và tên"] || c["Name"] || '';
@@ -715,80 +706,67 @@ export async function importMasterDataFromExcelFile(file: File): Promise<{
         if (name || phone || company) {
           const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
           const docId = String(rawKeySafe(rawId));
-          const docRef = doc(db, 'contacts', docId);
 
-          batch.set(docRef, {
-            id: docId,
-            ID: c.ID || docId,
-            "Danh xưng": c["Danh xưng"] || 'Mr',
-            "Tên": name,
-            "Chức vụ": c["Chức vụ"] || '',
-            "Phòng ban": c["Phòng ban"] || '',
-            "Công ty": company,
-            "Điện thoại": phone,
-            "Email": c["Email"] || '',
-            "Mức độ quan hệ": String(c["Mức độ quan hệ"] || '3'),
-            "Phụ trách": c["Phụ trách"] || '',
-            "Ghi chú": c["Ghi chú"] || '',
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-
-          count++;
-          contactsCount++;
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+          try {
+            await dbEngine.save('contacts', {
+              id: docId,
+              ID: c.ID || docId,
+              "Danh xưng": c["Danh xưng"] || 'Mr',
+              "Tên": name,
+              "Chức vụ": c["Chức vụ"] || '',
+              "Phòng ban": c["Phòng ban"] || '',
+              "Công ty": company,
+              "Điện thoại": phone,
+              "Email": c["Email"] || '',
+              "Mức độ quan hệ": String(c["Mức độ quan hệ"] || '3'),
+              "Phụ trách": c["Phụ trách"] || '',
+              "Ghi chú": c["Ghi chú"] || '',
+              updatedAt: new Date().toISOString()
+            });
+            contactsCount++;
+          } catch (e) {}
         }
       }
-      if (count > 0) await batch.commit();
     }
 
     // Customers
     if (sNameLower.includes('khach_hang') || sNameLower.includes('customer')) {
-      let batch = writeBatch(db);
-      let count = 0;
       for (let i = 0; i < rows.length; i++) {
         const cust = rows[i];
         const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
         if (custId) {
           const docId = rawKeySafe(custId);
-          const docRef = doc(db, 'customers', docId);
-          batch.set(docRef, { ...cust, id: docId, Customer_ID: cust["Customer_ID"] || docId, updatedAt: new Date().toISOString() }, { merge: true });
-          count++;
-          customersCount++;
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+          try {
+            await dbEngine.save('customers', {
+              ...cust,
+              id: docId,
+              Customer_ID: cust["Customer_ID"] || docId,
+              updatedAt: new Date().toISOString()
+            });
+            customersCount++;
+          } catch (e) {}
         }
       }
-      if (count > 0) await batch.commit();
     }
 
     // Suppliers
     if (sNameLower.includes('nha_cung_cap') || sNameLower.includes('supplier') || sNameLower.includes('ncc')) {
-      let batch = writeBatch(db);
-      let count = 0;
       for (let i = 0; i < rows.length; i++) {
         const supp = rows[i];
         const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
         if (suppId) {
           const docId = rawKeySafe(suppId);
-          const docRef = doc(db, 'suppliers', docId);
-          batch.set(docRef, { ...supp, id: docId, "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId, updatedAt: new Date().toISOString() }, { merge: true });
-          count++;
-          suppliersCount++;
-          if (count >= 400) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
+          try {
+            await dbEngine.save('suppliers', {
+              ...supp,
+              id: docId,
+              "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId,
+              updatedAt: new Date().toISOString()
+            });
+            suppliersCount++;
+          } catch (e) {}
         }
       }
-      if (count > 0) await batch.commit();
     }
   }
 
