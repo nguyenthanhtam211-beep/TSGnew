@@ -598,6 +598,52 @@ export default function ContractsView({
                   </div>
                 </div>
 
+                {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Hồ Sơ Hợp Đồng Gốc (PDF)</span>
+                    <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded">DRIVE CLOUD</span>
+                  </h4>
+                  <div className="bg-rose-50/60 border border-rose-200/80 p-3 rounded-xl space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <FileText size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-900 truncate" title={selectedContract.attachmentName || `${selectedContract.contractNumber}.pdf`}>
+                          {selectedContract.attachmentName || `${selectedContract.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`}
+                        </p>
+                        <span className="text-[10px] text-rose-700 font-medium block">
+                          Thư mục: 📁 01_Hop_Dong_Goc_Va_Phu_Luc_PDF
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 border-t border-rose-200/50">
+                      <a
+                        href={selectedContract.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(selectedContract.contractNumber)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
+                      >
+                        <Eye size={13} />
+                        <span>Mở PDF trên Drive</span>
+                        <ArrowUpRight size={12} />
+                      </a>
+                      <button
+                        onClick={() => {
+                          const url = selectedContract.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(selectedContract.contractNumber)}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success("Đã sao chép đường dẫn file PDF trên Google Drive!");
+                        }}
+                        className="px-2.5 py-1.5 bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg text-[11px] font-semibold transition-all"
+                        title="Sao chép link Drive"
+                      >
+                        Copy Link
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Price Table in Contract (Căn cứ đối chiếu) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -739,6 +785,41 @@ export default function ContractsView({
                 </div>
               </div>
 
+              {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) - Mobile */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Hồ Sơ Hợp Đồng Gốc (PDF)</span>
+                  <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded">DRIVE CLOUD</span>
+                </h4>
+                <div className="bg-rose-50/60 border border-rose-200/80 p-3 rounded-2xl space-y-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <FileText size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {selectedContract.attachmentName || `${selectedContract.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`}
+                      </p>
+                      <span className="text-[10px] text-rose-700 font-medium block">
+                        Thư mục: 📁 01_Hop_Dong_Goc_Va_Phu_Luc_PDF
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-rose-200/50">
+                    <a
+                      href={selectedContract.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(selectedContract.contractNumber)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Eye size={14} />
+                      <span>Xem File PDF Gốc</span>
+                      <ArrowUpRight size={13} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
               {/* Price list in contract */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -763,15 +844,19 @@ export default function ContractsView({
                 )}
               </div>
 
-              {/* Appendices */}
-              {(selectedContract.appendices || []).length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Phụ Lục Hợp Đồng ({selectedContract.appendices?.length})
-                  </h4>
+              {/* Appendices in Mobile */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Phụ Lục Hợp Đồng ({(selectedContract.appendices || []).length})
+                </h4>
+                {(selectedContract.appendices || []).length === 0 ? (
+                  <div className="p-2.5 bg-slate-50 rounded-xl text-center text-[11px] text-slate-400">
+                    Không có phụ lục điều chỉnh giá
+                  </div>
+                ) : (
                   <div className="space-y-2">
-                    {selectedContract.appendices?.map((app, idx) => (
-                      <div key={idx} className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-xl text-xs space-y-1">
+                    {(selectedContract.appendices || []).map((app, idx) => (
+                      <div key={idx} className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-xl space-y-1 text-xs">
                         <div className="flex justify-between font-bold text-amber-900">
                           <span>{app.appendixNumber}</span>
                           <span className="text-[10px] font-normal text-amber-700">{formatDateForDisplay(app.signDate)}</span>
@@ -785,8 +870,8 @@ export default function ContractsView({
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               <button
                 type="button"
@@ -905,6 +990,66 @@ export default function ContractsView({
                     onChange={e => setFormData({ ...formData, expirationDate: e.target.value })}
                     className="w-full px-3.5 py-2 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-blue-500 outline-none transition-all"
                   />
+                </div>
+              </div>
+
+              {/* File Hợp Đồng Gốc (PDF) Lưu Trên Google Drive */}
+              <div className="border-t border-slate-200 pt-4 space-y-2">
+                <label className="text-xs font-bold text-slate-900 uppercase flex items-center gap-1.5">
+                  <FileText size={15} className="text-rose-600" />
+                  File Hợp Đồng Gốc PDF (Lưu trữ Google Drive)
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Tải lên file scan PDF hoặc nhập link Google Drive trong thư mục <code>01_Hop_Dong_Goc_Va_Phu_Luc_PDF</code> để đối chiếu chéo khi xuất đơn & kiểm tra bảng giá.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Tên file scan (VD: 01_2026_HDMB_ThangLong.pdf)"
+                      value={formData.attachmentName || ''}
+                      onChange={e => setFormData({ ...formData, attachmentName: e.target.value })}
+                      className="w-full px-3.5 py-2 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="Link Google Drive (VD: https://drive.google.com/file/d/...)"
+                      value={formData.attachmentUrl || ''}
+                      onChange={e => setFormData({ ...formData, attachmentUrl: e.target.value })}
+                      className="w-full px-3.5 py-2 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+                {/* Drag & Drop or Browse file */}
+                <div className="flex items-center gap-3 pt-1">
+                  <label className="cursor-pointer px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200/60">
+                    <Paperclip size={14} />
+                    <span>Chọn File PDF từ máy tính</span>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFormData(prev => ({
+                            ...prev,
+                            attachmentName: file.name,
+                            attachmentUrl: prev.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`
+                          }));
+                          toast.success(`Đã đính kèm file: ${file.name}`);
+                        }
+                      }}
+                    />
+                  </label>
+                  {formData.attachmentName && (
+                    <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      <CheckCircle2 size={13} />
+                      {formData.attachmentName}
+                    </span>
+                  )}
                 </div>
               </div>
 

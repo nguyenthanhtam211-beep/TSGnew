@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -894,7 +894,7 @@ export default function App() {
             onNavigateToSupplier={handleNavigateToSupplier}
           />
         )}
-        {activeTab === "pricing" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "pricing" && <TableView pricingData={pricingData} contractsData={contractsData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026 (Đối chiếu từ Hợp đồng)" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
         {activeTab === "po" && (
           <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
             title="Đơn hàng (PO_Header)" 
@@ -1164,7 +1164,8 @@ function TableView({
   specsData = [],
   poHeaders = [],
   suppliers = [],
-  products = []
+  products = [],
+  contractsData = []
 }: { 
   title: string, 
   data: any[], 
@@ -1181,7 +1182,8 @@ function TableView({
   specsData?: any[],
   poHeaders?: any[],
   suppliers?: any[],
-  products?: any[]
+  products?: any[],
+  contractsData?: any[]
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1748,6 +1750,37 @@ function TableView({
            <FileText size={14} />
            <span className="truncate max-w-[150px] font-medium" title={strVal}>{strVal}</span>
          </div>
+      );
+    }
+
+    // Contract Cross-Reference with Google Drive Original PDF Link
+    if (header === 'Số hợp đồng' || header === 'Hợp đồng' || header.includes('hợp đồng') || header.includes('Hợp đồng') || header === 'Đối chiếu từ hợp đồng') {
+      const matchingContract = (contractsData || []).find((c: any) => 
+        (c.contractNumber && c.contractNumber.trim().toLowerCase() === strVal.trim().toLowerCase()) ||
+        (c.contractNumber && strVal.includes(c.contractNumber)) ||
+        (c.partnerName && row['RP_Khách hàng'] && c.partnerName.includes(row['RP_Khách hàng']))
+      );
+
+      const driveSearchUrl = matchingContract?.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(strVal)}`;
+
+      return (
+        <div className="flex items-center gap-1.5 py-0.5">
+          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60 text-[11px]">
+            {strVal}
+          </span>
+          <a 
+            href={driveSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded transition-all shadow-2xs group"
+            title="Đối chiếu & xem File Hợp đồng gốc PDF trên Google Drive"
+          >
+            <FileText size={11} className="text-rose-600" />
+            <span>PDF Gốc</span>
+            <ArrowUpRight size={10} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          </a>
+        </div>
       );
     }
 

@@ -12,6 +12,51 @@ import { ensureGoogleToken, clearStoredGoogleToken, getStoredGoogleToken } from 
 export const MASTER_SHEET_TITLE = "[TSG ERP] Kho Dữ Liệu Doanh Nghiệp TSG (Master Data)";
 const STORAGE_KEY_SPREADSHEET_ID = 'google_spreadsheet_id';
 
+/**
+ * CẤU TRÚC PHÂN CHIA THƯ MỤC GOOGLE DRIVE KHOA HỌC CHO TSG BUSINESS ERP
+ */
+export const TSG_DRIVE_STRUCTURE = {
+  ROOT_FOLDER: "TSG Business ERP - Master Storage",
+  SUB_FOLDERS: [
+    { 
+      key: "01_CONTRACTS", 
+      name: "01_Hop_Dong_Goc_Va_Phu_Luc_PDF", 
+      desc: "Lưu trữ bản scan PDF hợp đồng mua/bán gốc & phụ lục đơn giá",
+      subItems: ["Hop_Dong_Ban_Hang_Khach_Hang", "Hop_Dong_Mua_Hang_Nha_Cung_Cap", "Phu_Luc_Dieu_Chinh_Gia"]
+    },
+    { 
+      key: "02_PRICING", 
+      name: "02_Bang_Gia_Va_Chinh_Sach_2026", 
+      desc: "File Excel & phụ lục bảng giá niêm yết 3 tầng giá (Thăng Long, Thanh Hóa, Bắc Sơn...)" 
+    },
+    { 
+      key: "03_PO_ORDERS", 
+      name: "03_Don_Hang_PO_Va_Ban_Scan_OCR", 
+      desc: "File scan PO gốc từ khách hàng và kết quả bóc tách OCR AI" 
+    },
+    { 
+      key: "04_DELIVERIES", 
+      name: "04_Phieu_Xuat_Kho_Giao_Hang_PXK", 
+      desc: "Chứng từ xuất kho, biên bản giao nhận hàng ký duyệt" 
+    },
+    { 
+      key: "05_MASTER_SHEETS", 
+      name: "05_Master_Data_Google_Sheets_BI", 
+      desc: "Bảng tính Master 2-Way Sync cấp dữ liệu cho BI / Looker Studio" 
+    },
+    { 
+      key: "06_COMMISSIONS", 
+      name: "06_Chinh_Sach_Hoa_Hong_Commission", 
+      desc: "Biên bản tính & phê duyệt chi phí hoa hồng theo đối tác" 
+    },
+    { 
+      key: "07_REPORTS", 
+      name: "07_Bao_Cao_Tai_Chinh_Va_Slide_PDF", 
+      desc: "Báo cáo P&L, dòng tiền, slide thuyết trình xuất tự động" 
+    },
+  ]
+};
+
 export function getStoredSpreadsheetId(): string {
   return localStorage.getItem(STORAGE_KEY_SPREADSHEET_ID) || '';
 }
@@ -24,7 +69,7 @@ export function setStoredSpreadsheetId(id: string): void {
 
 export function getDriveFileUrl(spreadsheetId?: string): string {
   const id = spreadsheetId || getStoredSpreadsheetId();
-  if (!id) return 'https://drive.google.com/';
+  if (!id) return 'https://drive.google.com/drive/search?q=TSG%20Business%20ERP';
   return `https://docs.google.com/spreadsheets/d/${id}/edit`;
 }
 
