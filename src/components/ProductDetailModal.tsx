@@ -27,10 +27,11 @@ import {
   CheckCircle2,
   Maximize2,
   Minimize2,
-  Copy,
-  Tag
+  Tag,
+  Boxes,
+  HelpCircle,
+  FileCheck
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
 import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay } from '../lib/business-logic';
@@ -112,19 +113,17 @@ export function ProductDetailModal({
   const buyPrice = primaryPricing ? parseNumber(primaryPricing['Đơn giá mua'] || primaryPricing['Đơn giá nhập'] || 0) : 0;
   const sellPrice = primaryPricing ? parseNumber(primaryPricing['Đơn giá bán'] || primaryPricing['Giá AVP'] || 0) : 0;
   const profitUnit = primaryPricing ? parseNumber(primaryPricing['Lợi nhuận'] || (sellPrice - buyPrice)) : 0;
-  const marginPct = primaryPricing?.['Biên lợi nhuận'] || (sellPrice > 0 ? (Math.round((profitUnit / sellPrice) * 100) + '%') : '—');
+  const marginPct = primaryPricing?.['Biên lợi nhuận'] || (sellPrice > 0 ? `${Math.round((profitUnit / sellPrice) * 100)}%` : '—');
 
   // 2. Relational Customers
   const relatedCustomers = useMemo(() => {
     const list: Array<{ name: string; location: string; totalQty: number; revenue: number }> = [];
     const custMap = new Map<string, { location: string; totalQty: number; revenue: number }>();
 
-    // From product master
     if (product['Khách hàng']) {
       custMap.set(product['Khách hàng'], { location: 'Kho khách hàng', totalQty: 0, revenue: 0 });
     }
 
-    // From pricings
     matchedPricings.forEach(pr => {
       const c = pr['RP_Khách hàng'] || pr['Khách hàng'];
       if (c) {
@@ -133,7 +132,6 @@ export function ProductDetailModal({
       }
     });
 
-    // From PO Lines
     poLinesData.filter(po => 
       po['Tên sản phẩm'] === productName || 
       (productCode && po['Mã của khách']?.includes(productCode))
@@ -247,61 +245,66 @@ export function ProductDetailModal({
   }, [latestPO, productCode, relatedCustomers]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-4 sm:p-6 animate-in fade-in duration-150">
+      {/* Fixed Dimension Window Frame to prevent layout shifts when toggling tabs */}
       <div className={clsx(
-        "bg-white rounded-3xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-200 border border-black/[0.08]",
-        isMaximized ? "max-w-7xl h-[95vh]" : "max-w-5xl max-h-[92vh]"
+        "bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 border border-slate-200/80",
+        isMaximized ? "w-[98vw] h-[96vh]" : "w-[92vw] max-w-5xl h-[88vh]"
       )}>
         
-        {/* Apple macOS Header */}
-        <div className="px-6 py-4 border-b border-black/[0.06] flex justify-between items-center bg-[#F5F5F7]">
-          <div className="flex items-center gap-4">
+        {/* Apple macOS Style Header */}
+        <div className="px-5 py-3.5 border-b border-slate-200/80 flex justify-between items-center bg-[#F8F9FA] shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
             <MacTrafficLights 
               onClose={onClose} 
               onMaximize={() => setIsMaximized(!isMaximized)}
               isMaximized={isMaximized}
             />
-            <div className="h-4 w-px bg-black/[0.08]" />
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 shadow-xs">
-                <Package size={18} />
+            <div className="h-4 w-px bg-slate-300" />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs font-bold">
+                <Package size={16} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs bg-white text-slate-800 px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono font-bold text-[11px] bg-slate-200/80 text-slate-800 px-1.5 py-0.5 rounded border border-slate-300/60 shrink-0">
                     {productCode || 'SKU'}
                   </span>
-                  <h2 className="text-sm sm:text-base font-bold text-[#1D1D1F]">{productName}</h2>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{productName}</h2>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  {product['Nhóm hàng'] || 'Sản phẩm TSG'} • ĐVT: <strong className="text-slate-700">{product['Đơn Vị Tính'] || 'Cái'}</strong> • Trạng thái: <span className="font-bold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span>
-                </p>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                  <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>
+                  <span>•</span>
+                  <span>ĐVT: <strong className="text-slate-700 font-semibold">{product['Đơn Vị Tính'] || 'Cái'}</strong></span>
+                  <span>•</span>
+                  <span>Tình trạng: <span className="font-semibold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span></span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0 ml-3">
             <button
               onClick={() => setIsMaximized(!isMaximized)}
-              className="hidden sm:flex w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-300 items-center justify-center text-slate-600 transition-colors"
-              title={isMaximized ? "Thu nhỏ" : "Mở rộng"}
+              className="hidden sm:flex w-7 h-7 rounded-lg hover:bg-slate-200/70 items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
+              title={isMaximized ? "Thu nhỏ" : "Phóng to"}
             >
-              {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
+              className="w-7 h-7 rounded-lg hover:bg-slate-200/70 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
             >
               <X size={15} />
             </button>
           </div>
         </div>
 
-        {/* macOS Apple Segmented Tab Bar */}
-        <div className="px-6 py-2.5 border-b border-slate-200/80 bg-white shrink-0 overflow-x-auto">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl w-fit border border-slate-200/60">
+        {/* Apple Segmented Pills Tab Bar */}
+        <div className="px-5 py-2.5 border-b border-slate-200/70 bg-white shrink-0 overflow-x-auto">
+          <div className="inline-flex items-center gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/60">
             {[
-              { id: 'overview', label: 'Tổng quan', icon: Sparkles },
+              { id: 'overview', label: 'Tổng quan 360°', icon: Sparkles },
               { id: 'pricing', label: 'Bảng giá', count: matchedPricings.length, icon: DollarSign },
               { id: 'orders', label: 'Đơn hàng & PO', count: relatedPoLines.length, icon: ShoppingCart },
               { id: 'specs', label: 'Kỹ thuật (TDS)', count: matchedSpecs.length, icon: ShieldCheck },
@@ -314,18 +317,18 @@ export function ProductDetailModal({
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={clsx(
-                    "py-1.5 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap",
+                    "py-1.5 px-3 rounded-lg font-medium text-xs flex items-center gap-1.5 transition-all whitespace-nowrap",
                     isActive 
-                      ? "bg-white text-slate-900 shadow-xs" 
-                      : "text-slate-500 hover:text-slate-900 hover:bg-white/50"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold" 
+                      : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
                   )}
                 >
                   <Icon size={13} className={isActive ? "text-blue-600" : "text-slate-400"} />
                   <span>{tab.label}</span>
                   {tab.count !== undefined && tab.count > 0 && (
                     <span className={clsx(
-                      "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
-                      isActive ? "bg-blue-50 text-blue-700 font-bold border border-blue-200/60" : "bg-slate-200/70 text-slate-600"
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-mono leading-none",
+                      isActive ? "bg-blue-50 text-blue-700 font-bold border border-blue-200/60" : "bg-slate-200/80 text-slate-600"
                     )}>
                       {tab.count}
                     </span>
@@ -336,208 +339,220 @@ export function ProductDetailModal({
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC]">
+        {/* Scrollable Content Viewport with Solid Height */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 bg-slate-50/50">
           
-          {/* TAB 1: TỔNG QUAN (Bento Grid 360°) */}
+          {/* TAB 1: TỔNG QUAN 360° */}
           {activeTab === 'overview' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-5 animate-in fade-in duration-150">
               
-              {/* Bento Grid: 6 Pillars */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Bento Grid: 6 Balanced Pillars */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
                 
                 {/* 1. Khách Hàng */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
-                      <Building2 size={16} />
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
+                        <Building2 size={15} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs tracking-tight">Khách Hàng Mua</h4>
+                        <p className="text-[10.5px] text-slate-500">Đơn vị tiêu thụ & điểm nhận</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Khách Hàng Mua</h4>
-                      <p className="text-[11px] text-slate-500">Đơn vị tiêu thụ & điểm giao</p>
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      {relatedCustomers.length > 0 ? (
+                        relatedCustomers.map((cust, idx) => (
+                          <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                            <div className="min-w-0 pr-2">
+                              <p className="font-semibold text-slate-900 truncate">{cust.name}</p>
+                              <p className="text-[10px] text-slate-500 truncate">Giao: {cust.location}</p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-bold text-blue-600">{cust.totalQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</p>
+                              <p className="text-[10px] text-slate-400">{formatVND(cust.revenue)}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-2 text-center">Chưa gán khách hàng</p>
+                      )}
                     </div>
-                  </div>
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    {relatedCustomers.length > 0 ? (
-                      relatedCustomers.map((cust, idx) => (
-                        <div key={idx} className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
-                          <div>
-                            <p className="font-bold text-slate-900">{cust.name}</p>
-                            <p className="text-[10px] text-slate-500">Giao đến: {cust.location}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-blue-600">{cust.totalQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</p>
-                            <p className="text-[10px] text-slate-400">{formatVND(cust.revenue)}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin khách hàng</p>
-                    )}
                   </div>
                 </div>
 
                 {/* 2. Nhà Cung Cấp */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                      <Building2 size={16} />
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                        <Building2 size={15} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs tracking-tight">Nhà Cung Cấp SX</h4>
+                        <p className="text-[10.5px] text-slate-500">Đơn vị gia công & vật liệu</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Nhà Cung Cấp SX</h4>
-                      <p className="text-[11px] text-slate-500">Đơn vị gia công & vật liệu</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    {relatedSuppliers.length > 0 ? (
-                      relatedSuppliers.map((supp, idx) => (
-                        <div key={idx} className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <CompanyLogo name={supp.name} className="w-6 h-6 rounded-full shrink-0" />
-                            <div>
-                              <p className="font-bold text-slate-900">{supp.name}</p>
-                              <p className="text-[10px] text-slate-500">{supp.materialGroup}</p>
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      {relatedSuppliers.length > 0 ? (
+                        relatedSuppliers.map((supp, idx) => (
+                          <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <CompanyLogo name={supp.name} className="w-5 h-5 rounded-full shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate">{supp.name}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{supp.materialGroup}</p>
+                              </div>
                             </div>
+                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-semibold rounded border border-amber-200/60 shrink-0">
+                              Đối tác
+                            </span>
                           </div>
-                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md border border-amber-200/60">
-                            Chiến lược
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin NCC</p>
-                    )}
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-2 text-center">Chưa gán NCC</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* 3. Giá & Biên Lợi Nhuận */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                        <DollarSign size={16} />
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                          <DollarSign size={15} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs tracking-tight">Giá Bán & Lợi Nhuận</h4>
+                          <p className="text-[10.5px] text-slate-500">Niêm yết Bảng giá 2026</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Giá Bán & Lợi Nhuận</h4>
-                        <p className="text-[11px] text-slate-500">Bảng giá niêm yết 2026</p>
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-md border border-emerald-200/60">
+                        {marginPct}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-100/80">
+                        <span className="text-slate-500">Đơn giá bán:</span>
+                        <span className="font-bold text-slate-900">{formatVND(sellPrice)}</span>
                       </div>
-                    </div>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200/60">
-                      {marginPct}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-500">Đơn giá bán niêm yết:</span>
-                      <span className="font-bold text-slate-900">{formatVND(sellPrice)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-500">Đơn giá mua (NCC):</span>
-                      <span className="font-medium text-slate-600">{formatVND(buyPrice)}</span>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span className="text-slate-500">Lợi nhuận gộp/đơn vị:</span>
-                      <span className="font-bold text-emerald-600">{formatVND(profitUnit)} / {product['Đơn Vị Tính'] || 'Cái'}</span>
+                      <div className="flex justify-between py-1 border-b border-slate-100/80">
+                        <span className="text-slate-500">Đơn giá mua:</span>
+                        <span className="font-medium text-slate-600">{formatVND(buyPrice)}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-500">Lợi nhuận gộp:</span>
+                        <span className="font-bold text-emerald-600">{formatVND(profitUnit)} / {product['Đơn Vị Tính'] || 'Cái'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* 4. Đơn Hàng Gần Nhất */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
-                      <ShoppingCart size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Đơn Hàng Gần Nhất</h4>
-                      <p className="text-[11px] text-slate-500">Lịch sử đặt & tiến độ giao</p>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 text-xs">
-                    {latestPO ? (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span 
-                            onClick={() => onPoClick?.(latestPO['Số đơn hàng'] || latestPO['Đơn hàng'])}
-                            className="font-mono font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200 cursor-pointer hover:bg-teal-100"
-                          >
-                            {latestPO['Số đơn hàng'] || latestPO['Đơn hàng']}
-                          </span>
-                          <span className="text-[11px] text-slate-500">{latestPO['Ngày đặt']}</span>
-                        </div>
-                        <div className="flex justify-between text-xs pt-1">
-                          <span className="text-slate-500">Số lượng đặt:</span>
-                          <span className="font-bold text-slate-900">{Number(latestPO['Số lượng']).toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-500">Tổng đặt tích lũy:</span>
-                          <span className="font-bold text-blue-600">{totalOrderedQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</span>
-                        </div>
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                        <ShoppingCart size={15} />
                       </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa phát sinh đơn hàng PO</p>
-                    )}
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs tracking-tight">Đơn Hàng Gần Nhất</h4>
+                        <p className="text-[10.5px] text-slate-500">Lịch sử đặt & giao PO</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 text-xs">
+                      {latestPO ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span 
+                              onClick={() => onPoClick?.(latestPO['Số đơn hàng'] || latestPO['Đơn hàng'])}
+                              className="font-mono font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 cursor-pointer hover:bg-teal-100 text-[11px]"
+                            >
+                              {latestPO['Số đơn hàng'] || latestPO['Đơn hàng']}
+                            </span>
+                            <span className="text-[10.5px] text-slate-500">{latestPO['Ngày đặt']}</span>
+                          </div>
+                          <div className="flex justify-between text-xs pt-1">
+                            <span className="text-slate-500">Số lượng đặt:</span>
+                            <span className="font-bold text-slate-900">{Number(latestPO['Số lượng']).toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Tổng đặt tích lũy:</span>
+                            <span className="font-bold text-blue-600">{totalOrderedQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-2 text-center">Chưa phát sinh PO</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* 5. Tiêu Chuẩn Kỹ Thuật (Specs) */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                      <ShieldCheck size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Tiêu Chuẩn Kỹ Thuật</h4>
-                      <p className="text-[11px] text-slate-500">Hồ sơ TDS & CAD kiểm định</p>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 text-xs">
-                    {primarySpec ? (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                            {primarySpec['Mã Spec']}
-                          </span>
-                          <span className="text-[11px] text-slate-500">v{primarySpec['Phiên bản'] || '1.0'}</span>
-                        </div>
-                        <p className="font-semibold text-slate-800 line-clamp-1">{primarySpec['Tên tiêu chuẩn']}</p>
-                        <p className="text-[11px] text-slate-500">Chất liệu: {primarySpec['Chất liệu'] || 'Giấy Carton / Ivory'}</p>
+                {/* 5. Tiêu Chuẩn Kỹ Thuật */}
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                        <ShieldCheck size={15} />
                       </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa thiết lập hồ sơ Specs</p>
-                    )}
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs tracking-tight">Tiêu Chuẩn Kỹ Thuật</h4>
+                        <p className="text-[10.5px] text-slate-500">Hồ sơ TDS & bản vẽ CAD</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 text-xs">
+                      {primarySpec ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 text-[11px]">
+                              {primarySpec['Mã Spec']}
+                            </span>
+                            <span className="text-[10.5px] text-slate-500">v{primarySpec['Phiên bản'] || '1.0'}</span>
+                          </div>
+                          <p className="font-medium text-slate-800 truncate">{primarySpec['Tên tiêu chuẩn']}</p>
+                          <p className="text-[10.5px] text-slate-500">Chất liệu: {primarySpec['Chất liệu'] || 'Giấy Carton / Ivory'}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-2 text-center">Chưa lập hồ sơ Specs</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* 6. Hợp Đồng & Thư Mục Drive */}
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                      <HardDrive size={16} />
+                {/* 6. Hợp Đồng & Drive */}
+                <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                        <HardDrive size={15} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs tracking-tight">Hợp Đồng & Drive</h4>
+                        <p className="text-[10.5px] text-slate-500">Lưu trữ phân cấp Năm → Tháng</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Hợp Đồng & Drive</h4>
-                      <p className="text-[11px] text-slate-500">Lưu trữ Google Drive</p>
+                    <div className="pt-2 border-t border-slate-100 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[11px]">
+                          {relatedContracts[0]?.contractNumber || primaryPricing?.['Số hợp đồng'] || '177/HĐ-TLTL'}
+                        </span>
+                        <a
+                          href={driveInfo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded"
+                        >
+                          <span>Drive</span>
+                          <ArrowUpRight size={11} />
+                        </a>
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate font-mono bg-slate-50 p-1.5 rounded border border-slate-200/60" title={driveInfo.folderPath}>
+                        📁 {driveInfo.folderPath}
+                      </p>
                     </div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                        {relatedContracts[0]?.contractNumber || primaryPricing?.['Số hợp đồng'] || '177/HĐ-TLTL'}
-                      </span>
-                      <a
-                        href={driveInfo.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md"
-                      >
-                        <span>Mở Drive</span>
-                        <ArrowUpRight size={12} />
-                      </a>
-                    </div>
-                    <p className="text-[10px] text-slate-500 truncate font-mono" title={driveInfo.folderPath}>
-                      📁 {driveInfo.folderPath}
-                    </p>
                   </div>
                 </div>
 
@@ -545,38 +560,38 @@ export function ProductDetailModal({
 
               {/* Quick Specs Matrix Preview */}
               {primarySpec && (
-                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wide flex items-center gap-2">
-                      <Layers size={15} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Trọng Điểm ({primarySpec['Mã Spec']})
+                      <Layers size={14} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Trọng Điểm ({primarySpec['Mã Spec']})
                     </h4>
                     <button
                       onClick={() => setActiveTab('specs')}
-                      className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                      className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-0.5"
                     >
                       Xem toàn bộ hồ sơ TDS <ChevronRight size={13} />
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200/80">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
-                          <th className="py-2.5 px-4">CHỈ TIÊU</th>
-                          <th className="py-2.5 px-3 text-center">ĐVT</th>
-                          <th className="py-2.5 px-4">TIÊU CHUẨN MẪU</th>
-                          <th className="py-2.5 px-3 text-center">DUNG SAI</th>
-                          <th className="py-2.5 px-4">PHƯƠNG PHÁP THỬ</th>
+                        <tr className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200/80">
+                          <th className="py-2 px-3.5">Chỉ Tiêu</th>
+                          <th className="py-2 px-2.5 text-center">ĐVT</th>
+                          <th className="py-2 px-3.5">Tiêu Chuẩn Mẫu</th>
+                          <th className="py-2 px-2.5 text-center">Dung Sai</th>
+                          <th className="py-2 px-3.5">Phương Pháp Thử</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {(primarySpec['Thông số kỹ thuật'] || []).slice(0, 4).map((p: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-4 font-bold text-slate-900">{p.criterion}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">{p.unit}</td>
-                            <td className="py-2.5 px-4 font-bold text-blue-700">{p.standard}</td>
-                            <td className="py-2.5 px-3 text-center text-slate-600">{p.tolerance || '-'}</td>
-                            <td className="py-2.5 px-4 text-slate-500">{p.testMethod || '-'}</td>
+                          <tr key={idx} className="hover:bg-slate-50/70">
+                            <td className="py-2.5 px-3.5 font-semibold text-slate-900">{p.criterion}</td>
+                            <td className="py-2.5 px-2.5 text-center font-mono text-slate-600">{p.unit}</td>
+                            <td className="py-2.5 px-3.5 font-bold text-blue-700">{p.standard}</td>
+                            <td className="py-2.5 px-2.5 text-center text-slate-600">{p.tolerance || '-'}</td>
+                            <td className="py-2.5 px-3.5 text-slate-500">{p.testMethod || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -590,21 +605,21 @@ export function ProductDetailModal({
 
           {/* TAB 2: BẢNG GIÁ */}
           {activeTab === 'pricing' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                <div className="p-4.5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Bảng Giá 2026 Của Sản Phẩm</h3>
                     <p className="text-xs text-slate-500 mt-0.5">Đơn giá mua, bán, biên lợi nhuận theo từng khách hàng & địa điểm giao</p>
                   </div>
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200">
+                  <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200">
                     {matchedPricings.length} tầng giá
                   </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
+                      <tr className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200">
                         <th className="py-3 px-4">Mã Giá</th>
                         <th className="py-3 px-4">Khách Hàng</th>
                         <th className="py-3 px-4">Nhà Cung Cấp</th>
@@ -617,23 +632,31 @@ export function ProductDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {matchedPricings.map((pr, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3 px-4 font-mono font-bold text-blue-700">{pr['Mã giá bán']}</td>
-                          <td className="py-3 px-4 font-bold text-slate-900">{pr['RP_Khách hàng'] || pr['Khách hàng']}</td>
-                          <td className="py-3 px-4 text-slate-600">{pr['RP_Nhà cung cấp'] || pr['Nhà cung cấp']}</td>
-                          <td className="py-3 px-4 text-slate-600">{pr['Giao đến'] || 'Hà Nội'}</td>
-                          <td className="py-3 px-4 text-right text-slate-600">{formatVND(parseNumber(pr['Đơn giá mua'] || pr['Đơn giá nhập'] || 0))}</td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">{formatVND(parseNumber(pr['Đơn giá bán'] || pr['Giá AVP'] || 0))}</td>
-                          <td className="py-3 px-4 text-right font-bold text-emerald-600">{formatVND(parseNumber(pr['Lợi nhuận'] || 0))}</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md">
-                              {pr['Biên lợi nhuận'] || '—'}
-                            </span>
+                      {matchedPricings.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-12 text-center text-slate-400">
+                            Chưa có bảng giá niêm yết cho sản phẩm này
                           </td>
-                          <td className="py-3 px-4 font-mono text-[11px] text-rose-700">{pr['Số hợp đồng'] || '—'}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        matchedPricings.map((pr, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/70">
+                            <td className="py-3 px-4 font-mono font-bold text-blue-700">{pr['Mã giá bán']}</td>
+                            <td className="py-3 px-4 font-semibold text-slate-900">{pr['RP_Khách hàng'] || pr['Khách hàng']}</td>
+                            <td className="py-3 px-4 text-slate-600">{pr['RP_Nhà cung cấp'] || pr['Nhà cung cấp']}</td>
+                            <td className="py-3 px-4 text-slate-600">{pr['Giao đến'] || 'Hà Nội'}</td>
+                            <td className="py-3 px-4 text-right text-slate-600">{formatVND(parseNumber(pr['Đơn giá mua'] || pr['Đơn giá nhập'] || 0))}</td>
+                            <td className="py-3 px-4 text-right font-bold text-slate-900">{formatVND(parseNumber(pr['Đơn giá bán'] || pr['Giá AVP'] || 0))}</td>
+                            <td className="py-3 px-4 text-right font-bold text-emerald-600">{formatVND(parseNumber(pr['Lợi nhuận'] || 0))}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded">
+                                {pr['Biên lợi nhuận'] || '—'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-mono text-[11px] text-rose-700">{pr['Số hợp đồng'] || '—'}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -643,9 +666,9 @@ export function ProductDetailModal({
 
           {/* TAB 3: ĐƠN HÀNG & PO */}
           {activeTab === 'orders' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                <div className="p-4.5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Danh Sách Đơn Hàng PO Đã Đặt</h3>
                     <p className="text-xs text-slate-500 mt-0.5">Tổng cộng: {totalOrderedQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'} • Doanh thu: {formatVND(totalRevenue)}</p>
@@ -654,7 +677,7 @@ export function ProductDetailModal({
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
+                      <tr className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200">
                         <th className="py-3 px-4">Mã Đơn Hàng (PO)</th>
                         <th className="py-3 px-4">Khách Hàng</th>
                         <th className="py-3 px-4 text-right">Số Lượng Đặt</th>
@@ -665,22 +688,30 @@ export function ProductDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {relatedPoLines.map((po, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td 
-                            onClick={() => onPoClick?.(po['Số đơn hàng'] || po['Đơn hàng'])}
-                            className="py-3 px-4 font-mono font-bold text-teal-700 cursor-pointer hover:underline"
-                          >
-                            {po['Số đơn hàng'] || po['Đơn hàng']}
+                      {relatedPoLines.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-slate-400">
+                            Chưa phát sinh đơn hàng PO nào cho sản phẩm này
                           </td>
-                          <td className="py-3 px-4 font-bold text-slate-900">{po['Khách hàng'] || product['Khách hàng']}</td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">{Number(po['Số lượng']).toLocaleString('vi-VN')}</td>
-                          <td className="py-3 px-4 text-right text-slate-600">{formatVND(parseNumber(po['Đơn giá bán'] || 0))}</td>
-                          <td className="py-3 px-4 text-right font-bold text-blue-600">{formatVND(parseNumber(po['Thành tiền dòng'] || 0))}</td>
-                          <td className="py-3 px-4 text-slate-600">{po['Ngày đặt']}</td>
-                          <td className="py-3 px-4 text-slate-600">{po['Ngày giao hàng'] || '—'}</td>
                         </tr>
-                      ))}
+                      ) : (
+                        relatedPoLines.map((po, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/70">
+                            <td 
+                              onClick={() => onPoClick?.(po['Số đơn hàng'] || po['Đơn hàng'])}
+                              className="py-3 px-4 font-mono font-bold text-teal-700 cursor-pointer hover:underline"
+                            >
+                              {po['Số đơn hàng'] || po['Đơn hàng']}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-900">{po['Khách hàng'] || product['Khách hàng']}</td>
+                            <td className="py-3 px-4 text-right font-bold text-slate-900">{Number(po['Số lượng']).toLocaleString('vi-VN')}</td>
+                            <td className="py-3 px-4 text-right text-slate-600">{formatVND(parseNumber(po['Đơn giá bán'] || 0))}</td>
+                            <td className="py-3 px-4 text-right font-bold text-blue-600">{formatVND(parseNumber(po['Thành tiền dòng'] || 0))}</td>
+                            <td className="py-3 px-4 text-slate-600">{po['Ngày đặt']}</td>
+                            <td className="py-3 px-4 text-slate-600">{po['Ngày giao hàng'] || '—'}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -690,39 +721,42 @@ export function ProductDetailModal({
 
           {/* TAB 4: SPECS & TDS */}
           {activeTab === 'specs' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-5 animate-in fade-in duration-150">
               {primarySpec ? (
-                <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden p-6 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden p-5 sm:p-6 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-slate-100">
                     <div>
-                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-xs rounded-md border border-blue-200">
-                        {primarySpec['Mã Spec']} - v{primarySpec['Phiên bản'] || '1.0'}
-                      </span>
-                      <h3 className="text-lg font-bold text-slate-900 mt-1.5">{primarySpec['Tên tiêu chuẩn']}</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Khách hàng áp dụng: {primarySpec['Khách hàng']} | Người duyệt: {primarySpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-xs rounded border border-blue-200">
+                          {primarySpec['Mã Spec']}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">Phiên bản v{primarySpec['Phiên bản'] || '1.0'}</span>
+                      </div>
+                      <h3 className="text-base font-bold text-slate-900 mt-1">{primarySpec['Tên tiêu chuẩn']}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Khách hàng: {primarySpec['Khách hàng']} • Người duyệt: {primarySpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</p>
                     </div>
                   </div>
 
                   {/* Specs Table */}
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
-                          <th className="py-3 px-4 w-1/3">CHỈ TIÊU</th>
-                          <th className="py-3 px-3 text-center w-20">ĐVT</th>
-                          <th className="py-3 px-4 w-1/4">TIÊU CHUẨN MẪU</th>
-                          <th className="py-3 px-3 text-center">DUNG SAI</th>
-                          <th className="py-3 px-4">PHƯƠNG PHÁP THỬ</th>
+                        <tr className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200">
+                          <th className="py-2.5 px-3.5 w-1/3">Chỉ Tiêu</th>
+                          <th className="py-2.5 px-2.5 text-center w-20">ĐVT</th>
+                          <th className="py-2.5 px-3.5 w-1/4">Tiêu Chuẩn Mẫu</th>
+                          <th className="py-2.5 px-2.5 text-center">Dung Sai</th>
+                          <th className="py-2.5 px-3.5">Phương Pháp Thử</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200">
+                      <tbody className="divide-y divide-slate-200/70">
                         {(primarySpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-3 px-4 font-bold text-slate-900">{p.criterion}</td>
-                            <td className="py-3 px-3 text-center font-mono text-slate-600">{p.unit}</td>
-                            <td className="py-3 px-4 font-bold text-blue-700 text-sm">{p.standard}</td>
-                            <td className="py-3 px-3 text-center text-slate-600">{p.tolerance || '-'}</td>
-                            <td className="py-3 px-4 text-slate-600">{p.testMethod || '-'}</td>
+                          <tr key={idx} className="hover:bg-slate-50/70">
+                            <td className="py-2.5 px-3.5 font-semibold text-slate-900">{p.criterion}</td>
+                            <td className="py-2.5 px-2.5 text-center font-mono text-slate-600">{p.unit}</td>
+                            <td className="py-2.5 px-3.5 font-bold text-blue-700">{p.standard}</td>
+                            <td className="py-2.5 px-2.5 text-center text-slate-600">{p.tolerance || '-'}</td>
+                            <td className="py-2.5 px-3.5 text-slate-600">{p.testMethod || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -731,7 +765,7 @@ export function ProductDetailModal({
 
                   {/* Packaging */}
                   {primarySpec['Quy cách đóng gói'] && (
-                    <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-100">
+                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
                       <h5 className="font-bold text-blue-950 text-xs mb-1">Quy cách đóng gói & Bảo quản:</h5>
                       <p className="text-slate-700 text-xs leading-relaxed">{primarySpec['Quy cách đóng gói']}</p>
                     </div>
@@ -741,32 +775,33 @@ export function ProductDetailModal({
                   {primarySpec['Hình ảnh thiết kế'] && (
                     <div>
                       <h5 className="font-bold text-slate-900 text-xs uppercase mb-2">Bản vẽ CAD / Thiết kế đính kèm:</h5>
-                      <div className="h-56 rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center p-2">
-                        <img src={primarySpec['Hình ảnh thiết kế']} className="h-full object-contain rounded-xl" alt="CAD" referrerPolicy="no-referrer" />
+                      <div className="h-52 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center p-2">
+                        <img src={primarySpec['Hình ảnh thiết kế']} className="h-full object-contain rounded-lg" alt="CAD" referrerPolicy="no-referrer" />
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="p-12 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">
-                  <ShieldCheck size={48} className="mx-auto mb-2 opacity-40 text-blue-500" />
-                  <p className="font-bold text-slate-700">Chưa có tiêu chuẩn kỹ thuật Specs cho sản phẩm này</p>
+                <div className="p-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+                  <ShieldCheck size={44} className="mx-auto mb-3 opacity-30 text-blue-600" />
+                  <p className="font-bold text-slate-700 text-sm">Chưa có tiêu chuẩn kỹ thuật (Specs / TDS) cho sản phẩm này</p>
+                  <p className="text-xs text-slate-400 mt-1">Bạn có thể tạo tiêu chuẩn mới trong phân hệ Tiêu chuẩn kỹ thuật</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 5: CONTRACTS & DRIVE */}
+          {/* TAB 5: HỢP ĐỒNG & DRIVE */}
           {activeTab === 'contracts' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-6">
+            <div className="space-y-5 animate-in fade-in duration-150">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 space-y-5">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Hợp Đồng Pháp Lý & Thư Mục Google Drive</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Lưu trữ phân cấp khoa học theo Năm $ightarrow$ Tháng</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Lưu trữ phân cấp khoa học theo Năm → Tháng</p>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <HardDrive size={15} className="text-blue-600" /> Đường dẫn thư mục Google Drive:
                     </span>
@@ -774,12 +809,12 @@ export function ProductDetailModal({
                       href={driveInfo.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs"
                     >
                       <ExternalLink size={13} /> Mở trên Google Drive
                     </a>
                   </div>
-                  <p className="font-mono text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200/80 break-all">
+                  <p className="font-mono text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-200/80 break-all">
                     {driveInfo.folderPath}
                   </p>
                   <p className="text-[11px] text-slate-500">
@@ -790,27 +825,31 @@ export function ProductDetailModal({
                 {/* Contracts List */}
                 <div className="space-y-3">
                   <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wide">Hợp đồng kinh tế liên quan:</h4>
-                  {relatedContracts.map((c, idx) => (
-                    <div key={idx} className="p-4 bg-white rounded-2xl border border-slate-200 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">
-                            {c.contractNumber}
-                          </span>
-                          <span className="font-bold text-slate-800 text-xs">{c.title || 'Hợp đồng mua bán bao bì'}</span>
+                  {relatedContracts.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic py-2">Chưa có hợp đồng nào được gán cho sản phẩm này</p>
+                  ) : (
+                    relatedContracts.map((c, idx) => (
+                      <div key={idx} className="p-4 bg-slate-50/70 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-xs">
+                              {c.contractNumber}
+                            </span>
+                            <span className="font-semibold text-slate-800 text-xs">{c.title || 'Hợp đồng mua bán bao bì'}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">Đối tác: {c.partnerName} • Ngày ký: {c.signDate}</p>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Đối tác: {c.partnerName} • Ngày ký: {c.signDate}</p>
+                        <a
+                          href={'https://drive.google.com/drive/search?q=' + encodeURIComponent(c.contractNumber)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-2xs"
+                        >
+                          <FileText size={13} /> PDF Gốc <ArrowUpRight size={12} />
+                        </a>
                       </div>
-                      <a
-                        href={'https://drive.google.com/drive/search?q=' + encodeURIComponent(c.contractNumber)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold flex items-center gap-1"
-                      >
-                        <FileText size={13} /> PDF Gốc <ArrowUpRight size={12} />
-                      </a>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
