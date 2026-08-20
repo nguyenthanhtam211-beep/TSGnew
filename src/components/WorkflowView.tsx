@@ -425,12 +425,29 @@ export default function WorkflowView({
   const handleItemChangeInReconciliation = (index: number, updatedItem: any) => {
     const newLines = poLines.map((line, i) => {
       if (i === index) {
+        const qty = updatedItem.quantity !== undefined ? parseNumber(updatedItem.quantity) : parseNumber(line["Số lượng"] || line.quantity || 1);
+        const sell = updatedItem.effectivePrice !== undefined ? parseNumber(updatedItem.effectivePrice) : (parseNumber(updatedItem["Đơn giá bán"]) || parseNumber(line.effectivePrice || 0));
+        const buy = updatedItem.buyPrice !== undefined ? parseNumber(updatedItem.buyPrice) : (parseNumber(updatedItem["Đơn giá nhập"]) || parseNumber(line.buyPrice || 0));
+        const code = updatedItem.masterProductCode || updatedItem.code || line.code || line["Mã sản phẩm"];
+        const name = updatedItem.masterProductName || updatedItem.name || line.name || line["Tên sản phẩm"];
+        const unit = updatedItem.unit || line.unit || line["ĐVT"] || "Cái";
+
         return {
           ...line,
           ...updatedItem,
-          "Đơn giá bán": updatedItem.effectivePrice,
-          "Đơn giá nhập": updatedItem.buyPrice,
-          "Thành tiền dòng": updatedItem.effectivePrice * updatedItem.quantity
+          code: code,
+          name: name,
+          unit: unit,
+          quantity: qty,
+          effectivePrice: sell,
+          buyPrice: buy,
+          "Mã sản phẩm": code,
+          "Tên sản phẩm": name,
+          "ĐVT": unit,
+          "Số lượng": qty,
+          "Đơn giá bán": sell,
+          "Đơn giá nhập": buy,
+          "Thành tiền dòng": sell * qty
         };
       }
       return line;
@@ -447,18 +464,25 @@ export default function WorkflowView({
       });
       const masterSell = priceRecord ? (parseNumber(priceRecord['Giá bán']) || parseNumber(priceRecord['Đơn giá bán']) || parseNumber(priceRecord['Đơn giá bán mới'])) : (line.effectivePrice || 0);
       const masterBuy = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : (line.buyPrice || 0);
+      const prodCode = priceRecord ? priceRecord['Mã sản phẩm'] : (line.masterProductCode || line.code);
+      const prodName = priceRecord ? priceRecord['Tên sản phẩm'] : (line.masterProductName || line.name);
+      const qty = parseNumber(line["Số lượng"] || line.quantity || 1);
 
       return {
         ...line,
+        code: prodCode,
+        name: prodName,
         effectivePrice: masterSell,
         buyPrice: masterBuy,
+        "Mã sản phẩm": prodCode,
+        "Tên sản phẩm": prodName,
         "Đơn giá bán": masterSell,
         "Đơn giá nhập": masterBuy,
-        masterProductCode: priceRecord ? priceRecord['Mã sản phẩm'] : (line.masterProductCode || line.code),
-        masterProductName: priceRecord ? priceRecord['Tên sản phẩm'] : (line.masterProductName || line.name),
+        masterProductCode: prodCode,
+        masterProductName: prodName,
         priceCode: priceRecord ? (priceRecord['Mã giá'] || priceRecord['Mã giá bán']) : line.priceCode,
         supplier: priceRecord ? (priceRecord['RP_Nhà cung cấp'] || priceRecord['Nhà cung cấp']) : (line.supplier || "Tâm Sen"),
-        "Thành tiền dòng": masterSell * line["Số lượng"]
+        "Thành tiền dòng": masterSell * qty
       };
     });
     setPoLines(newLines);
@@ -470,34 +494,49 @@ export default function WorkflowView({
       toast.error("Vui lòng chọn sản phẩm!");
       return;
     }
-    const priceRec = pricingData.find(p => p["Mã sản phẩm"] === selectedProductCode && (!poCustomer || p["RP_Khách hàng"] === poCustomer));
+    const priceRec = pricingData.find(p => p["Mã sản phẩm"] === selectedProductCode && (!poCustomer || p["RP_Khách hàng"] === poCustomer)) 
+      || pricingData.find(p => p["Mã sản phẩm"] === selectedProductCode);
     if (!priceRec) {
       toast.error("Không tìm thấy giá cho sản phẩm đã chọn!");
       return;
     }
-    const sellPrice = parseNumber(priceRec["Đơn giá bán"] || priceRec["Đơn giá bán mới"]);
-    const buyPrice = parseNumber(priceRec["Đơn giá mua"] || priceRec["Giá nhập"]);
-    const lineTotal = sellPrice * lineQty;
+    const sellPrice = parseNumber(priceRec["Đơn giá bán"] || priceRec["Đơn giá bán mới"] || priceRec["Giá bán"]);
+    const buyPrice = parseNumber(priceRec["Đơn giá mua"] || priceRec["Giá nhập"] || priceRec["Giá vốn"]);
+    const qty = Math.max(1, parseNumber(lineQty) || 1);
+    const lineTotal = sellPrice * qty;
+    const prodName = priceRec["Tên sản phẩm"] || selectedProductCode;
+    const prodCode = priceRec["Mã sản phẩm"] || selectedProductCode;
+    const prodUnit = priceRec["ĐVT"] || "Cái";
+    const pCode = priceRec["Mã giá bán"] || priceRec["Mã giá"] || "Gsp_082";
+    const supplier = priceRec["RP_Nhà cung cấp"] || priceRec["Nhà cung cấp"] || "Tâm Sen";
 
     const newLine = {
-      id: `temp-${Date.now()}`,
-      code: priceRec["Mã sản phẩm"],
-      "Mã sản phẩm": priceRec["Mã sản phẩm"],
-      "Tên sản phẩm": priceRec["Tên sản phẩm"],
-      "ĐVT": priceRec["ĐVT"] || "Cái",
-      "Số lượng": lineQty,
+      id: `manual-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      code: prodCode,
+      name: prodName,
+      unit: prodUnit,
+      quantity: qty,
       poPrice: sellPrice,
       effectivePrice: sellPrice,
       buyPrice: buyPrice,
+      priceCode: pCode,
+      masterProductCode: prodCode,
+      masterProductName: prodName,
+      supplier: supplier,
+      deliveryDate: poDate ? poDate.split("-").reverse().join("/") : new Date().toLocaleDateString("vi-VN"),
+      // Vietnamese keys for backward compatibility
+      "Mã sản phẩm": prodCode,
+      "Tên sản phẩm": prodName,
+      "ĐVT": prodUnit,
+      "Số lượng": qty,
       "Đơn giá bán": sellPrice,
       "Đơn giá nhập": buyPrice,
-      priceCode: priceRec["Mã giá bán"] || priceRec["Mã giá"],
       "Thành tiền dòng": lineTotal
     };
 
-    setPoLines([...poLines, newLine]);
+    setPoLines(prev => [...prev, newLine]);
     setSelectedProductCode("");
-    toast.success("Đã thêm dòng sản phẩm vào PO!");
+    toast.success(`Đã thêm ${qty.toLocaleString('vi-VN')} ${prodUnit} [${prodCode}] ${prodName} vào đơn!`);
   };
 
   const handleRemovePOLine = (lineId: string) => {

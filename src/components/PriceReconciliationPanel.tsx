@@ -22,6 +22,7 @@ export interface ReconciliationItem {
   masterProductName?: string; // Tên SP trong Bảng Giá
   supplier?: string;
   notes?: string;
+  [key: string]: any;
 }
 
 interface PriceReconciliationPanelProps {
@@ -58,17 +59,28 @@ export function PriceReconciliationPanel({
     return filtered.length > 0 ? filtered : pricingData;
   }, [pricingData, customer]);
 
-  // Calculate totals
-  const totalRevenue = items.reduce((sum, item) => sum + ((item.effectivePrice || 0) * (item.quantity || 0)), 0);
-  const totalCogs = items.reduce((sum, item) => sum + ((item.buyPrice || 0) * (item.quantity || 0)), 0);
+  // Calculate totals safely
+  const totalRevenue = items.reduce((sum, item: any) => {
+    const eff = item.effectivePrice !== undefined ? parseNumber(item.effectivePrice) : (parseNumber(item["Đơn giá bán"]) || parseNumber(item.poPrice));
+    const qty = item.quantity !== undefined ? parseNumber(item.quantity) : parseNumber(item["Số lượng"]);
+    return sum + (eff * qty);
+  }, 0);
+
+  const totalCogs = items.reduce((sum, item: any) => {
+    const buy = item.buyPrice !== undefined ? parseNumber(item.buyPrice) : parseNumber(item["Đơn giá nhập"]);
+    const qty = item.quantity !== undefined ? parseNumber(item.quantity) : parseNumber(item["Số lượng"]);
+    return sum + (buy * qty);
+  }, 0);
+
   const totalProfit = totalRevenue - totalCogs;
   const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
   // Count binding progress
-  const boundCount = items.filter(item => {
+  const boundCount = items.filter((item: any) => {
+    const eff = item.effectivePrice !== undefined ? parseNumber(item.effectivePrice) : parseNumber(item["Đơn giá bán"]);
     return (item.priceCode && item.priceCode !== 'N/A' && item.priceCode !== 'Gsp_N/A') ||
       (item.masterProductCode && item.masterProductCode !== '') ||
-      (item.effectivePrice > 0);
+      (eff > 0);
   }).length;
 
   const allBound = boundCount === items.length && items.length > 0;
@@ -194,14 +206,21 @@ export function PriceReconciliationPanel({
 
                 const suggestedPriceCode = suggestedRecord ? (suggestedRecord['Mã giá'] || suggestedRecord['Mã giá bán']) : '';
 
+                // Safe extraction of properties supporting both formats
+                const itemName = (item as any).name || (item as any)["Tên sản phẩm"] || (item as any).masterProductName || "Sản phẩm chưa đặt tên";
+                const itemCode = (item as any).code || (item as any)["Mã sản phẩm"] || (item as any).masterProductCode || "";
+                const itemUnit = (item as any).unit || (item as any)["ĐVT"] || "Cái";
+                const itemQty = (item as any).quantity !== undefined ? parseNumber((item as any).quantity) : parseNumber((item as any)["Số lượng"]);
+                const itemEffPrice = (item as any).effectivePrice !== undefined ? parseNumber((item as any).effectivePrice) : (parseNumber((item as any)["Đơn giá bán"]) || parseNumber((item as any).poPrice));
+                const itemBuyPrice = (item as any).buyPrice !== undefined ? parseNumber((item as any).buyPrice) : parseNumber((item as any)["Đơn giá nhập"]);
+                const lineTotal = itemEffPrice * itemQty;
+
                 // Is currently bound?
                 const isBound = Boolean(
                   item.masterProductCode || 
                   (item.priceCode && item.priceCode !== 'N/A' && item.priceCode !== 'Gsp_N/A') ||
-                  item.effectivePrice > 0
+                  itemEffPrice > 0
                 );
-
-                const lineTotal = (item.effectivePrice || 0) * (item.quantity || 0);
 
                 return (
                   <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
@@ -211,8 +230,8 @@ export function PriceReconciliationPanel({
                     {/* OCR Info: Scanned Code, Name, Qty */}
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 text-xs">{item.name || "Sản phẩm chưa đặt tên"}</span>
-                        <ProductHoverCard productName={item.name} productCode={item.code} pricingData={pricingData}>
+                        <span className="font-bold text-slate-900 text-xs">{itemName}</span>
+                        <ProductHoverCard productName={itemName} productCode={itemCode} pricingData={pricingData}>
                           <button type="button" className="text-slate-400 hover:text-blue-600 transition">
                             <HelpCircle size={13} />
                           </button>
@@ -220,10 +239,10 @@ export function PriceReconciliationPanel({
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
                         <span className="font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-semibold text-slate-700">
-                          {item.code || 'Mã PO'}
+                          {itemCode || 'Mã SP'}
                         </span>
-                        <span>SL: <strong className="text-slate-800 font-mono font-bold">{(item.quantity || 0).toLocaleString('vi-VN')}</strong> {item.unit || 'Cái'}</span>
-                        {item.poPrice > 0 && (
+                        <span>SL: <strong className="text-slate-800 font-mono font-bold">{itemQty.toLocaleString('vi-VN')}</strong> {itemUnit}</span>
+                        {(item.poPrice || 0) > 0 && (
                           <span className="text-slate-400">| Giá PO: {formatVND(item.poPrice)}</span>
                         )}
                       </div>
@@ -355,14 +374,19 @@ export function PriceReconciliationPanel({
                       <div className="inline-flex flex-col items-end">
                         <input
                           type="number"
-                          value={item.effectivePrice || 0}
+                          value={itemEffPrice || 0}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value) || 0;
-                            onChangeItem(idx, { ...item, effectivePrice: val });
+                            onChangeItem(idx, { 
+                              ...item, 
+                              effectivePrice: val, 
+                              "Đơn giá bán": val,
+                              "Thành tiền dòng": val * itemQty 
+                            });
                           }}
                           className="w-24 text-right border border-slate-200 rounded-lg p-1.5 font-mono font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none text-xs"
                         />
-                        <span className="text-[9px] text-slate-400 mt-0.5">Giá vốn: {formatVND(item.buyPrice || 0)}</span>
+                        <span className="text-[9px] text-slate-400 mt-0.5">Giá vốn: {formatVND(itemBuyPrice || 0)}</span>
                       </div>
                     </td>
 
