@@ -6,9 +6,37 @@
 
 export const parseNumber = (val: any): number => {
   if (val === null || val === undefined || val === '') return 0;
-  if (typeof val === 'number') return val;
-  const str = String(val).replace(/[^0-9.-]+/g, "");
-  const num = parseFloat(str);
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  let str = String(val).trim();
+  if (!str) return 0;
+
+  // If both dot and comma exist:
+  if (str.includes('.') && str.includes(',')) {
+    if (str.indexOf('.') < str.indexOf(',')) {
+      // Format "1.234.567,89" (VN standard: dot is thousand, comma is decimal)
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Format "1,234,567.89" (US standard: comma is thousand, dot is decimal)
+      str = str.replace(/,/g, '');
+    }
+  } else if (str.includes(',')) {
+    // Only commas exist: e.g. "9,008" or "2,316" or "10,861" or "2,5"
+    const parts = str.split(',');
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(',', '.');
+    }
+  } else if (str.includes('.')) {
+    // Only dots exist: e.g. "10.861" or "9.008" or "718.062.120"
+    const parts = str.split('.');
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      str = str.replace(/\./g, '');
+    }
+  }
+
+  const cleaned = str.replace(/[^0-9.-]+/g, '');
+  const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 };
 

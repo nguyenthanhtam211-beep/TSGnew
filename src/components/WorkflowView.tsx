@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 import { DualPODocumentModal } from "./DualPODocumentModal";
-import { findPriceRecord } from "../lib/business-logic";
+import { findPriceRecord, parseNumber } from "../lib/business-logic";
 import { exportGenericTableToPDF, formatVND } from "../lib/pdf-exporter";
 import { processDocumentOCR } from "../lib/gemini";
 
@@ -193,13 +193,8 @@ export default function WorkflowView({
   const [vatRate, setVatRate] = useState<number>(8); // Default VAT 8%
 
   const formatCurrency = (value: any) => {
-    const num = parseFloat(String(value || "0").replace(/,/g, ''));
+    const num = parseNumber(value);
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(isNaN(num) ? 0 : num);
-  };
-
-  const parseNumber = (val: any) => {
-    const parsed = parseFloat(String(val || "0").replace(/,/g, ''));
-    return isNaN(parsed) ? 0 : parsed;
   };
 
   // Customer matching helper for Sourcing & Pricing catalog
@@ -702,7 +697,7 @@ export default function WorkflowView({
         new Promise(resolve => setTimeout(resolve, 600))
       ]).catch(err => console.warn("Background commit notice:", err));
 
-      toast.success(`Đã khởi tạo Cặp Đơn Hàng Kép ${newPoNumber}! Chuyển sang Bước 2 để Thẩm định & Phê duyệt.`, { id: loadToast });
+      toast.success(`Đã lưu Đơn hàng ${newPoNumber}! Chuyển sang Bước 2 để Thẩm định giá & Phê duyệt.`, { id: loadToast });
       setSelectedPoForApproval(newPoNumber.trim());
       setApprovalFilter("pending");
       setNewPoNumber("");
@@ -1610,9 +1605,9 @@ export default function WorkflowView({
                     </span>
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm">
-                        3. Bảng Cặp Đơn Hàng Kép & Đối Chiếu Bảng Giá / Hợp Đồng ({poLines.length} mặt hàng)
+                        3. Bảng Đối Chiếu Giá Bán (SO) ↔ Giá Mua Xưởng (PO) ({poLines.length} mặt hàng)
                       </h4>
-                      <p className="text-xs text-slate-500">Đối chiếu song phương: Đơn bán khách hàng (SO) ↔ Đơn mua xưởng sản xuất (PO)</p>
+                      <p className="text-xs text-slate-500">Đối chiếu đồng bộ: Đơn giá bán cho Khách hàng (SO) ↔ Đơn giá mua từ Xưởng sản xuất (PO)</p>
                     </div>
                   </div>
 
@@ -1882,7 +1877,7 @@ export default function WorkflowView({
                 {/* Left Column: PO Headers List with Smart Tabs & Search (4 cols) */}
                 <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh Sách Cặp Đơn Hàng</h4>
+                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Danh Sách Đơn Hàng Cần Duyệt & Sản Xuất</h4>
                     <button
                       onClick={() => setActiveStep(1)}
                       className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 hover:underline"
@@ -2086,7 +2081,7 @@ export default function WorkflowView({
                       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
                         <div className="flex items-center justify-between">
                           <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
-                            Chi Tiết Cặp Đơn Hàng Kép ({currentPoLinesForApproval.length} mặt hàng)
+                            Chi Tiết Sản Phẩm & Định Mức Giá ({currentPoLinesForApproval.length} mặt hàng)
                           </h4>
                           <span className="text-xs text-slate-500">
                             Khách hàng: <strong className="text-blue-700">{currentPoForApproval["Khách hàng"]}</strong>

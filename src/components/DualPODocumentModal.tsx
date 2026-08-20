@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
 import MacTrafficLights from "./MacTrafficLights";
+import { parseNumber } from "../lib/business-logic";
 
 interface DualPODocumentModalProps {
   isOpen: boolean;
@@ -154,15 +155,16 @@ export function DualPODocumentModal({
   // Tâm Sen PO uses effective selling prices / Tâm Sen contract price
   // An Việt Phát PO uses direct supplier buying cost
   const tableDataTamSen = useMemo(() => {
+    if (!poLines || poLines.length === 0) return [];
     return poLines.map((line, idx) => {
-      const sellPrice = line.effectivePrice !== undefined ? line.effectivePrice : (parseFloat(String(line["Đơn giá bán"] || 0).replace(/,/g, '')) || 260375);
-      const qty = parseFloat(String(line["Số lượng"] || 0).replace(/,/g, '')) || 2000;
+      const sellPrice = parseNumber(line.effectivePrice ?? line["Đơn giá bán"] ?? line.poPrice ?? line["Giá bán"] ?? line["Đơn giá bán mới"] ?? 0);
+      const qty = parseNumber(line["Số lượng"] ?? line.quantity ?? line.qty ?? 1);
       const amount = sellPrice * qty;
 
-      const rawSpecs = line.specs || line["Quy cách"] || "Thùng nâu 5 lớp sóng AB (KP250/3M330/KP250). KT trong: 1.140x700x715 (±5mm), 1.120x680x705 (±5mm). Trọng lượng 15kg (±0.4kg). Dập ghim, TCKT đã duyệt.";
+      const rawSpecs = line.specs || line["Quy cách"] || "Thùng carton sóng theo tiêu chuẩn kỹ thuật đã duyệt.";
       
       // Multi-batch delivery date parser
-      let deliverySchedule = line.deliverySchedule || line.deliveryDate || "01/08/2026";
+      let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
       let deliveryBatches: { batch: number; date: string; qty: number }[] = [];
       
       if (line.deliveryBatches && Array.isArray(line.deliveryBatches)) {
@@ -176,38 +178,37 @@ export function DualPODocumentModal({
           qty: subQty
         }));
       } else {
-        // Default 2 delivery batches for demonstration if qty > 500
         deliveryBatches = [
-          { batch: 1, date: "01/08/2026", qty: Math.round(qty * 0.5) },
-          { batch: 2, date: "15/08/2026", qty: Math.round(qty * 0.5) }
+          { batch: 1, date: deliverySchedule, qty: qty }
         ];
       }
 
       return {
         stt: idx + 1,
-        code: line.code || line["Mã sản phẩm"] || "PS-15-I",
-        name: line["Tên sản phẩm"] || line.name || "Thùng C48 5 lớp - 15kg",
-        unit: line["ĐVT"] || "Cái",
+        code: line.code || line["Mã sản phẩm"] || line.masterProductCode || "-",
+        name: line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm",
+        unit: line["ĐVT"] || line.unit || "Cái",
         specs: rawSpecs,
-        deliveryDate: line.deliveryDate || "01/08/2026",
+        deliveryDate: deliverySchedule,
         deliveryBatches,
         qty: qty,
         unitPrice: sellPrice,
         amount: amount
       };
     });
-  }, [poLines]);
+  }, [poLines, formattedPoDate]);
 
   const tableDataAVP = useMemo(() => {
+    if (!poLines || poLines.length === 0) return [];
     return poLines.map((line, idx) => {
       // Cost price for An Việt Phát ordering from Supplier
-      const buyPrice = line.buyPrice !== undefined && line.buyPrice > 0 ? line.buyPrice : (parseFloat(String(line["Đơn giá nhập"] || 0).replace(/,/g, '')) || 260375);
-      const qty = parseFloat(String(line["Số lượng"] || 0).replace(/,/g, '')) || 2000;
+      const buyPrice = parseNumber(line.buyPrice ?? line["Đơn giá nhập"] ?? line["Giá nhập"] ?? line["Giá vốn"] ?? 0);
+      const qty = parseNumber(line["Số lượng"] ?? line.quantity ?? line.qty ?? 1);
       const amount = buyPrice * qty;
 
-      const rawSpecs = line.specs || line["Quy cách"] || "Thùng nâu 5 lớp sóng AB (KP250/3M330/KP250). KT trong: 1.140x700x715 (±5mm), 1.120x680x705 (±5mm). Trọng lượng 15kg (±0.4kg). Dập ghim, TCKT đã duyệt.";
+      const rawSpecs = line.specs || line["Quy cách"] || "Thùng carton sóng theo tiêu chuẩn kỹ thuật đã duyệt.";
 
-      let deliverySchedule = line.deliverySchedule || line.deliveryDate || "01/08/2026";
+      let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
       let deliveryBatches: { batch: number; date: string; qty: number }[] = [];
       
       if (line.deliveryBatches && Array.isArray(line.deliveryBatches)) {
@@ -222,25 +223,24 @@ export function DualPODocumentModal({
         }));
       } else {
         deliveryBatches = [
-          { batch: 1, date: "01/08/2026", qty: Math.round(qty * 0.5) },
-          { batch: 2, date: "15/08/2026", qty: Math.round(qty * 0.5) }
+          { batch: 1, date: deliverySchedule, qty: qty }
         ];
       }
 
       return {
         stt: idx + 1,
-        code: line.code || line["Mã sản phẩm"] || "PS-15-I",
-        name: line["Tên sản phẩm"] || line.name || "Thùng C48 5 lớp - 15kg",
-        unit: line["ĐVT"] || "Cái",
+        code: line.code || line["Mã sản phẩm"] || line.masterProductCode || "-",
+        name: line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm",
+        unit: line["ĐVT"] || line.unit || "Cái",
         specs: rawSpecs,
-        deliveryDate: line.deliveryDate || "01/08/2026",
+        deliveryDate: deliverySchedule,
         deliveryBatches,
         qty: qty,
         unitPrice: buyPrice,
         amount: amount
       };
     });
-  }, [poLines]);
+  }, [poLines, formattedPoDate]);
 
   const subtotalTamSen = useMemo(() => tableDataTamSen.reduce((s, item) => s + item.amount, 0), [tableDataTamSen]);
   const vatTamSen = Math.round(subtotalTamSen * 0.08);
@@ -774,7 +774,7 @@ export function DualPODocumentModal({
                   </div>
                   <div className="grid grid-cols-12 gap-2 border-t border-slate-200/60 pt-1">
                     <div className="col-span-3 font-bold text-slate-700 uppercase">GIAO HÀNG ĐẾN</div>
-                    <div className="col-span-9 font-bold text-slate-900">CÔNG TY TNHH MỘT THÀNH VIÊN THUỐC LÁ THĂNG LONG</div>
+                    <div className="col-span-9 font-bold text-slate-900">{poCustomer || "CÔNG TY TNHH MỘT THÀNH VIÊN THUỐC LÁ THĂNG LONG"}</div>
                   </div>
                 </div>
 
@@ -942,7 +942,7 @@ export function DualPODocumentModal({
                   </div>
                   <div className="grid grid-cols-12 gap-2 border-t border-slate-200/60 pt-1">
                     <div className="col-span-3 font-bold text-slate-700 uppercase">GIAO HÀNG ĐẾN</div>
-                    <div className="col-span-9 font-bold text-slate-900">CÔNG TY TNHH MỘT THÀNH VIÊN THUỐC LÁ THĂNG LONG</div>
+                    <div className="col-span-9 font-bold text-slate-900">{poCustomer || "CÔNG TY TNHH MỘT THÀNH VIÊN THUỐC LÁ THĂNG LONG"}</div>
                   </div>
                 </div>
 
