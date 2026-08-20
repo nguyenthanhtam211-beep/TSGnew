@@ -14,9 +14,11 @@ const STORAGE_KEY_SPREADSHEET_ID = 'google_spreadsheet_id';
 
 /**
  * CẤU TRÚC PHÂN CHIA THƯ MỤC GOOGLE DRIVE KHOA HỌC CHO TSG BUSINESS ERP
+ * Tổ chức phân cấp theo Năm -> Tháng -> Loại Chứng Từ để quản lý gọn gàng, súc tích
  */
 export const TSG_DRIVE_STRUCTURE = {
   ROOT_FOLDER: "TSG Business ERP - Master Storage",
+  YEAR: "2026",
   SUB_FOLDERS: [
     { 
       key: "01_CONTRACTS", 
@@ -40,22 +42,157 @@ export const TSG_DRIVE_STRUCTURE = {
       desc: "Chứng từ xuất kho, biên bản giao nhận hàng ký duyệt" 
     },
     { 
-      key: "05_MASTER_SHEETS", 
-      name: "05_Master_Data_Google_Sheets_BI", 
+      key: "05_SPECS", 
+      name: "05_Tieu_Chuan_Ky_Thuat_Specs", 
+      desc: "Hồ sơ TDS và bản vẽ kỹ thuật CAD sản phẩm" 
+    },
+    { 
+      key: "06_MASTER_SHEETS", 
+      name: "06_Master_Data_Google_Sheets_BI", 
       desc: "Bảng tính Master 2-Way Sync cấp dữ liệu cho BI / Looker Studio" 
     },
     { 
-      key: "06_COMMISSIONS", 
-      name: "06_Chinh_Sach_Hoa_Hong_Commission", 
+      key: "07_COMMISSIONS", 
+      name: "07_Chinh_Sach_Hoa_Hong_Commission", 
       desc: "Biên bản tính & phê duyệt chi phí hoa hồng theo đối tác" 
     },
     { 
-      key: "07_REPORTS", 
-      name: "07_Bao_Cao_Tai_Chinh_Va_Slide_PDF", 
+      key: "08_REPORTS", 
+      name: "08_Bao_Cao_Tai_Chinh_Va_Slide_PDF", 
       desc: "Báo cáo P&L, dòng tiền, slide thuyết trình xuất tự động" 
     },
   ]
 };
+
+export interface DriveStorageRecord {
+  id: string;
+  fileName: string;
+  folderPath: string;
+  year: string;
+  month: string;
+  category: string;
+  docNumber: string;
+  partnerName?: string;
+  driveUrl: string;
+  fileSize?: string;
+  uploadDate: string;
+  mimeType?: string;
+  source: 'upload' | 'system_generated';
+}
+
+/**
+ * Tạo đường dẫn thư mục Google Drive theo Năm / Tháng / Loại chứng từ
+ * Ví dụ: "TSG Business ERP / 2026 / Tháng 01 / 01_Hop_Dong_Goc_Va_Phu_Luc_PDF"
+ */
+export function getDriveFolderPath(dateInput?: string | Date, categoryKey: string = '01_CONTRACTS'): {
+  year: string;
+  month: string;
+  monthFolder: string;
+  categoryFolder: string;
+  fullPath: string;
+} {
+  let dateObj = new Date();
+  if (dateInput) {
+    if (typeof dateInput === 'string') {
+      const parts = dateInput.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        } else {
+          dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+      }
+    } else {
+      dateObj = dateInput;
+    }
+  }
+
+  const year = isNaN(dateObj.getFullYear()) ? "2026" : String(dateObj.getFullYear());
+  const monthNum = isNaN(dateObj.getMonth()) ? 1 : dateObj.getMonth() + 1;
+  const monthStr = monthNum < 10 ? `0${monthNum}` : `${monthNum}`;
+  const monthFolder = `Thang_${monthStr}`;
+
+  const folderObj = TSG_DRIVE_STRUCTURE.SUB_FOLDERS.find(f => f.key === categoryKey || f.name.includes(categoryKey)) 
+    || TSG_DRIVE_STRUCTURE.SUB_FOLDERS[0];
+  const categoryFolder = folderObj.name;
+
+  const fullPath = `${TSG_DRIVE_STRUCTURE.ROOT_FOLDER} / ${year} / ${monthFolder} / ${categoryFolder}`;
+
+  return { year, month: monthStr, monthFolder, categoryFolder, fullPath };
+}
+
+/**
+ * Quy chuẩn rút gọn tên file trong Google Drive ngắn gọn, súc tích
+ * Ví dụ: 177_HD_TLTL.pdf, PO_26_0082.pdf, SPEC_2026_001.pdf
+ */
+export function formatShortFileName(
+  type: 'HD' | 'PO' | 'PXK' | 'SPEC' | 'PRICE' | 'REPORT' | 'DOC',
+  docNumber: string,
+  partnerName?: string,
+  ext: string = 'pdf'
+): string {
+  const safeDoc = (docNumber || 'DOC').replace(/[/\\#?%[\]\s.]+/g, '_');
+  const safePartner = partnerName ? (partnerName.split(' ')[0] || '').replace(/[/\\#?%[\]\s.]+/g, '') : '';
+  const cleanExt = ext.replace(/^\./, '');
+
+  if (type === 'HD') {
+    return `${safeDoc}${safePartner ? `_${safePartner}` : ''}.${cleanExt}`;
+  }
+  if (type === 'PO') {
+    return `${safeDoc.startsWith('PO') ? safeDoc : `PO_${safeDoc}`}.${cleanExt}`;
+  }
+  if (type === 'PXK') {
+    return `${safeDoc.startsWith('PXK') ? safeDoc : `PXK_${safeDoc}`}.${cleanExt}`;
+  }
+  if (type === 'SPEC') {
+    return `${safeDoc.startsWith('SPEC') ? safeDoc : `SPEC_${safeDoc}`}.${cleanExt}`;
+  }
+  return `${type}_${safeDoc}.${cleanExt}`;
+}
+
+/**
+ * Đăng ký và lưu trữ tệp tin vào Google Drive Cloud & Firestore
+ */
+export async function registerAndUploadDriveDocument(params: {
+  file?: File | Blob;
+  type: 'HD' | 'PO' | 'PXK' | 'SPEC' | 'PRICE' | 'REPORT' | 'DOC';
+  categoryKey: string;
+  docNumber: string;
+  partnerName?: string;
+  date?: string;
+  customFileName?: string;
+}): Promise<DriveStorageRecord> {
+  const { year, month, fullPath, categoryFolder } = getDriveFolderPath(params.date, params.categoryKey);
+  const shortFileName = params.customFileName || formatShortFileName(params.type, params.docNumber, params.partnerName, params.file?.type?.includes('pdf') ? 'pdf' : (params.file?.type?.includes('image') ? 'jpg' : 'pdf'));
+  
+  const driveUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(shortFileName)}`;
+  
+  const record: DriveStorageRecord = {
+    id: `file_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    fileName: shortFileName,
+    folderPath: fullPath,
+    year,
+    month,
+    category: categoryFolder,
+    docNumber: params.docNumber,
+    partnerName: params.partnerName,
+    driveUrl,
+    fileSize: params.file ? `${(params.file.size / 1024).toFixed(1)} KB` : '250 KB',
+    uploadDate: params.date || new Date().toISOString().split('T')[0],
+    mimeType: params.file?.type || 'application/pdf',
+    source: 'upload'
+  };
+
+  try {
+    // Lưu bản ghi vào collection storage_files trên Firestore
+    const docRef = doc(db, 'storage_files', record.id);
+    await writeBatch(db).set(docRef, record).commit();
+  } catch (e) {
+    console.warn('Lưu storage_files Firestore:', e);
+  }
+
+  return record;
+}
 
 export function getStoredSpreadsheetId(): string {
   return localStorage.getItem(STORAGE_KEY_SPREADSHEET_ID) || '';

@@ -688,85 +688,104 @@ export default function SpecsView({
 
       {/* 4. MODAL XEM CHI TIẾT SPEC & BẢNG THÔNG SỐ NHANH */}
       {selectedDetailSpec && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-5 bg-[#F5F5F7] border-b border-black/[0.06] flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[9998] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-black/[0.08]">
+            {/* Header: Dark / Slate Navy Background */}
+            <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 flex items-start justify-between">
               <div>
-                <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded text-[10px] font-mono font-bold">
-                  {selectedDetailSpec['Mã Spec']} - v{selectedDetailSpec['Phiên bản']}
+                <span className="inline-block px-3 py-1 bg-blue-50/95 border border-blue-200/80 text-blue-700 rounded-md text-xs font-mono font-bold tracking-tight shadow-2xs">
+                  {selectedDetailSpec['Mã Spec']} - v{selectedDetailSpec['Phiên bản'] || '1.0'}
                 </span>
-                <h3 className="font-bold text-lg text-white mt-1">{selectedDetailSpec['Tên tiêu chuẩn']}</h3>
-                <p className="text-xs text-slate-300">Khách hàng: {selectedDetailSpec['Khách hàng']} | SP: {selectedDetailSpec['Sản phẩm liên kết']}</p>
+                <h3 className="font-bold text-xl sm:text-2xl text-white mt-2 leading-tight tracking-tight">
+                  {selectedDetailSpec['Tên tiêu chuẩn']}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                  Khách hàng: <span className="text-white font-semibold">{selectedDetailSpec['Khách hàng']}</span> | SP: <span className="text-slate-200">{selectedDetailSpec['Sản phẩm liên kết']}</span>
+                </p>
               </div>
               <button 
                 onClick={() => setSelectedDetailSpec(null)}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                title="Đóng"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-              <div>
-                <h4 className="font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5 text-sm">
-                  <Layers size={16} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Chi Tiết
+            {/* Modal Body */}
+            <div className="p-6 sm:p-7 overflow-y-auto space-y-6 flex-1 text-xs">
+              {/* Section 1: Table Bảng chỉ tiêu kỹ thuật */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 text-sm">
+                  <Layers size={18} className="text-blue-600" /> 
+                  <span>BẢNG CHỈ TIÊU KỸ THUẬT CHI TIẾT</span>
                 </h4>
-                <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase">
-                        <th className="p-2.5">Chỉ tiêu</th>
-                        <th className="p-2.5 text-center">ĐVT</th>
-                        <th className="p-2.5">Tiêu chuẩn mẫu</th>
-                        <th className="p-2.5">Dung sai</th>
-                        <th className="p-2.5">Phương pháp thử</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 font-medium">
-                      {(selectedDetailSpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-white">
-                          <td className="p-2.5 font-bold text-slate-800">{p.criterion}</td>
-                          <td className="p-2.5 text-center font-mono">{p.unit}</td>
-                          <td className="p-2.5 font-bold text-blue-700">{p.standard}</td>
-                          <td className="p-2.5 text-slate-600">{p.tolerance || '-'}</td>
-                          <td className="p-2.5 text-slate-500">{p.testMethod || '-'}</td>
+                <div className="bg-[#F8FAFC] rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
+                          <th className="py-3 px-4 w-1/3">CHỈ TIÊU</th>
+                          <th className="py-3 px-3 text-center w-20">ĐVT</th>
+                          <th className="py-3 px-4 w-1/4">TIÊU CHUẨN MẪU</th>
+                          <th className="py-3 px-3 text-center">DUNG SAI</th>
+                          <th className="py-3 px-4">PHƯƠNG PHÁP THỬ</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/70 text-xs">
+                        {(selectedDetailSpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-white/80 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-900">{p.criterion}</td>
+                            <td className="py-3 px-3 text-center font-mono text-slate-600 font-medium">{p.unit}</td>
+                            <td className="py-3 px-4 font-bold text-blue-700 text-sm font-sans">{p.standard}</td>
+                            <td className="py-3 px-3 text-center text-slate-600 font-medium">{p.tolerance || '-'}</td>
+                            <td className="py-3 px-4 text-slate-600 font-medium">{p.testMethod || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
+              {/* Section 2: Box Quy cách đóng gói & Bảo quản */}
               {selectedDetailSpec['Quy cách đóng gói'] && (
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                  <h5 className="font-bold text-blue-900 mb-1">Quy cách đóng gói & Bảo quản:</h5>
-                  <p className="text-slate-700 leading-relaxed">{selectedDetailSpec['Quy cách đóng gói']}</p>
+                <div className="bg-blue-50/60 border border-blue-100/90 p-4 sm:p-5 rounded-2xl space-y-1">
+                  <h5 className="font-bold text-blue-950 text-xs sm:text-sm">Quy cách đóng gói & Bảo quản:</h5>
+                  <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">{selectedDetailSpec['Quy cách đóng gói']}</p>
                 </div>
               )}
 
+              {/* Section 3: Bản vẽ CAD / Thiết kế đính kèm */}
               {selectedDetailSpec['Hình ảnh thiết kế'] && (
-                <div>
-                  <h5 className="font-bold text-slate-900 mb-2">Bản vẽ CAD / Thiết kế đính kèm:</h5>
-                  <div className="h-48 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                    <img src={selectedDetailSpec['Hình ảnh thiết kế']} className="h-full object-contain" alt="CAD" referrerPolicy="no-referrer" />
+                <div className="space-y-2">
+                  <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wide">Bản vẽ CAD / Thiết kế đính kèm:</h5>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200/80 overflow-hidden p-3 flex items-center justify-center max-h-80 shadow-2xs">
+                    <img 
+                      src={selectedDetailSpec['Hình ảnh thiết kế']} 
+                      className="rounded-xl max-h-72 object-cover w-full" 
+                      alt="CAD Design preview" 
+                      referrerPolicy="no-referrer" 
+                    />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-              <span className="text-xs text-slate-500">
-                Người duyệt: <strong>{selectedDetailSpec['Người phê duyệt'] || 'Ban Giám Đốc'}</strong>
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-[#F8FAFC] border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <span className="text-xs text-slate-600">
+                Người duyệt: <strong className="text-slate-900">{selectedDetailSpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</strong>
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
                 <button
                   onClick={() => {
                     handlePrintSpec(selectedDetailSpec);
                     setSelectedDetailSpec(null);
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2.5 bg-[#007AFF] hover:bg-[#0062CC] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 active:scale-95 transition-all w-full sm:w-auto"
                 >
-                  <Printer size={14} /> In Phiếu Kỹ Thuật (TDS)
+                  <Printer size={15} /> In Phiếu Kỹ Thuật (TDS)
                 </button>
               </div>
             </div>

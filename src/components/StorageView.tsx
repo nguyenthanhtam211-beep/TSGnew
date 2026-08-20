@@ -172,70 +172,94 @@ export default function StorageView({ files = [], onUpload, onDelete }: StorageV
             className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">Tất cả năm</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>Năm {y}</option>)}
           </select>
 
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
             <button 
               onClick={() => setViewMode("list")}
               className={clsx("p-1.5 rounded", viewMode === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-400")}
+              title="Dạng danh sách"
             >
               <MoreVertical size={16} className="rotate-90" />
             </button>
             <button 
               onClick={() => setViewMode("grid")}
               className={clsx("p-1.5 rounded", viewMode === "grid" ? "bg-white shadow-sm text-blue-600" : "text-slate-400")}
+              title="Dạng thư mục"
             >
               <Folder size={16} />
             </button>
           </div>
+        </div>
+
+        {/* Tree Path Breadcrumb */}
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700 flex items-center gap-1">
+            <Folder size={14} className="text-amber-500" />
+            TSG Business ERP - Master Storage
+          </span>
+          <ChevronRight size={13} className="text-slate-400" />
+          <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+            {selectedYear === 'All' ? 'Tất cả các năm (2026)' : `Năm ${selectedYear}`}
+          </span>
+          <ChevronRight size={13} className="text-slate-400" />
+          <span className="text-slate-500 italic">
+            Phân chia 12 tháng & 7 thư mục chứng từ chuyên biệt
+          </span>
         </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-auto p-6">
         {filteredFiles.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-            <HardDrive size={64} strokeWidth={1} className="mb-4 opacity-50" />
-            <p className="text-lg font-medium">Chưa có tài liệu nào được lưu trữ</p>
-            <p className="text-sm">Tải lên tài liệu đầu tiên hoặc sử dụng OCR để tự động lưu trữ</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12">
+            <HardDrive size={64} strokeWidth={1} className="mb-4 opacity-50 text-blue-500" />
+            <p className="text-lg font-bold text-slate-700">Chưa có tài liệu nào trong thư mục này</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-md text-center">
+              Các file PDF hợp đồng, ảnh scan PO, và phiếu xuất kho tải lên hoặc do hệ thống sinh ra sẽ tự động lưu vào đây theo phân cấp Năm & Tháng.
+            </p>
           </div>
         ) : viewMode === "list" ? (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tên tệp</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tên tệp & Đường dẫn Drive</th>
                   <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Loại / Số hiệu</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian tải</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
                   <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredFiles.map((file, idx) => (
-                  <tr key={file.fileId || idx} className="hover:bg-slate-50 transition-colors group">
+                  <tr key={file.fileId || file.id || idx} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="bg-slate-100 p-2 rounded-lg group-hover:bg-white transition-colors">
+                        <div className="bg-slate-100 p-2 rounded-lg group-hover:bg-white transition-colors shrink-0">
                           {getFileIcon(file.mimeType)}
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-800 line-clamp-1">{file.fileName}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{file.mimeType}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate" title={file.fileName}>{file.fileName}</p>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate flex items-center gap-1">
+                            <Folder size={11} className="text-amber-500 shrink-0" />
+                            <span>{file.folderPath || `TSG Business ERP / ${file.year || 2026} / Tháng ${String(file.month || 1).padStart(2, '0')} / ${file.category || file.documentType || '01_Hop_Dong_Goc_Va_Phu_Luc_PDF'}`}</span>
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className={clsx(
-                          "px-2 py-0.5 rounded text-[10px] font-bold",
-                          file.documentType === "PO" ? "bg-blue-100 text-blue-700" :
-                          file.documentType === "PXK" ? "bg-green-100 text-green-700" :
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                          file.documentType === "PO" || file.category?.includes('PO') ? "bg-blue-100 text-blue-700" :
+                          file.documentType === "PXK" || file.category?.includes('PXK') ? "bg-green-100 text-green-700" :
+                          file.documentType === "HD" || file.category?.includes('Hop_Dong') ? "bg-rose-100 text-rose-700" :
                           "bg-slate-100 text-slate-600"
                         )}>
-                          {file.documentType}
+                          {file.documentType || (file.category?.includes('Hop_Dong') ? 'HĐ' : 'DOC')}
                         </span>
-                        <span className="text-xs font-mono font-medium text-slate-500">{file.documentNumber}</span>
+                        <span className="text-xs font-mono font-medium text-slate-600">{file.documentNumber || file.docNumber}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">

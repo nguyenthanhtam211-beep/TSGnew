@@ -1410,8 +1410,8 @@ function TableView({
         }
     }
     
-    // Filter out unnecessary columns
-    const excludeCols = ['Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng'];
+    // Filter out unnecessary / redundant columns
+    const excludeCols = ['Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 'Lợi nhuận (1)', 'Bản sao Kích thước'];
     if (isPOLineTable && title.includes("Chi tiết đơn")) {
       excludeCols.push('Đơn giá nhập', 'Lợi nhuận', 'Lợi nhuận dòng');
     }

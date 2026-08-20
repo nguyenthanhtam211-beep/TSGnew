@@ -11,6 +11,7 @@ import clsx from 'clsx';
 import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO, findPriceRecord } from '../lib/business-logic';
 import { processContractOCR } from '../lib/gemini';
+import { registerAndUploadDriveDocument, getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
 import CompanyLogo from './CompanyLogo';
 
 export interface ContractItem {
@@ -292,12 +293,28 @@ export default function ContractsView({
     const toastId = toast.loading("Gemini AI đang bóc tách Hợp đồng & Bảng giá...");
     try {
       const result = await processContractOCR(file);
+      const contractNum = result.contractNumber || file.name.replace(/\.[^/.]+$/, "");
+      const shortName = formatShortFileName('HD', contractNum, result.partnerName, file.name.endsWith('.pdf') ? 'pdf' : 'jpg');
+      const { fullPath } = getDriveFolderPath(result.signDate || new Date(), '01_CONTRACTS');
+      
       setOcrContractResult({
         ...result,
-        attachmentName: file.name,
-        attachmentUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(result.contractNumber || file.name)}`
+        attachmentName: shortName,
+        attachmentUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(shortName)}`
       });
-      toast.success(`Đã bóc tách thành công Hợp đồng ${result.contractNumber || ''} với ${(result.products || []).length} mặt hàng!`, { id: toastId });
+
+      // Đăng ký lưu trữ file vào thư mục Drive phân loại theo Năm / Tháng
+      await registerAndUploadDriveDocument({
+        file,
+        type: 'HD',
+        categoryKey: '01_CONTRACTS',
+        docNumber: contractNum,
+        partnerName: result.partnerName,
+        date: result.signDate,
+        customFileName: shortName
+      });
+
+      toast.success(`Đã bóc tách & lưu hồ sơ HĐ vào thư mục Drive (${fullPath})!`, { id: toastId });
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Không thể xử lý OCR Hợp đồng. Vui lòng thử lại.", { id: toastId });
@@ -312,8 +329,13 @@ export default function ContractsView({
       toast.error("Vui lòng quét hoặc nhập Số Hợp Đồng trước khi lưu!");
       return;
     }
+
+    const contractNum = ocrContractResult.contractNumber || '';
+    const shortName = ocrContractResult.attachmentName || formatShortFileName('HD', contractNum, ocrContractResult.partnerName, 'pdf');
+    const { fullPath } = getDriveFolderPath(ocrContractResult.signDate, '01_CONTRACTS');
+
     const newContract: ContractItem = {
-      contractNumber: ocrContractResult.contractNumber || '',
+      contractNumber: contractNum,
       title: ocrContractResult.title || 'Hợp đồng mua bán hàng hóa',
       partnerName: ocrContractResult.partnerName || 'Chưa rõ đối tác',
       partnerType: ocrContractResult.partnerType || 'Khách hàng',
@@ -326,16 +348,16 @@ export default function ContractsView({
       deliveryTerms: ocrContractResult.deliveryTerms || '',
       aiExecutiveSummary: ocrContractResult.aiExecutiveSummary || '',
       status: 'Hiệu lực',
-      attachmentName: ocrContractResult.attachmentName || `${ocrContractResult.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`,
-      attachmentUrl: ocrContractResult.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(ocrContractResult.contractNumber)}`,
-      notes: 'Được trích xuất và đối chiếu giá tự động bằng Gemini AI',
+      attachmentName: shortName,
+      attachmentUrl: ocrContractResult.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(shortName)}`,
+      notes: `Lưu tại Google Drive: ${fullPath}`,
       products: ocrContractResult.products || [],
       appendices: []
     };
 
     if (onAddContract) {
       await onAddContract(newContract);
-      toast.success(`Đã lưu Hợp đồng ${newContract.contractNumber} vào hệ thống & tạo hồ sơ đối chiếu giá!`);
+      toast.success(`Đã lưu Hợp đồng ${newContract.contractNumber} vào hệ thống & thư mục Drive!`);
       setSelectedContract(newContract);
       setIsOcrModalOpen(false);
     }

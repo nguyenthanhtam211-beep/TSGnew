@@ -353,3 +353,84 @@ export const formatDateForDisplay = (val: any): string => {
   return `${d}/${m}/${y}`;
 };
 
+/**
+ * Trích xuất tên ngắn gọn & quy cách chi tiết của sản phẩm để tránh tên quá dài
+ * Ví dụ: "Lưỡi gà trắng 71mm x 800m x 210gsm" -> { shortName: "Lưỡi gà trắng 71mm", specDetail: "800m x 210gsm" }
+ */
+export const parseProductNameAndSpecs = (fullName: string): { shortName: string; specDetail: string } => {
+  if (!fullName) return { shortName: '', specDetail: '' };
+  const raw = fullName.trim();
+  
+  // Kiểm tra các mẫu phân tách phổ biến
+  if (raw.includes(' x ') || raw.includes(' - ')) {
+    const parts = raw.split(/ [x\-] /);
+    if (parts.length >= 2) {
+      return {
+        shortName: parts[0].trim(),
+        specDetail: parts.slice(1).join(' x ').trim()
+      };
+    }
+  }
+
+  return { shortName: raw, specDetail: '' };
+};
+
+/**
+ * Tra cứu thực thể Sản phẩm hợp nhất (Single Source of Truth) xuyên suốt các bảng:
+ * Products, Specs, Pricing, Contracts, PO_Lines, Deliveries
+ */
+export const findUnifiedProductEntity = (params: {
+  productData: any[];
+  specsData?: any[];
+  pricingData?: any[];
+  contractsData?: any[];
+  poLines?: any[];
+  query: string;
+}) => {
+  const { productData, specsData = [], pricingData = [], contractsData = [], poLines = [], query } = params;
+  if (!query) return null;
+
+  const normQuery = normalizeString(query);
+
+  // 1. Tìm trong danh mục Master Products
+  const matchedProduct = productData.find(p => {
+    const code = normalizeString(p['Mã sản phẩm'] || p['SKU'] || '');
+    const name = normalizeString(p['Tên sản phẩm'] || '');
+    return code === normQuery || name.includes(normQuery) || normQuery.includes(code);
+  });
+
+  const matchedSpec = specsData.find(s => {
+    const specCode = normalizeString(s['Mã Spec'] || '');
+    const prodLink = normalizeString(s['Sản phẩm liên kết'] || s['Tên tiêu chuẩn'] || '');
+    return specCode === normQuery || prodLink.includes(normQuery) || normQuery.includes(prodLink);
+  });
+
+  const matchedPricings = pricingData.filter(pr => {
+    const prCode = normalizeString(pr['Mã sản phẩm'] || '');
+    const prName = normalizeString(pr['Tên sản phẩm'] || '');
+    return prCode === normQuery || prName.includes(normQuery) || normQuery.includes(prCode);
+  });
+
+  const matchedContracts = contractsData.filter(c => {
+    return (c.products || []).some((cp: any) => {
+      const cpCode = normalizeString(cp.productCode || '');
+      const cpName = normalizeString(cp.productName || '');
+      return cpCode === normQuery || cpName.includes(normQuery);
+    });
+  });
+
+  const matchedPOLines = poLines.filter(po => {
+    const poName = normalizeString(po['Tên sản phẩm'] || '');
+    const poCode = normalizeString(po['Mã của khách'] || po['Mã giá bán'] || '');
+    return poName.includes(normQuery) || poCode === normQuery;
+  });
+
+  return {
+    matchedProduct,
+    matchedSpec,
+    matchedPricings,
+    matchedContracts,
+    matchedPOLines
+  };
+};
+
