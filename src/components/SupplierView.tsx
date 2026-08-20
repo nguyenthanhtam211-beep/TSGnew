@@ -817,27 +817,28 @@ export default function SupplierView({
             {/* Supplier Table / Grid */}
             {filteredSuppliers.length > 0 ? (
               viewMode === 'table' ? (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs sm:text-sm text-left border-collapse">
-                      <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
+                      <thead className="bg-[#F8F9FA] text-slate-500 font-semibold border-b border-slate-200/80 text-[11px] uppercase tracking-wider">
                         <tr>
-                          <th className="px-5 py-3.5">Mã & Nhà cung cấp</th>
-                          <th className="px-5 py-3.5">Loại hình & Nhóm hàng</th>
-                          <th className="px-5 py-3.5">Mã số thuế & Email</th>
-                          <th className="px-5 py-3.5">Địa chỉ</th>
-                          <th className="px-5 py-3.5">Điều khoản TT</th>
-                          <th className="px-5 py-3.5">Đánh giá</th>
-                          <th className="px-5 py-3.5">Đầu mối</th>
-                          <th className="px-5 py-3.5 text-right">Thao tác</th>
+                          <th className="px-4 py-3 w-[26%]">Nhà Cung Cấp</th>
+                          <th className="px-3 py-3 w-[14%]">Phân Loại & Nhóm</th>
+                          <th className="px-3 py-3 w-[15%]">MST & Email</th>
+                          <th className="px-3 py-3 w-[18%]">Địa Chỉ Trụ Sở</th>
+                          <th className="px-3 py-3 w-[12%]">Điều Khoản TT</th>
+                          <th className="px-3 py-3 w-[8%] text-center">Đánh Giá</th>
+                          <th className="px-3 py-3 w-[8%] text-center">Đầu Mối</th>
+                          <th className="px-4 py-3 w-[9%] text-center">Thao Tác</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 text-xs">
                         {filteredSuppliers.map((supplier, idx) => {
                           const cleanName = cleanCompanyName(supplier["Tên Nhà Cung Cấp"] || "");
                           const linkedContacts = getLinkedContacts(supplier);
                           const { totalProjects, totalTasks } = getSupplierTasksAndProjects(supplier);
                           const suppKey = supplier.id || supplier["Mã nhà cung cấp"] || `supp-row-${idx}`;
+                          const rawEmail = String(supplier["Email"] || '').replace(/^mailto:/i, '').trim();
 
                           return (
                             <tr 
@@ -845,38 +846,40 @@ export default function SupplierView({
                               onClick={() => setSelectedSupplierDetail(supplier)}
                               className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                             >
-                              <td className="px-5 py-3">
-                                <div className="flex items-center gap-3">
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-2.5 min-w-0">
                                   <CompanyLogo 
                                     name={supplier["Tên Nhà Cung Cấp"] || cleanName} 
-                                    size="sm" 
+                                    size="xs" 
                                     className="shrink-0 rounded-lg shadow-2xs" 
                                     logoUrl={getSupplierLogo(supplier)} 
                                     logoFit={supplier.logoFit} 
                                   />
                                   <div className="min-w-0">
-                                    <span className="text-[10px] font-mono font-semibold text-slate-400 uppercase block">
-                                      {supplier["Mã nhà cung cấp"]}
-                                    </span>
-                                    <div className="font-semibold text-slate-900 group-hover:text-[#0071E3] transition-colors truncate mt-0.5">
-                                      {cleanName}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-1 py-0.2 rounded border border-slate-200/80 uppercase shrink-0">
+                                        {supplier["Mã nhà cung cấp"]}
+                                      </span>
                                     </div>
+                                    <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs sm:text-[13px] mt-0.5" title={cleanName}>
+                                      {cleanName}
+                                    </p>
                                   </div>
                                 </div>
                               </td>
 
-                              <td className="px-5 py-3">
+                              <td className="px-3 py-2.5">
                                 <div className="space-y-0.5">
-                                  <span className="text-[11px] font-medium text-slate-700 block">
-                                    {supplier["Loại hình"] || "Nhà sản xuất"}
-                                  </span>
-                                  <span className="inline-block text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-medium">
+                                  <span className="inline-block text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-medium border border-purple-200/60">
                                     {supplier["Nhóm hàng"] || "Cung ứng"}
+                                  </span>
+                                  <span className="text-[10.5px] text-slate-400 block truncate">
+                                    {supplier["Loại hình"] || "Nhà sản xuất"}
                                   </span>
                                 </div>
                               </td>
 
-                              <td className="px-5 py-3 font-mono text-xs text-slate-700" onClick={(e) => e.stopPropagation()}>
+                              <td className="px-3 py-2.5 font-mono text-xs text-slate-700" onClick={(e) => e.stopPropagation()}>
                                 <div className="space-y-0.5">
                                   {supplier["Mã số thuế"] ? (
                                     <button 
@@ -887,72 +890,69 @@ export default function SupplierView({
                                       {supplier["Mã số thuế"]}
                                     </button>
                                   ) : <span className="text-slate-300">—</span>}
-                                  {supplier["Email"] && (
-                                    <a href={`mailto:${supplier["Email"]}`} className="text-[11px] text-blue-600 font-sans hover:underline block truncate max-w-[150px]">
-                                      {supplier["Email"]}
+                                  {rawEmail && (
+                                    <a href={`mailto:${rawEmail}`} className="text-[11px] text-blue-600 font-sans hover:underline block truncate max-w-[140px]" title={rawEmail}>
+                                      {rawEmail}
                                     </a>
                                   )}
                                 </div>
                               </td>
 
-                              <td className="px-5 py-3 text-slate-600 max-w-xs">
-                                <span className="line-clamp-1 text-xs" title={supplier["Địa chỉ"]}>
-                                  {supplier["Địa chỉ"] || "—"}
-                                </span>
+                              <td className="px-3 py-2.5 text-slate-600">
+                                {supplier["Địa chỉ"] ? (
+                                  <span className="line-clamp-1 text-xs" title={supplier["Địa chỉ"]}>
+                                    {supplier["Địa chỉ"]}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
                               </td>
 
-                              <td className="px-5 py-3">
-                                <span className="text-xs text-slate-700 font-medium">
+                              <td className="px-3 py-2.5">
+                                <span className="text-[11px] text-slate-700 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60 whitespace-nowrap inline-block">
                                   {supplier["Điều khoản thanh toán"] || "Công nợ 30 ngày"}
                                 </span>
                               </td>
 
-                              <td className="px-5 py-3">
-                                <div className="flex items-center gap-1 text-amber-500 font-semibold text-xs">
+                              <td className="px-3 py-2.5 text-center">
+                                <div className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-bold text-[11px]">
                                   <span>{supplier["Đánh giá"] || "5"}</span>
-                                  <Star size={12} fill="currentColor" />
+                                  <Star size={10.5} fill="currentColor" className="text-amber-500" />
                                 </div>
                               </td>
 
-                              <td className="px-5 py-3">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {linkedContacts.length > 0 ? (
-                                    <span className="text-xs text-slate-700 font-semibold">
-                                      {linkedContacts.length} đầu mối
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-slate-300">—</span>
-                                  )}
-                                  {totalTasks > 0 && (
-                                    <span className="text-[10px] bg-blue-50 text-blue-700 font-medium px-1.5 py-0.2 rounded border border-blue-100">
-                                      {totalTasks} việc
-                                    </span>
-                                  )}
-                                </div>
+                              <td className="px-3 py-2.5 text-center">
+                                {linkedContacts.length > 0 ? (
+                                  <span className="inline-block text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-semibold border border-blue-200/60 whitespace-nowrap">
+                                    {linkedContacts.length} đầu mối
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
                               </td>
 
-                              <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => setSelectedSupplierDetail(supplier)}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                                     title="Xem hồ sơ"
                                   >
-                                    <Eye size={15} />
+                                    <Eye size={14} />
                                   </button>
                                   <button 
                                     onClick={() => handleOpenModal(supplier)}
-                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
                                     title="Chỉnh sửa"
                                   >
-                                    <Edit2 size={15} />
+                                    <Edit2 size={14} />
                                   </button>
                                   <button 
                                     onClick={(e) => handleDelete(supplier.id, supplier["Mã nhà cung cấp"], e)}
-                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                     title="Xóa"
                                   >
-                                    <Trash2 size={15} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                               </td>
