@@ -4,7 +4,7 @@ import {
   ShoppingCart, FileText, Calendar, Truck, CheckSquare, BarChart3, 
   ArrowRight, Plus, CheckCircle, AlertTriangle, AlertCircle, 
   TrendingUp, DollarSign, Download, Users, Package, RefreshCw, ChevronRight, Calculator, Check, FileSpreadsheet,
-  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2
+  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award
 } from "lucide-react";
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
@@ -119,17 +119,20 @@ export default function WorkflowView({
   const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split("T")[0]);
   const [planNotes, setPlanNotes] = useState("");
 
-  // States for Step 4 (Giao hàng)
+  // States for Step 4 (Giao hàng & BBBG)
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
   const [pxkNumber, setPxkNumber] = useState("");
+  const [bbbgNumber, setBbbgNumber] = useState("");
+  const [receiverSigner, setReceiverSigner] = useState("");
   const [deliveredQty, setDeliveredQty] = useState<number>(0);
   const [actualDate, setActualDate] = useState(new Date().toISOString().split("T")[0]);
   const [carrier, setCarrier] = useState("");
   const [hasIncident, setHasIncident] = useState(false);
   const [incidentDetail, setIncidentDetail] = useState("");
 
-  // Filter for Step 5 (Đối soát)
+  // Filter for Step 5 & Step 6
   const [reconcileFilter, setReconcileFilter] = useState("all");
+  const [accountingFilter, setAccountingFilter] = useState("all");
 
   const formatCurrency = (value: any) => {
     const num = parseFloat(String(value || "0").replace(/,/g, ''));
@@ -659,6 +662,8 @@ export default function WorkflowView({
     setSelectedPlan(plan);
     setDeliveredQty(parseNumber(plan["Số lượng kế hoạch"] || plan["Số lượng"]));
     setPxkNumber(`26/PXK/${Math.floor(10 + Math.random() * 899)}`);
+    setBbbgNumber(`BBBG-${Math.floor(1000 + Math.random() * 9000)}`);
+    setReceiverSigner(plan["Khách hàng"] ? `Thủ kho ${plan["Khách hàng"]}` : "");
     const defaultCarrier = supplierData.find(s => s["Nhóm hàng"] === "Vận chuyển")?.["Tên Nhà Cung Cấp"] || "Song Dũng";
     setCarrier(defaultCarrier);
   };
@@ -674,12 +679,12 @@ export default function WorkflowView({
       return;
     }
 
-    const loadToast = toast.loading("Đang xử lý xuất kho...");
+    const loadToast = toast.loading("Đang xử lý xuất kho & lưu BBBG...");
     try {
       // Find original PO line to pull financial info
       const poLine = combinedPoLinesData.find(l => l["STT"] === selectedPlan["Chi tiết đơn hàng"]);
-      const buyPrice = poLine ? parseNumber(poLine["Đơn giá bán"]) : 0;
-      const sellPrice = poLine ? parseNumber(poLine["Đơn giá nhập"]) : 0;
+      const buyPrice = poLine ? (parseNumber(poLine["Đơn giá nhập"]) || parseNumber(poLine.buyPrice)) : 0;
+      const sellPrice = poLine ? (parseNumber(poLine["Đơn giá bán"]) || parseNumber(poLine.effectivePrice)) : 0;
       const revenue = sellPrice * deliveredQty;
       const profit = (sellPrice - buyPrice) * deliveredQty;
 
@@ -696,11 +701,14 @@ export default function WorkflowView({
         "ĐVT": poLine ? poLine["ĐVT"] : "Cái",
         "Số lượng giao": deliveredQty,
         "Số lượng đặt": poLine ? parseNumber(poLine["Số lượng"]) : deliveredQty,
+        "Số lượng thực nhận": deliveredQty,
         "Đã giao": deliveredQty,
         "Còn lại": poLine ? Math.max(0, parseNumber(poLine["Số lượng"]) - deliveredQty) : 0,
         "Tiến độ giao": poLine ? `${Math.round((deliveredQty / parseNumber(poLine["Số lượng"])) * 100)}%` : "100%",
         "Status": "Hoàn thành",
         "Số PXK": pxkNumber,
+        "Số BBBG": bbbgNumber || `BBBG-${pxkNumber}`,
+        "Người ký nhận": receiverSigner || "Thủ kho khách hàng",
         "Khách hàng": selectedPlan["Khách hàng"],
         "Sự cố": hasIncident ? "1" : "0",
         "Chi tiết sự cố": hasIncident ? incidentDetail : "",
@@ -711,6 +719,8 @@ export default function WorkflowView({
         "Doanh thu": (revenue || 0).toLocaleString("vi-VN"),
         "Lợi nhuận gộp": (profit || 0).toLocaleString("vi-VN"),
         "% Lợi nhuận": poLine && sellPrice > 0 ? `${((sellPrice - buyPrice) / sellPrice * 100).toFixed(2)}%` : "0%",
+        "AccountingStatus": "Chưa thu tiền",
+        "InvoiceStatus": "Chưa xuất",
         "Tháng": parseInt(actualDate.split("-")[1]) || 7,
         "createdAt": new Date().toISOString()
       };
@@ -1851,24 +1861,47 @@ export default function WorkflowView({
                     </div>
 
                     <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Số Phiếu Xuất Kho (Số PXK)</label>
-                        <input
-                          type="text"
-                          value={pxkNumber}
-                          onChange={(e) => setPxkNumber(e.target.value)}
-                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Số Phiếu Xuất Kho (PXK)</label>
+                          <input
+                            type="text"
+                            value={pxkNumber}
+                            onChange={(e) => setPxkNumber(e.target.value)}
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-blue-700"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Số Biên Bản Bàn Giao (BBBG)</label>
+                          <input
+                            type="text"
+                            value={bbbgNumber}
+                            onChange={(e) => setBbbgNumber(e.target.value)}
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-emerald-700"
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Số lượng thực giao</label>
-                        <input
-                          type="number"
-                          value={deliveredQty}
-                          onChange={(e) => setDeliveredQty(Math.max(1, parseInt(e.target.value) || 0))}
-                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Số lượng thực giao</label>
+                          <input
+                            type="number"
+                            value={deliveredQty}
+                            onChange={(e) => setDeliveredQty(Math.max(1, parseInt(e.target.value) || 0))}
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Thủ kho / Người nhận ký</label>
+                          <input
+                            type="text"
+                            placeholder="Tên thủ kho nhận hàng"
+                            value={receiverSigner}
+                            onChange={(e) => setReceiverSigner(e.target.value)}
+                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                          />
+                        </div>
                       </div>
 
                       <div>
@@ -1988,28 +2021,38 @@ export default function WorkflowView({
                     <h3 className="font-bold text-slate-800 text-base">Hệ thống đối soát chéo Đơn đặt (PO) và Thực giao (PXK)</h3>
                     <p className="text-xs text-slate-500">Tự động phát hiện chênh lệch sản lượng, lỗi giao nhận và các lô hàng bị sự cố</p>
                   </div>
-                  {/* Status Filters */}
-                  <div className="flex gap-1.5 flex-wrap">
-                    {[
-                      { key: "all", label: "Tất cả" },
-                      { key: "Khớp 100%", label: "Khớp 100%" },
-                      { key: "Giao thiếu", label: "Giao thiếu" },
-                      { key: "Giao thừa", label: "Giao thừa" },
-                      { key: "Chưa giao", label: "Chưa giao" },
-                      { key: "incident", label: "Có sự cố" }
-                    ].map((btn) => (
-                      <button
-                        key={btn.key}
-                        onClick={() => setReconcileFilter(btn.key)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                          reconcileFilter === btn.key
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-                        }`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
+                  {/* Status Filters & CTA */}
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[
+                        { key: "all", label: "Tất cả" },
+                        { key: "Khớp 100%", label: "Khớp 100%" },
+                        { key: "Giao thiếu", label: "Giao thiếu" },
+                        { key: "Giao thừa", label: "Giao thừa" },
+                        { key: "Chưa giao", label: "Chưa giao" },
+                        { key: "incident", label: "Có sự cố" }
+                      ].map((btn) => (
+                        <button
+                          key={btn.key}
+                          onClick={() => setReconcileFilter(btn.key)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            reconcileFilter === btn.key
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                          }`}
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setActiveStep(6)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <span>Lập Hóa đơn & Quyết toán Kế toán</span>
+                      <ArrowRight size={14} />
+                    </button>
                   </div>
                 </div>
 
@@ -2085,60 +2128,61 @@ export default function WorkflowView({
           )}
 
           {/* ================================================== */}
-          {/* STEP 6: KẾ TOÁN VÀ DOANH THU */}
+          {/* STEP 6: HÓA ĐƠN VAT, CÔNG NỢ & BÁO CÁO TÀI CHÍNH */}
           {/* ================================================== */}
           {activeStep === 6 && (
             <div className="space-y-6">
               {/* Financial KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Báo cáo Doanh thu</span>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">Doanh thu bán</span>
                     <TrendingUp size={16} className="text-blue-600" />
                   </div>
-                  <div className="text-xl font-extrabold text-slate-900">{formatCurrency(financialSummary.revenueSum)}</div>
-                  <span className="text-[10px] text-slate-500 font-medium">Từ các phiếu xuất kho PXK thực tế</span>
+                  <div className="text-lg font-extrabold text-slate-900">{formatCurrency(financialSummary.revenueSum)}</div>
+                  <span className="text-[10px] text-slate-500 font-medium block">Từ phiếu PXK thực tế</span>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Giá vốn đầu vào (COGS)</span>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">Giá vốn đầu vào (COGS)</span>
                     <Package size={16} className="text-slate-400" />
                   </div>
-                  <div className="text-xl font-bold text-slate-600">{formatCurrency(financialSummary.cogsSum)}</div>
-                  <span className="text-[10px] text-slate-500 font-medium">Chi phí mua nguyên vật liệu gốc</span>
+                  <div className="text-lg font-bold text-slate-600">{formatCurrency(financialSummary.cogsSum)}</div>
+                  <span className="text-[10px] text-slate-500 font-medium block">Chi phí mua NCC gốc</span>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Lợi nhuận ròng dự toán</span>
+                    <span className="text-[11px] font-bold text-emerald-600 uppercase">Lợi nhuận gộp</span>
                     <DollarSign size={16} className="text-emerald-600" />
                   </div>
-                  <div className="text-xl font-extrabold text-emerald-600">{formatCurrency(financialSummary.profitSum)}</div>
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 text-xs px-1.5 py-0.5 rounded font-bold self-start inline-block">
-                    Mức biên: {financialSummary.marginAvg.toFixed(2)}%
+                  <div className="text-lg font-extrabold text-emerald-600">{formatCurrency(financialSummary.profitSum)}</div>
+                  <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold inline-block">
+                    Biên LN: {financialSummary.marginAvg.toFixed(2)}%
                   </span>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Tổng Công Nợ</span>
+                    <span className="text-[11px] font-bold text-purple-600 uppercase">Hoa hồng môi giới (3%)</span>
+                    <Award size={16} className="text-purple-600" />
+                  </div>
+                  <div className="text-lg font-extrabold text-purple-700">
+                    {formatCurrency(financialSummary.profitSum * 0.03)}
+                  </div>
+                  <span className="text-[10px] text-purple-600 font-medium block">Trích theo lợi nhuận gộp</span>
+                </div>
+
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-orange-500 uppercase">Công nợ phải thu</span>
                     <Users size={16} className="text-orange-500" />
                   </div>
-                  <div className="text-xs space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Phải thu:</span>
-                      <strong className="text-blue-600 font-extrabold">
-                        {formatCurrency(receivablesByCustomer.reduce((sum, c) => sum + c.val, 0))}
-                      </strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Phải trả:</span>
-                      <strong className="text-red-500 font-bold">
-                        {formatCurrency(payablesBySupplier.reduce((sum, s) => sum + s.val, 0))}
-                      </strong>
-                    </div>
+                  <div className="text-lg font-extrabold text-blue-600">
+                    {formatCurrency(receivablesByCustomer.reduce((sum, c) => sum + c.val, 0))}
                   </div>
+                  <span className="text-[10px] text-slate-500 font-medium block">Chưa thanh toán</span>
                 </div>
               </div>
 
@@ -2179,45 +2223,91 @@ export default function WorkflowView({
 
               {/* Accounting Audit log */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h4 className="font-bold text-slate-800 text-sm">Dịch sách hồ sơ giao hàng phục vụ quyết toán kế toán</h4>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">Bảng kê chứng từ xuất Hóa đơn GTGT & Quyết toán công nợ</h4>
+                    <p className="text-xs text-slate-500">Khớp số liệu giao nhận thực tế với trạng thái hóa đơn điện tử và dòng tiền</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {[
+                      { key: "all", label: "Tất cả" },
+                      { key: "Chưa xuất", label: "Chưa xuất VAT" },
+                      { key: "Đã xuất VAT", label: "Đã xuất VAT" },
+                      { key: "Chưa thu tiền", label: "Chưa thu nợ" },
+                      { key: "Nợ quá hạn", label: "Quá hạn ⚠️" },
+                      { key: "Đã thu tiền", label: "Đã tất toán" }
+                    ].map((btn) => (
+                      <button
+                        key={btn.key}
+                        onClick={() => setAccountingFilter(btn.key)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                          accountingFilter === btn.key
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
-                        <th className="px-4 py-3">Số PXK</th>
+                        <th className="px-4 py-3">Số PXK / BBBG</th>
                         <th className="px-4 py-3">Đơn hàng PO</th>
                         <th className="px-4 py-3">Khách hàng</th>
                         <th className="px-4 py-3">Sản phẩm</th>
                         <th className="px-4 py-3 text-right">Số lượng giao</th>
                         <th className="px-4 py-3 text-right">Doanh thu</th>
+                        <th className="px-4 py-3 text-right">Hoa hồng (3%)</th>
                         <th className="px-4 py-3">Trạng thái Hóa đơn</th>
                         <th className="px-4 py-3">Quyết toán Thu</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                      {deliveryData.filter(d => !d.isDeleted).map((d, index) => {
+                      {deliveryData.filter(d => {
+                        if (d.isDeleted) return false;
+                        if (accountingFilter === "all") return true;
+                        if (accountingFilter === "Chưa xuất" || accountingFilter === "Đã xuất VAT") {
+                          return (d["InvoiceStatus"] || "Chưa xuất") === accountingFilter;
+                        }
+                        if (accountingFilter === "Chưa thu tiền" || accountingFilter === "Nợ quá hạn" || accountingFilter === "Đã thu tiền") {
+                          return (d["AccountingStatus"] || "Chưa thu tiền") === accountingFilter;
+                        }
+                        return true;
+                      }).map((d, index) => {
                         const qty = parseNumber(d["Số lượng giao"]);
                         const sellPrice = parseNumber(d["Đơn giá bán"]);
+                        const buyPrice = parseNumber(d["Đơn giá nhập"]);
                         const rev = sellPrice * qty;
+                        const profit = (sellPrice - buyPrice) * qty;
+                        const comm = profit * 0.03;
 
                         return (
                           <tr key={index} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-mono font-bold text-blue-700">{d["Số PXK"]}</td>
+                            <td className="px-4 py-3">
+                              <span className="font-mono font-bold text-blue-700 block">{d["Số PXK"] || "-"}</span>
+                              {d["Số BBBG"] && (
+                                <span className="text-[10px] text-slate-400 font-mono block">{d["Số BBBG"]}</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 font-medium text-slate-600">{d["Đơn hàng"]}</td>
                             <td className="px-4 py-3 font-semibold">{d["Khách hàng"]}</td>
                             <td className="px-4 py-3 truncate max-w-[130px]">{d["Tên sản phẩm"]}</td>
                             <td className="px-4 py-3 text-right font-bold">{(qty || 0).toLocaleString("vi-VN")}</td>
                             <td className="px-4 py-3 text-right font-extrabold text-blue-700">{formatCurrency(rev)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-purple-600">{formatCurrency(comm > 0 ? comm : 0)}</td>
                             <td className="px-4 py-3">
                               <select
                                 value={d["InvoiceStatus"] || "Chưa xuất"}
                                 onChange={(e) => handleUpdateAccountingStatus(d.id, "InvoiceStatus", e.target.value)}
                                 className="bg-slate-50 border border-slate-200 rounded text-[11px] p-1 font-semibold"
                               >
-                                <option value="Chưa xuất">Chưa xuất</option>
+                                <option value="Chưa xuất">Chưa xuất VAT</option>
                                 <option value="Đã xuất VAT">Đã xuất VAT</option>
                                 <option value="Hủy hóa đơn">Hủy hóa đơn</option>
                               </select>
@@ -2229,6 +2319,8 @@ export default function WorkflowView({
                                 className={`border rounded text-[11px] p-1 font-semibold ${
                                   d["AccountingStatus"] === "Đã thu tiền"
                                     ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                    : d["AccountingStatus"] === "Nợ quá hạn"
+                                    ? "bg-rose-50 border-rose-200 text-rose-700"
                                     : "bg-amber-50 border-amber-200 text-amber-700"
                                 }`}
                               >
