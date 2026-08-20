@@ -112,7 +112,7 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
           if (Array.isArray(fallbackData)) {
             fallbackData.forEach(item => {
               const key = getItemKey(item, collectionName);
-              if (key) mergedMap.set(key, item);
+              if (key) mergedMap.set(key, { ...item });
             });
           }
           
@@ -122,7 +122,19 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
               if (item.isDeleted === true) {
                 mergedMap.delete(key);
               } else {
-                mergedMap.set(key, item);
+                const existing = mergedMap.get(key) || {};
+                const mergedItem = { ...existing, ...item };
+                // Keep fallback critical identifiers if Firestore document had stripped them
+                if (!mergedItem['Tên sản phẩm'] && existing['Tên sản phẩm']) {
+                  mergedItem['Tên sản phẩm'] = existing['Tên sản phẩm'];
+                }
+                if (!mergedItem['Mã sản phẩm'] && existing['Mã sản phẩm']) {
+                  mergedItem['Mã sản phẩm'] = existing['Mã sản phẩm'];
+                }
+                if (!mergedItem['Đơn Vị Tính'] && existing['Đơn Vị Tính']) {
+                  mergedItem['Đơn Vị Tính'] = existing['Đơn Vị Tính'];
+                }
+                mergedMap.set(key, mergedItem);
               }
             }
           });

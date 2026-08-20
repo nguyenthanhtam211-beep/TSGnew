@@ -394,31 +394,39 @@ export default function App() {
 
   const handleUpdateToFirestore = async (colName: string, row: any) => {
     try {
-      const id = row.id || getItemKey(row, colName);
-      if (!id) {
+      const rawId = row.id || getItemKey(row, colName) || row['Mã sản phẩm'] || row['SKU'] || row['Mã hàng'];
+      if (!rawId) {
         throw new Error("Không thể xác định ID của dòng dữ liệu");
       }
+      const id = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
       
-      // Clean data: remove temporary UI fields and calculations before saving
+      // Clean data: remove only transient summary/analytics calculations before saving
       const dataToSave = { ...row };
       
-      // Remove known enriched/calculated fields to keep Firestore clean
-      const uiFields = [
+      // Remove temporary runtime UI calculations, but NEVER delete Tên sản phẩm, ĐVT, or business keys
+      const transientFields = [
         'id', 'Doanh thu dự kiến', 'Lợi nhuận dự kiến', 'Tiến độ', 'Số dòng', 'Status',
-        'Tên sản phẩm', 'ĐVT', 'Nhóm sản phẩm', 'Doanh thu', 'Lợi nhuận gộp', 
-        'Tiến độ giao', 'isOverdue', 'qtyOrdered', 'qtyDelivered', 'remainingQty',
-        'currentRevenue', 'currentProfit', 'margin', 'isDelayed', 'isReconciled'
+        'Doanh thu', 'Lợi nhuận gộp', 'Tiến độ giao', 'isOverdue', 'qtyOrdered', 
+        'qtyDelivered', 'remainingQty', 'currentRevenue', 'currentProfit', 'margin', 
+        'isDelayed', 'isReconciled'
       ];
-      uiFields.forEach(field => delete dataToSave[field]);
+      transientFields.forEach(field => delete dataToSave[field]);
       
-      await setDoc(doc(db, colName, id), { 
+      // Explicitly protect core product fields
+      if (row['Tên sản phẩm']) dataToSave['Tên sản phẩm'] = row['Tên sản phẩm'];
+      if (row['Mã sản phẩm']) dataToSave['Mã sản phẩm'] = row['Mã sản phẩm'];
+      if (row['Đơn Vị Tính']) dataToSave['Đơn Vị Tính'] = row['Đơn Vị Tính'];
+      
+      const setPromise = setDoc(doc(db, colName, id), { 
         ...dataToSave, 
         updatedAt: new Date().toISOString() 
       }, { merge: true });
-      toast.success("Cập nhật thành công!");
+
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
+      await Promise.race([setPromise, timeoutPromise]);
     } catch (err) {
       console.error(`Failed to update ${colName}`, err);
-      toast.error("Lỗi cập nhật!");
+      throw err;
     }
   };
 
@@ -1421,22 +1429,44 @@ function TableView({
 
   const headers = useMemo(() => {
     if (!data || data.length === 0) return [];
-    let maxKeys = 0;
-    let bestHeaders: string[] = [];
-    for (let i = 0; i < Math.min(data.length, 50); i++) {
-        const keys = Object.keys(data[i]);
-        if (keys.length > maxKeys) {
-            maxKeys = keys.length;
-            bestHeaders = keys;
-        }
-    }
     
-    // Filter out unnecessary / redundant columns
-    const excludeCols = ['Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 'Lợi nhuận (1)', 'Bản sao Kích thước'];
+    // Collect ALL unique keys across all records in the table
+    const allKeysSet = new Set<string>();
+    data.forEach(item => {
+      if (item && typeof item === 'object') {
+        Object.keys(item).forEach(k => allKeysSet.add(k));
+      }
+    });
+    
+    // Explicit priority order for logical, user-friendly columns
+    const priorityOrder = [
+      'Mã sản phẩm', 'Tên sản phẩm', 'Sản phẩm', 'Mã hàng', 'SKU', 
+      'Nhóm hàng', 'Phân loại', 'Đơn Vị Tính', 'ĐVT', 
+      'Khách hàng', 'Mã Nhà Cung Cấp', 'Nhà cung cấp', 'Đơn giá mua', 'Đơn giá nhập',
+      'Đơn giá bán', 'Giá AVP', 'Giá 2026', 'Lợi nhuận', 'Biên lợi nhuận',
+      'Thông Số Sản Phẩm', 'Trọng lượng riêng', 'Tình trạng', 'Mẫu thiết kế',
+      'Đơn hàng', 'Số đơn hàng', 'Ngày đặt hàng', 'Ngày đặt', 'Ngày giao hàng', 'Ngày giao',
+      'Số lượng', 'Số lượng đặt', 'Số lượng giao', 'Thành tiền dòng', 'Thành tiền'
+    ];
+    
+    const excludeCols = ['id', 'isDeleted', 'createdAt', 'updatedAt', 'deletedAt', 'Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 'Lợi nhuận (1)', 'Bản sao Kích thước'];
     if (isPOLineTable && title.includes("Chi tiết đơn")) {
       excludeCols.push('Đơn giá nhập', 'Lợi nhuận', 'Lợi nhuận dòng');
     }
-    return bestHeaders.filter(h => !excludeCols.includes(h));
+    
+    const validKeys = Array.from(allKeysSet).filter(h => !excludeCols.includes(h));
+    
+    // Sort so priority keys come first in logical order
+    validKeys.sort((a, b) => {
+      const idxA = priorityOrder.indexOf(a);
+      const idxB = priorityOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    
+    return validKeys;
   }, [data, isPOLineTable, title]);
 
 

@@ -4,9 +4,11 @@ import {
   Building2, Users, FileText, ArrowUpRight, ChevronRight, Eye, 
   Edit3, Trash2, Layers, CheckCircle2, AlertCircle, HardDrive, 
   ExternalLink, Sparkles, Truck, ShoppingCart, Tag, Clock, HelpCircle,
-  LayoutGrid, List
+  LayoutGrid, List, Check, X, PlusCircle
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
+import { toast } from 'react-hot-toast';
 import { formatVND, parseNumber } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
@@ -54,11 +56,18 @@ export default function ProductsView({
   const [selectedSupplier, setSelectedSupplier] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
+  // Edit / Add modal states
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
+  const [isSaving, setIsSaving] = useState(false);
+
   // Enrich each product with 360-degree relational data
   const enrichedProducts = useMemo(() => {
     return productData.map((p) => {
       const code = (p['Mã sản phẩm'] || p['SKU'] || p['Mã hàng'] || '').trim();
-      const name = (p['Tên sản phẩm'] || p['Sản phẩm'] || '').trim();
+      let name = (p['Tên sản phẩm'] || p['Sản phẩm'] || '').trim();
 
       // 1. Relational Pricing & Margins
       const matchedPricings = pricingData.filter((pr) => {
@@ -66,6 +75,19 @@ export default function ProductsView({
         const prName = (pr['Tên sản phẩm'] || '').trim();
         return (code && prCode === code) || (name && prName === name);
       });
+
+      // Name fallback from pricing or specs if not defined
+      if (!name) {
+        if (matchedPricings.length > 0 && matchedPricings[0]['Tên sản phẩm']) {
+          name = matchedPricings[0]['Tên sản phẩm'].trim();
+        } else {
+          const matchedSp = specsData.find(s => (s['Mã sản phẩm'] || '').trim() === code);
+          if (matchedSp && (matchedSp['Tên tiêu chuẩn'] || matchedSp['Sản phẩm liên kết'])) {
+            name = (matchedSp['Tên tiêu chuẩn'] || matchedSp['Sản phẩm liên kết']).trim();
+          }
+        }
+      }
+      if (!name) name = code;
 
       const primaryPricing = matchedPricings[0] || null;
       const buyPrice = primaryPricing ? parseNumber(primaryPricing['Đơn giá mua'] || primaryPricing['Đơn giá nhập'] || 0) : 0;
@@ -110,7 +132,6 @@ export default function ProductsView({
         return poName === name || (code && poCode.includes(code));
       });
 
-      // Find latest PO
       const latestPO = matchedPOLines.length > 0 ? matchedPOLines[matchedPOLines.length - 1] : null;
       const totalOrderedQty = matchedPOLines.reduce((sum, po) => sum + parseNumber(po['Số lượng'] || 0), 0);
       const totalRevenue = matchedPOLines.reduce((sum, po) => sum + parseNumber(po['Thành tiền dòng'] || 0), 0);
@@ -144,7 +165,7 @@ export default function ProductsView({
         contractNumber,
         driveFolderPath: driveFolder.fullPath,
         shortFileName,
-        driveSearchUrl: 'https://drive.google.com/drive/search?q=' + encodeURIComponent(shortFileName)
+        driveSearchUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(shortFileName)}`
       };
     });
   }, [productData, pricingData, poLinesData, specsData, contractsData]);
@@ -198,8 +219,67 @@ export default function ProductsView({
     return { total, withSpecs, withPricing, withOrders, totalRev };
   }, [enrichedProducts]);
 
+  // Handle opening edit drawer
+  const handleOpenEdit = (p: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingProduct(p);
+    setEditFormData({
+      ...p.raw,
+      'Mã sản phẩm': p.code,
+      'Tên sản phẩm': p.name,
+      'Nhóm hàng': p.category,
+      'Đơn Vị Tính': p.unit,
+      'Khách hàng': p.relatedCustomers[0] || p.raw['Khách hàng'] || '',
+      'Mã Nhà Cung Cấp': p.relatedSuppliers[0] || p.raw['Mã Nhà Cung Cấp'] || '',
+      'Thông Số Sản Phẩm': p.primarySpec?.['Mã Spec'] || p.raw['Thông Số Sản Phẩm'] || '',
+      'Trọng lượng riêng': p.raw['Trọng lượng riêng'] || '',
+      'Tình trạng': p.status || 'Đang kinh doanh'
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Handle saving edit form
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onEditProduct) return;
+    
+    setIsSaving(true);
+    const toastId = toast.loading('Đang lưu thông tin sản phẩm...');
+    try {
+      await onEditProduct(editFormData);
+      toast.success('Đã lưu thành công!', { id: toastId });
+      setIsEditModalOpen(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi lưu dữ liệu!', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle saving new product
+  const handleSaveAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAddProduct) return;
+
+    setIsSaving(true);
+    const toastId = toast.loading('Đang tạo sản phẩm mới...');
+    try {
+      await onAddProduct(editFormData);
+      toast.success('Đã thêm sản phẩm thành công!', { id: toastId });
+      setIsAddModalOpen(false);
+      setEditFormData({});
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi tạo sản phẩm!', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50/50 min-h-screen relative">
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-black/[0.06] shadow-xs">
         <div>
@@ -222,6 +302,25 @@ export default function ProductsView({
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setEditFormData({
+                'Mã sản phẩm': '',
+                'Tên sản phẩm': '',
+                'Nhóm hàng': 'Thùng carton',
+                'Đơn Vị Tính': 'Cái',
+                'Khách hàng': 'Thăng Long',
+                'Mã Nhà Cung Cấp': 'YFY',
+                'Tình trạng': 'Đang kinh doanh'
+              });
+              setIsAddModalOpen(true);
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <Plus size={15} />
+            <span>Thêm sản phẩm</span>
+          </button>
+
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
             <button
               onClick={() => setViewMode('table')}
@@ -360,7 +459,7 @@ export default function ProductsView({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-3.5 px-4">Sản Phẩm & Mã Hiệu</th>
+                  <th className="py-3.5 px-4">Sản Phẩm & Tên Chi Tiết</th>
                   <th className="py-3.5 px-4">Khách Hàng Mua</th>
                   <th className="py-3.5 px-4">Nhà Cung Cấp SX</th>
                   <th className="py-3.5 px-4 text-right">Đơn Giá & Biên LN</th>
@@ -389,17 +488,17 @@ export default function ProductsView({
                       {/* Product Name & Code */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
-                            <Package size={16} />
+                          <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                            <Package size={17} />
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                              <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-sm">
                                 {p.name}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
                                 {p.code}
                               </span>
                               <span className="text-[11px] text-slate-400">• {p.category}</span>
@@ -534,16 +633,25 @@ export default function ProductsView({
 
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectProductDetails(p.code || p.name);
-                          }}
-                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
-                        >
-                          <Sparkles size={13} />
-                          <span>360°</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={(e) => handleOpenEdit(p, e)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 transition-colors"
+                            title="Chỉnh sửa thông tin sản phẩm"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectProductDetails(p.code || p.name);
+                            }}
+                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
+                          >
+                            <Sparkles size={13} />
+                            <span>360°</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -574,15 +682,23 @@ export default function ProductsView({
                     {p.name}
                   </h3>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectProductDetails(p.code || p.name);
-                  }}
-                  className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
-                >
-                  <Eye size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => handleOpenEdit(p, e)}
+                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 flex items-center justify-center transition-colors"
+                  >
+                    <Edit3 size={15} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectProductDetails(p.code || p.name);
+                    }}
+                    className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* 360 Relational Pills */}
@@ -652,6 +768,309 @@ export default function ProductsView({
           ))}
         </div>
       )}
+
+      {/* Edit Product Drawer / Modal */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-sm shadow-amber-500/20">
+                    <Edit3 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">Chỉnh Sửa Thông Tin Sản Phẩm</h3>
+                    <p className="text-xs text-slate-500">Cập nhật thông tin chi tiết vào hệ thống</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">Tên sản phẩm (*):</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData['Tên sản phẩm'] || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, 'Tên sản phẩm': e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-900"
+                    placeholder="Nhập tên đầy đủ sản phẩm..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Mã sản phẩm / SKU (*):</label>
+                    <input
+                      type="text"
+                      required
+                      value={editFormData['Mã sản phẩm'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã sản phẩm': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-mono font-bold text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Đơn vị tính (ĐVT):</label>
+                    <select
+                      value={editFormData['Đơn Vị Tính'] || 'Cái'}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Đơn Vị Tính': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-800"
+                    >
+                      <option value="Cái">Cái</option>
+                      <option value="Cuộn">Cuộn</option>
+                      <option value="Kg">Kg</option>
+                      <option value="Tờ">Tờ</option>
+                      <option value="Hộp">Hộp</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Khách hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhóm hàng:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Nhóm hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Nhóm hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Mã Spec kỹ thuật:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Thông Số Sản Phẩm'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Thông Số Sản Phẩm': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-mono text-slate-900"
+                      placeholder="VD: Spec-001"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Trọng lượng riêng:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Trọng lượng riêng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Trọng lượng riêng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Tình trạng:</label>
+                    <select
+                      value={editFormData['Tình trạng'] || 'Đang kinh doanh'}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Tình trạng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-800"
+                    >
+                      <option value="Đang kinh doanh">Đang kinh doanh</option>
+                      <option value="Sắp mở bán">Sắp mở bán</option>
+                      <option value="Tạm dừng">Tạm dừng</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <Check size={16} />
+                    <span>{isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-5 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Product Modal */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">
+                    <Plus size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">Thêm Mới Sản Phẩm</h3>
+                    <p className="text-xs text-slate-500">Đăng ký sản phẩm mới vào hệ thống</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveAdd} className="p-6 space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">Tên sản phẩm (*):</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData['Tên sản phẩm'] || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, 'Tên sản phẩm': e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-900"
+                    placeholder="VD: Thùng Thăng Long Bao cứng TH130/07"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Mã sản phẩm / SKU (*):</label>
+                    <input
+                      type="text"
+                      required
+                      value={editFormData['Mã sản phẩm'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã sản phẩm': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-mono font-bold text-slate-900"
+                      placeholder="VD: TH130/07"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Đơn vị tính (ĐVT):</label>
+                    <select
+                      value={editFormData['Đơn Vị Tính'] || 'Cái'}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Đơn Vị Tính': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-800"
+                    >
+                      <option value="Cái">Cái</option>
+                      <option value="Cuộn">Cuộn</option>
+                      <option value="Kg">Kg</option>
+                      <option value="Tờ">Tờ</option>
+                      <option value="Hộp">Hộp</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Khách hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Khách hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhà cung cấp:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Mã Nhà Cung Cấp'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Mã Nhà Cung Cấp': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Nhóm hàng:</label>
+                    <input
+                      type="text"
+                      value={editFormData['Nhóm hàng'] || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Nhóm hàng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">Tình trạng:</label>
+                    <select
+                      value={editFormData['Tình trạng'] || 'Đang kinh doanh'}
+                      onChange={(e) => setEditFormData({ ...editFormData, 'Tình trạng': e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-slate-800"
+                    >
+                      <option value="Đang kinh doanh">Đang kinh doanh</option>
+                      <option value="Sắp mở bán">Sắp mở bán</option>
+                      <option value="Tạm dừng">Tạm dừng</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <Check size={16} />
+                    <span>{isSaving ? 'Đang thêm...' : 'Tạo sản phẩm'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-5 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
