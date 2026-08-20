@@ -11,6 +11,7 @@ import clsx from 'clsx';
 import { toast } from 'react-hot-toast';
 import { formatVND, parseNumber } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
+import MacTrafficLights from './MacTrafficLights';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
 
 interface ProductsViewProps {
@@ -811,22 +812,15 @@ export default function ProductsView({
               transition={{ type: 'spring', damping: 25, stiffness: 250 }}
               className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200"
             >
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold shadow-xs">
-                    <Edit3 size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base">Chỉnh Sửa Thông Tin Sản Phẩm</h3>
-                    <p className="text-xs text-slate-500">Cập nhật thông tin chi tiết vào hệ thống</p>
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <MacTrafficLights onClose={() => setIsEditModalOpen(false)} />
+                  <div className="h-4 w-px bg-slate-300" />
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 text-sm truncate">Chỉnh Sửa Thông Tin Sản Phẩm</h3>
+                    <p className="text-[11px] text-slate-500">Cập nhật thông tin chi tiết vào hệ thống</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
-                >
-                  <X size={15} />
-                </button>
               </div>
 
               <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
@@ -988,22 +982,15 @@ export default function ProductsView({
               exit={{ scale: 0.95, opacity: 0 }}
               className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
             >
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">
-                    <Plus size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base">Thêm Mới Sản Phẩm</h3>
-                    <p className="text-xs text-slate-500">Đăng ký sản phẩm mới vào hệ thống</p>
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <MacTrafficLights onClose={() => setIsAddModalOpen(false)} />
+                  <div className="h-4 w-px bg-slate-300" />
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 text-sm truncate">Thêm Mới Sản Phẩm</h3>
+                    <p className="text-[11px] text-slate-500">Đăng ký sản phẩm mới vào hệ thống</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
-                >
-                  <X size={15} />
-                </button>
               </div>
 
               <form onSubmit={handleSaveAdd} className="p-6 space-y-4 text-xs">

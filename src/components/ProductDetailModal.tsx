@@ -282,22 +282,6 @@ export function ProductDetailModal({
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5 shrink-0 ml-3">
-            <button
-              onClick={() => setIsMaximized(!isMaximized)}
-              className="hidden sm:flex w-7 h-7 rounded-lg hover:bg-slate-200/70 items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
-              title={isMaximized ? "Thu nhỏ" : "Phóng to"}
-            >
-              {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-lg hover:bg-slate-200/70 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
-            >
-              <X size={15} />
-            </button>
-          </div>
         </div>
 
         {/* Apple Segmented Pills Tab Bar */}
