@@ -23,6 +23,7 @@ import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, formatShortCompanyName } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import MacTrafficLights from './MacTrafficLights';
+import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
 
 export const getCustomerLogo = (c: any) => {
@@ -1235,7 +1236,7 @@ export default function CustomerView({
                   {[
                     { key: 'all', label: `Tất cả (${customerContacts.length})` },
                     { key: 'exec', label: 'Ban Lãnh đạo' },
-                    { key: 'starred', label: 'Đối tác chiến lược (4-5★)' },
+                    { key: 'starred', label: 'Đầu mối thân thiết (4-5★)' },
                   ].map(tab => (
                     <button
                       key={tab.key}
@@ -1253,10 +1254,10 @@ export default function CustomerView({
 
             {/* Customer Contacts Table */}
             {filteredCustomerContacts.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs sm:text-sm text-left border-collapse">
-                    <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
+                    <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200/80 text-xs">
                       <tr>
                         <th className="px-5 py-3.5">Họ và Tên</th>
                         <th className="px-5 py-3.5">Doanh nghiệp khách hàng</th>
@@ -1269,8 +1270,7 @@ export default function CustomerView({
                     <tbody className="divide-y divide-slate-100">
                       {filteredCustomerContacts.map((contact) => {
                         const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-                        const cleanName = formatContactFullName(contact["Tên"] || "");
-                        const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                        const { salutation, cleanName } = parseContactSalutation(contact["Tên"] || "", contact["Danh xưng"] || "");
                         const initials = getAvatarInitials(cleanName);
                         const exec = isExecutive(contact["Chức vụ"]);
                         const cleanPhone = getRawCallablePhone(contact["Điện thoại"]);
@@ -1289,48 +1289,62 @@ export default function CustomerView({
                             }}
                             className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                           >
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-3.5">
                               <div className="flex items-center gap-3">
-                                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                  exec ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'bg-blue-100 text-blue-800'
+                                <div className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs ${
+                                  exec 
+                                    ? 'bg-amber-100/90 text-amber-900 border border-amber-300/80 shadow-amber-500/10' 
+                                    : salutation === 'Mrs' || salutation === 'Ms'
+                                    ? 'bg-rose-100/80 text-rose-800 border border-rose-200/80'
+                                    : 'bg-blue-100/80 text-blue-800 border border-blue-200/80'
                                 }`}>
                                   {initials}
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-slate-900 group-hover:text-[#0071E3] transition-colors flex items-center gap-1.5">
-                                    <span>{fullName}</span>
+                                  <div className="font-bold text-slate-900 group-hover:text-[#0071E3] transition-colors flex items-center gap-1.5 flex-wrap">
+                                    {salutation && <SalutationBadge salutation={salutation} size="sm" />}
+                                    <span className="text-slate-900 font-bold text-xs sm:text-sm">{cleanName}</span>
                                     {exec && (
-                                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1 rounded font-medium">
-                                        Lãnh đạo
+                                      <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200/90 px-1.5 py-0.5 rounded-md font-semibold inline-flex items-center gap-0.5">
+                                        <Star size={10} className="fill-amber-500 text-amber-500" />
+                                        <span>Lãnh đạo</span>
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-slate-400 mt-0.5">
-                                    {contact["Phụ trách"] ? `Phụ trách: ${contact["Phụ trách"]}` : `Mức độ: ${contact["Mức độ quan hệ"] || "3"}★`}
+                                  <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                                    <span className="inline-flex items-center text-amber-600 font-medium">
+                                      ★ {contact["Mức độ quan hệ"] || "3"}/5
+                                    </span>
+                                    {contact["Phụ trách"] && (
+                                      <>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="text-slate-500 truncate max-w-[120px]">PT: {contact["Phụ trách"]}</span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
                             </td>
 
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-3.5">
                               <div className="flex items-center gap-2">
-                                <CompanyLogo name={contact["Công ty"]} size="sm" className="rounded shadow-2xs" />
-                                <span className="font-medium text-slate-800">{contact["Công ty"]}</span>
+                                <CompanyLogo name={contact["Công ty"]} size="sm" className="rounded-lg shadow-2xs" />
+                                <span className="font-semibold text-slate-800">{contact["Công ty"]}</span>
                               </div>
                             </td>
 
-                            <td className="px-5 py-3 text-slate-600">
-                              <div className="font-medium text-slate-800">{contact["Chức vụ"] || "—"}</div>
+                            <td className="px-5 py-3.5 text-slate-600">
+                              <div className="font-semibold text-slate-800">{contact["Chức vụ"] || "—"}</div>
                               {contact["Phòng ban"] && (
                                 <div className="text-xs text-slate-400">{contact["Phòng ban"]}</div>
                               )}
                             </td>
 
-                            <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                               <div className="space-y-0.5 text-xs">
                                 {contact["Điện thoại"] ? (
                                   <div className="flex items-center gap-1.5 font-mono">
-                                    <a href={`tel:${cleanPhone}`} className="font-medium text-slate-700 hover:text-blue-600 transition-colors">
+                                    <a href={`tel:${cleanPhone}`} className="font-semibold text-slate-700 hover:text-[#0071E3] transition-colors">
                                       {formattedPhone}
                                     </a>
                                     {cleanPhone && (
@@ -1338,7 +1352,7 @@ export default function CustomerView({
                                         href={`https://zalo.me/${cleanPhone}`} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="px-1 text-[9px] bg-blue-100 text-blue-700 hover:bg-blue-200 rounded font-sans font-semibold"
+                                        className="px-1.5 py-0.2 text-[9px] bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md font-sans font-bold border border-blue-200/60"
                                       >
                                         Zalo
                                       </a>
@@ -1355,7 +1369,7 @@ export default function CustomerView({
                               </div>
                             </td>
 
-                            <td className="px-5 py-3">
+                            <td className="px-5 py-3.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {contactProjects.length > 0 && (
                                   <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-medium border border-purple-100">
@@ -1370,7 +1384,7 @@ export default function CustomerView({
                               </div>
                             </td>
 
-                            <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => {
@@ -1398,7 +1412,6 @@ export default function CustomerView({
                                 </button>
                               </div>
                             </td>
-
                           </tr>
                         );
                       })}

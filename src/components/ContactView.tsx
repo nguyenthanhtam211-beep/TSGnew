@@ -18,6 +18,7 @@ import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } fro
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import { toast } from 'react-hot-toast';
 import MacTrafficLights from './MacTrafficLights';
+import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 
 interface ContactViewProps {
   contacts: any[];
@@ -501,8 +502,10 @@ export default function ContactView({
   const currentProjects = selectedContactId ? (projects[selectedContactId] || []) : [];
   const currentActivities = selectedContactId ? (activities[selectedContactId] || []) : [];
 
-  const selectedCleanName = selectedContact ? formatContactFullName(selectedContact["Tên"] || "") : '';
-  const selectedFullName = selectedContact ? `${selectedContact["Danh xưng"] ? selectedContact["Danh xưng"] + " " : ""}${selectedCleanName}` : '';
+  const { salutation: selectedSalutation, cleanName: selectedCleanName } = selectedContact 
+    ? parseContactSalutation(selectedContact["Tên"] || "", selectedContact["Danh xưng"] || "")
+    : { salutation: null, cleanName: '' };
+  const selectedFullName = selectedCleanName;
   const selectedInitials = selectedContact ? getAvatarInitials(selectedCleanName) : 'TS';
   const selectedCleanPhone = selectedContact ? getRawCallablePhone(selectedContact["Điện thoại"]) : '';
   const selectedFormattedPhone = selectedContact ? formatVietnamesePhone(selectedContact["Điện thoại"]) : '';
@@ -677,13 +680,11 @@ export default function ContactView({
                   {groupedContacts[letter].map(contact => {
                     const contactId = contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
                     const isSelected = selectedContactId === contactId;
-                    const cleanName = formatContactFullName(contact["Tên"] || "");
-                    const fullName = `${contact["Danh xưng"] ? contact["Danh xưng"] + " " : ""}${cleanName}`;
+                    const { salutation, cleanName } = parseContactSalutation(contact["Tên"] || "", contact["Danh xưng"] || "");
                     const initials = getAvatarInitials(cleanName);
                     const exec = isExecutive(contact["Chức vụ"]);
                     const compType = getCompanyType(contact["Công ty"]);
                     const isCustomer = compType === 'Khách hàng';
-                    const formattedPhone = formatVietnamesePhone(contact["Điện thoại"]);
 
                     return (
                       <div
@@ -704,20 +705,23 @@ export default function ContactView({
                             isSelected
                               ? 'bg-white/20 text-white'
                               : exec 
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300/60'
-                              : isCustomer 
-                              ? 'bg-blue-100 text-blue-900' 
-                              : 'bg-purple-100 text-purple-900'
+                              ? 'bg-amber-100/90 text-amber-900 border border-amber-300/80 shadow-amber-500/10'
+                              : salutation === 'Mrs' || salutation === 'Ms'
+                              ? 'bg-rose-100/80 text-rose-800 border border-rose-200/80'
+                              : 'bg-blue-100/80 text-blue-800 border border-blue-200/80'
                           }`}>
                             {initials}
                           </div>
 
                           <div className="min-w-0">
-                            <div className="font-bold text-xs sm:text-sm truncate flex items-center gap-1.5">
-                              <span>{fullName}</span>
+                            <div className="font-bold text-xs sm:text-sm truncate flex items-center gap-1.5 flex-wrap">
+                              {salutation && (
+                                <SalutationBadge salutation={salutation} size="sm" />
+                              )}
+                              <span className={isSelected ? 'text-white font-bold' : 'text-slate-900 font-bold'}>{cleanName}</span>
                               {exec && (
-                                <span className={`text-[9px] px-1 rounded font-semibold ${
-                                  isSelected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                                  isSelected ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-800 border border-amber-200/90'
                                 }`}>
                                   Lãnh đạo
                                 </span>
@@ -776,12 +780,14 @@ export default function ContactView({
 
                 <div className="text-center sm:text-left flex-1 min-w-0">
                   <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                    {selectedSalutation && <SalutationBadge salutation={selectedSalutation} size="md" />}
                     <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                      {selectedFullName}
+                      {selectedCleanName}
                     </h2>
                     {selectedIsExec && (
-                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
-                        Ban Lãnh Đạo
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/90 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <Star size={10} className="fill-amber-500 text-amber-500" />
+                        <span>Ban Lãnh Đạo</span>
                       </span>
                     )}
                   </div>
