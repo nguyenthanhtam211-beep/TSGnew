@@ -264,44 +264,58 @@ export interface DriveSyncPayload {
 }
 
 /**
- * Helper to call Google APIs with automatic 401 token refresh retry
+ * Helper to call Google APIs with automatic timeout and 401 token refresh retry
  */
 async function callGoogleApi(
   url: string,
   options: RequestInit,
-  token: string
+  token: string,
+  timeoutMs = 12000
 ): Promise<Response> {
   let currentToken = token || getStoredGoogleToken() || '';
   
-  let res = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      "Authorization": `Bearer ${currentToken}`
-    }
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  // If 401 Unauthorized, force refresh token and retry once
-  if (res.status === 401) {
-    console.warn("Google Access Token expired (401). Requesting fresh token...");
-    try {
-      clearStoredGoogleToken();
-      currentToken = await ensureGoogleToken(undefined, true);
-      if (currentToken) {
-        res = await fetch(url, {
-          ...options,
-          headers: {
-            ...options.headers,
-            "Authorization": `Bearer ${currentToken}`
-          }
-        });
+  try {
+    let res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...options.headers,
+        "Authorization": `Bearer ${currentToken}`
       }
-    } catch (authErr) {
-      console.error("Failed to auto-refresh Google token:", authErr);
-    }
-  }
+    });
+    clearTimeout(timeoutId);
 
-  return res;
+    // If 401 Unauthorized, force refresh token and retry once
+    if (res.status === 401) {
+      console.warn("Google Access Token expired (401). Requesting fresh token...");
+      try {
+        clearStoredGoogleToken();
+        currentToken = await ensureGoogleToken(undefined, true);
+        if (currentToken) {
+          res = await fetch(url, {
+            ...options,
+            headers: {
+              ...options.headers,
+              "Authorization": `Bearer ${currentToken}`
+            }
+          });
+        }
+      } catch (authErr) {
+        console.error("Failed to auto-refresh Google token:", authErr);
+      }
+    }
+
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Yêu cầu tới Google API quá thời gian (${timeoutMs / 1000}s). Vui lòng thử lại.`);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -513,16 +527,14 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
     }
   };
 
-  let contactsCount = 0;
-  let customersCount = 0;
-  let suppliersCount = 0;
-  let productsCount = 0;
+  const contactsToSave: any[] = [];
+  const customersToSave: any[] = [];
+  const suppliersToSave: any[] = [];
+  const productsToSave: any[] = [];
 
-  // 1. KÉO VÀ ĐỒNG BỘ DANH BẠ (Contacts)
+  // 1. KÉO DANH BẠ (Contacts)
   if (contactsTab) {
     const rawContacts = await readSheetValues(contactsTab);
-    console.log(`Đã đọc ${rawContacts.length} dòng từ tab Danh bạ (${contactsTab})`);
-    
     for (let i = 0; i < rawContacts.length; i++) {
       const c = rawContacts[i];
       const name = c["Tên"] || c["Họ và tên"] || c["Name"] || c["Họ tên"] || '';
@@ -540,7 +552,7 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
         const rawId = c.ID || c.id || (name && company ? `${name}_${company}` : name || `contact_${i + 1}`);
         const docId = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        const payload = {
+        contactsToSave.push({
           id: docId,
           ID: c.ID || docId,
           "Danh xưng": salutation,
@@ -554,23 +566,14 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
           "Phụ trách": inCharge,
           "Ghi chú": notes,
           updatedAt: new Date().toISOString()
-        };
-
-        try {
-          await dbEngine.save('contacts', payload);
-          contactsCount++;
-        } catch (e) {
-          console.warn('Error saving contact to dbEngine:', e);
-        }
+        });
       }
     }
   }
 
-  // 2. KÉO VÀ ĐỒNG BỘ KHÁCH HÀNG (Customers)
+  // 2. KÉO KHÁCH HÀNG (Customers)
   if (customersTab) {
     const rawCustomers = await readSheetValues(customersTab);
-    console.log(`Đã đọc ${rawCustomers.length} dòng từ tab Khách hàng (${customersTab})`);
-
     for (let i = 0; i < rawCustomers.length; i++) {
       const cust = rawCustomers[i];
       const custId = cust["Customer_ID"] || cust["Mã khách hàng"] || cust["Mã KH"] || cust["id"] || cust["ID"] || cust["Tên đầy đủ"] || '';
@@ -580,7 +583,7 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
         const targetId = custId || `cust_${i + 1}`;
         const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        const payload = {
+        customersToSave.push({
           ...cust,
           id: docId,
           Customer_ID: cust["Customer_ID"] || docId,
@@ -597,23 +600,14 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
           "Tài khoản ngân hàng": cust["Tài khoản ngân hàng"] || '',
           "Tình trạng": cust["Tình trạng"] || 'Hoạt động',
           updatedAt: new Date().toISOString()
-        };
-
-        try {
-          await dbEngine.save('customers', payload);
-          customersCount++;
-        } catch (e) {
-          console.warn('Error saving customer to dbEngine:', e);
-        }
+        });
       }
     }
   }
 
-  // 3. KÉO VÀ ĐỒNG BỘ NHÀ CUNG CẤP (Suppliers)
+  // 3. KÉO NHÀ CUNG CẤP (Suppliers)
   if (suppliersTab) {
     const rawSuppliers = await readSheetValues(suppliersTab);
-    console.log(`Đã đọc ${rawSuppliers.length} dòng từ tab Nhà cung cấp (${suppliersTab})`);
-
     for (let i = 0; i < rawSuppliers.length; i++) {
       const supp = rawSuppliers[i];
       const suppId = supp["Mã nhà cung cấp"] || supp["Mã NCC"] || supp["Supplier_ID"] || supp["id"] || supp["ID"] || supp["Tên Nhà Cung Cấp"] || '';
@@ -623,7 +617,7 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
         const targetId = suppId || `supp_${i + 1}`;
         const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
 
-        const payload = {
+        suppliersToSave.push({
           ...supp,
           id: docId,
           "Mã nhà cung cấp": supp["Mã nhà cung cấp"] || docId,
@@ -639,19 +633,12 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
           "Tài khoản ngân hàng": supp["Tài khoản ngân hàng"] || '',
           "Tình trạng": supp["Tình trạng"] || 'Đang hợp tác',
           updatedAt: new Date().toISOString()
-        };
-
-        try {
-          await dbEngine.save('suppliers', payload);
-          suppliersCount++;
-        } catch (e) {
-          console.warn('Error saving supplier to dbEngine:', e);
-        }
+        });
       }
     }
   }
 
-  // 4. KÉO VÀ ĐỒNG BỘ SẢN PHẨM (Products)
+  // 4. KÉO SẢN PHẨM (Products)
   if (productsTab) {
     const rawProducts = await readSheetValues(productsTab);
     for (let i = 0; i < rawProducts.length; i++) {
@@ -659,17 +646,30 @@ export async function pullMasterDataFromDrive(token: string, spreadsheetId?: str
       const pId = prod["Mã sản phẩm"] || prod["Mã hàng"] || prod.id || prod.ID || '';
       if (pId) {
         const docId = String(pId).replace(/[/\\#?%[\]\s.]+/g, '_');
-        try {
-          await dbEngine.save('products', { ...prod, id: docId, "Mã sản phẩm": prod["Mã sản phẩm"] || docId, updatedAt: new Date().toISOString() });
-          productsCount++;
-        } catch (e) {
-          console.warn('Error saving product to dbEngine:', e);
-        }
+        productsToSave.push({
+          ...prod,
+          id: docId,
+          "Mã sản phẩm": prod["Mã sản phẩm"] || docId,
+          updatedAt: new Date().toISOString()
+        });
       }
     }
   }
 
-  return { contactsCount, customersCount, suppliersCount, productsCount };
+  // Batch Save to TSG Relational Data Engine (Instantaneous 0ms update)
+  const [cRes, cuRes, sRes, pRes] = await Promise.all([
+    dbEngine.saveBatch('contacts', contactsToSave),
+    dbEngine.saveBatch('customers', customersToSave),
+    dbEngine.saveBatch('suppliers', suppliersToSave),
+    dbEngine.saveBatch('products', productsToSave)
+  ]);
+
+  return {
+    contactsCount: cRes.count,
+    customersCount: cuRes.count,
+    suppliersCount: sRes.count,
+    productsCount: pRes.count
+  };
 }
 
 /**

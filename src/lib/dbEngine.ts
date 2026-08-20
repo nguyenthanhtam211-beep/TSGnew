@@ -261,6 +261,53 @@ class TSGDataEngine {
   }
 
   /**
+   * Batch Save (Create or Update multiple items at once)
+   * High performance: single localStorage write and single subscriber notification
+   */
+  public async saveBatch(colName: CollectionName, items: any[]): Promise<{ success: boolean; count: number }> {
+    if (!Array.isArray(items) || items.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    const colMap = this.loadCollection(colName);
+    const userMods = this.getUserModifiedMap(colName);
+    let count = 0;
+
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const key = getItemKey(item, colName);
+      if (!key) continue;
+      const sanitizedKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
+
+      const existing = colMap.get(sanitizedKey) || {};
+      const updatedPayload = {
+        ...existing,
+        ...item,
+        id: item.id || sanitizedKey,
+        _userModified: true,
+        updatedAt: new Date().toISOString()
+      };
+
+      colMap.set(sanitizedKey, updatedPayload);
+      userMods.set(sanitizedKey, updatedPayload);
+      count++;
+    }
+
+    this.memoryCache.set(colName, colMap);
+    this.saveUserModifiedMap(colName, userMods);
+
+    try {
+      const allItems = Array.from(colMap.values());
+      localStorage.setItem(this.getStorageKey(colName), JSON.stringify(allItems));
+    } catch (e) {
+      console.warn(`LocalStorage batch write warning for ${colName}:`, e);
+    }
+
+    this.notifySubscribers(colName);
+    return { success: true, count };
+  }
+
+  /**
    * Delete an item
    */
   public async delete(colName: CollectionName, id: string): Promise<{ success: boolean; id: string }> {
