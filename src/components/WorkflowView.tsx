@@ -1104,12 +1104,12 @@ export default function WorkflowView({
               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
             </span>
             Bước {activeStep} / 6: {
-              activeStep === 1 ? "Đặt hàng (Sourcing)" :
-              activeStep === 2 ? "Lên đơn hàng (PO)" :
-              activeStep === 3 ? "Lập kế hoạch giao" :
-              activeStep === 4 ? "Giao hàng (PXK)" :
-              activeStep === 5 ? "Kiểm tra, đối soát" :
-              "Báo cáo kế toán"
+              activeStep === 1 ? "Báo giá & Đơn hàng kép" :
+              activeStep === 2 ? "Phê duyệt & Khóa đơn" :
+              activeStep === 3 ? "Kế hoạch giao hàng" :
+              activeStep === 4 ? "Xuất kho & BBBG" :
+              activeStep === 5 ? "Đối soát 3 bên" :
+              "Hóa đơn, Công nợ & Tài chính"
             }
           </div>
         </div>
@@ -1119,12 +1119,12 @@ export default function WorkflowView({
       <div className="bg-white/60 backdrop-blur-md border-b border-black/[0.06] p-4 overflow-x-auto">
         <div className="flex items-center justify-between min-w-[850px] max-w-6xl mx-auto px-4 gap-2">
           {[
-            { step: 1, label: "1. Đặt hàng", icon: <ShoppingCart size={16} /> },
-            { step: 2, label: "2. Lên đơn hàng", icon: <FileText size={16} /> },
+            { step: 1, label: "1. Báo giá & Đơn hàng kép", icon: <ShoppingCart size={16} /> },
+            { step: 2, label: "2. Phê duyệt & Khóa đơn", icon: <ShieldCheck size={16} /> },
             { step: 3, label: "3. Kế hoạch giao", icon: <Calendar size={16} /> },
-            { step: 4, label: "4. Giao hàng", icon: <Truck size={16} /> },
-            { step: 5, label: "5. Đối soát", icon: <CheckSquare size={16} /> },
-            { step: 6, label: "6. Báo cáo kế toán", icon: <BarChart3 size={16} /> }
+            { step: 4, label: "4. Xuất kho & BBBG", icon: <Truck size={16} /> },
+            { step: 5, label: "5. Đối soát 3 bên", icon: <CheckSquare size={16} /> },
+            { step: 6, label: "6. Hóa đơn & Tài chính", icon: <BarChart3 size={16} /> }
           ].map((item, index) => {
             const isActive = activeStep === item.step;
             const isDone = activeStep > item.step;
