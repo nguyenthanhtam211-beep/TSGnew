@@ -388,3 +388,155 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
   }
 }
 
+/**
+ * Trích xuất dữ liệu OCR chuyên sâu cho HỢP ĐỒNG & PHỤ LỤC (Contracts & Price Annex)
+ * - Trích xuất thông tin pháp lý hợp đồng (Số HĐ, Đối tác, Ngày ký, Thời hạn, Điều khoản TT)
+ * - Đưa ra TÓM TẮT SƠ BỘ BẰNG AI (Quyền & nghĩa vụ chính, các điểm pháp lý cốt lõi, lưu ý rủi ro)
+ * - Bóc tách danh mục sản phẩm & đơn giá cam kết trong Hợp đồng
+ */
+export async function processContractOCR(file: File, customApiKey?: string): Promise<any> {
+  const apiKey = customApiKey || getStoredGeminiKey();
+
+  const base64Data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
+  const prompt = `Bạn là chuyên gia pháp lý và kiểm toán tài chính hàng đầu của Tập đoàn Tâm Sen (TSG Business ERP). Hãy phân tích kỹ lưỡng HỢP ĐỒNG / PHỤ LỤC / BẢNG GIÁ ĐÍNH KÈM (hình ảnh hoặc file PDF scan) và trích xuất thông tin chính xác:
+
+1. THÔNG TIN PHÁP LÝ HỢP ĐỒNG:
+- contractNumber: Số hợp đồng (ví dụ: "177/HĐ-TLTL", "01/2026/HĐMB-TSG", "102/HĐ2026-TLBS-TS", v.v.)
+- title: Trích yếu / Tên hợp đồng
+- partnerName: Tên đối tác (ví dụ: Công ty TNHH MTV Thuốc lá Thăng Long, Công ty Thuốc lá Thanh Hóa, Công ty Thuốc lá Bắc Sơn, Công ty Cổ phần Bao Bì & In...)
+- partnerType: "Khách hàng" | "Nhà cung cấp"
+- contractType: "Bán hàng" | "Mua hàng" | "Nguyên tắc" | "Gia công"
+- signDate: Ngày ký ("YYYY-MM-DD" hoặc "DD/MM/YYYY")
+- effectiveDate: Ngày bắt đầu hiệu lực ("YYYY-MM-DD" hoặc "DD/MM/YYYY")
+- expirationDate: Ngày hết hạn ("YYYY-MM-DD" hoặc "DD/MM/YYYY" hoặc "")
+- paymentTerms: Điều khoản thanh toán (ví dụ: "Chuyển khoản trong vòng 30 ngày kể từ ngày nhận đủ hóa đơn GTGT hợp lệ")
+- deliveryTerms: Điều khoản giao nhận, vận chuyển và địa điểm giao hàng
+- totalValue: Tổng giá trị hợp đồng bằng số (nếu có ghi giá trị cụ thể, nếu không có để 0)
+
+2. TÓM TẮT NỘI DUNG SƠ BỘ BẰNG AI (aiExecutiveSummary):
+- Hãy viết một bản tóm tắt phân tích súc tích, chuyên nghiệp (khoảng 3-5 câu / gạch đầu dòng) gồm:
+  + Mục đích hợp đồng (mua bán loại hàng hóa bao bì, quy cách gì).
+  + Cơ chế giá & phương thức thanh toán.
+  + Trách nhiệm giao hàng và quyền lợi hai bên.
+  + Các điều khoản phạt vi phạm / cảnh báo rủi ro quan trọng (nếu có).
+
+3. DANH MỤC SẢN PHẨM & ĐƠN GIÁ CAM KẾT (products):
+- Đọc kỹ bảng giá / phụ lục đính kèm hợp đồng để bóc tách từng mặt hàng:
+  + productCode: Mã sản phẩm / ký hiệu mã vật tư nếu có (ví dụ: "TH130/07", "TH25/07", "TH211/05", v.v.)
+  + productName: Tên đầy đủ của sản phẩm, chủng loại, quy cách
+  + unit: Đơn vị tính ("Thùng", "Hộp", "Cái", "Tờ", "Kg"...)
+  + quantity: Số lượng cam kết (nếu có)
+  + contractPrice: Đơn giá ký kết trong hợp đồng (bằng số)
+  + notes: Ghi chú quy cách hoặc điều kiện đơn giá
+
+Hãy xuất kết quả chính xác theo định dạng JSON hợp lệ:
+{
+  "contractNumber": string,
+  "title": string,
+  "partnerName": string,
+  "partnerType": "Khách hàng" | "Nhà cung cấp",
+  "contractType": "Bán hàng" | "Mua hàng" | "Nguyên tắc" | "Gia công",
+  "signDate": string,
+  "effectiveDate": string,
+  "expirationDate": string,
+  "paymentTerms": string,
+  "deliveryTerms": string,
+  "totalValue": number,
+  "aiExecutiveSummary": string,
+  "products": [
+    {
+      "productCode": string,
+      "productName": string,
+      "unit": string,
+      "quantity": number,
+      "contractPrice": number,
+      "notes": string
+    }
+  ]
+}`;
+
+  // Engine 1: Direct Google AI Studio REST Endpoint (Fastest)
+  if (apiKey) {
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    for (const model of modelsToTry) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data
+                    }
+                  },
+                  { text: prompt }
+                ]
+              }
+            ],
+            generation_config: {
+              response_mime_type: 'application/json',
+              temperature: 0.1,
+              max_output_tokens: 8192
+            }
+          })
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            return JSON.parse(text);
+          }
+        }
+      } catch (err) {
+        console.warn(`Direct Gemini Contract OCR model ${model} error:`, err);
+      }
+    }
+  }
+
+  // Engine 2: Serverless /api/ocr Endpoint fallback
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-gemini-key'] = apiKey;
+
+  const res = await fetch('/api/ocr', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      base64: base64Data,
+      mimeType: mimeType,
+      apiKey: apiKey || undefined,
+      prompt: prompt
+    })
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    return data;
+  }
+
+  const errText = await res.text();
+  let errMsg = `Lỗi máy chủ OCR Hợp đồng (${res.status})`;
+  try {
+    const parsed = JSON.parse(errText);
+    if (parsed.error) errMsg = parsed.error;
+  } catch (_) {}
+  throw new Error(errMsg);
+}
+

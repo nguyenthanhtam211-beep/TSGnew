@@ -3,12 +3,14 @@ import {
   FileText, Plus, Search, Filter, Calendar, CheckCircle2, Clock, 
   AlertTriangle, ArrowUpRight, DollarSign, Download, Eye, Edit3, 
   Trash2, Sparkles, Scale, Building2, User, ChevronRight, FileCheck,
-  Paperclip, Tag, ArrowRight, ShieldCheck
+  Paperclip, Tag, ArrowRight, ShieldCheck, Upload, Camera, Loader2,
+  Bot, Zap, Check, Layers, RefreshCw, CheckSquare
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import MacTrafficLights from './MacTrafficLights';
-import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO } from '../lib/business-logic';
+import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO, findPriceRecord } from '../lib/business-logic';
+import { processContractOCR } from '../lib/gemini';
 import CompanyLogo from './CompanyLogo';
 
 export interface ContractItem {
@@ -22,7 +24,9 @@ export interface ContractItem {
   effectiveDate: string; // Ngày có hiệu lực
   expirationDate: string; // Ngày hết hạn
   totalValue: number; // Giá trị hợp đồng (VNĐ)
-  paymentTerms: string; // Điều khoản thanh toán (e.g. 30 ngày sau khi nhận hóa đơn)
+  paymentTerms: string; // Điều khoản thanh toán
+  deliveryTerms?: string; // Điều khoản giao nhận
+  aiExecutiveSummary?: string; // Tóm tắt sơ bộ nội dung hợp đồng bởi AI
   status: 'Hiệu lực' | 'Hết hạn' | 'Đang thương thảo' | 'Thanh lý';
   attachmentName?: string; // Tên tệp đính kèm scan
   attachmentUrl?: string;
@@ -72,6 +76,12 @@ export default function ContractsView({
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractItem | null>(null);
 
+  // OCR Contract & Price Reconciliation State
+  const [isOcrModalOpen, setIsOcrModalOpen] = useState(false);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [ocrContractResult, setOcrContractResult] = useState<Partial<ContractItem> | null>(null);
+  const [ocrActiveTab, setOcrActiveTab] = useState<'all' | 'summary' | 'products' | 'reconciliation'>('all');
+
   // Form State
   const [formData, setFormData] = useState<Partial<ContractItem>>({
     contractNumber: '',
@@ -84,6 +94,8 @@ export default function ContractsView({
     expirationDate: '',
     totalValue: 0,
     paymentTerms: 'Chuyển khoản 30 ngày',
+    deliveryTerms: '',
+    aiExecutiveSummary: '',
     status: 'Hiệu lực',
     notes: '',
     products: [],
@@ -122,6 +134,212 @@ export default function ContractsView({
 
     return { total, active, totalVal, expiringSoon };
   }, [contractsData]);
+
+  // Reconciled OCR Products vs Pricing 2026
+  const reconciledOcrProducts = useMemo(() => {
+    if (!ocrContractResult || !ocrContractResult.products) return [];
+    return ocrContractResult.products.map(p => {
+      const matchedPricing = findPriceRecord(pricingData, {
+        sku: p.productCode || p.productName,
+        name: p.productName,
+        customer: ocrContractResult.partnerName
+      });
+      const currentPrice = matchedPricing ? (parseNumber(matchedPricing['Đơn giá bán']) || parseNumber(matchedPricing['Đơn giá bán mới']) || parseNumber(matchedPricing['Giá bán'])) : 0;
+      const contractPrice = parseNumber(p.contractPrice) || 0;
+      const diff = currentPrice > 0 ? (contractPrice - currentPrice) : 0;
+      const diffPct = currentPrice > 0 ? (diff / currentPrice) * 100 : 0;
+      
+      let matchStatus: 'exact' | 'higher' | 'lower' | 'new' = 'exact';
+      if (!matchedPricing || currentPrice === 0) {
+        matchStatus = 'new';
+      } else if (Math.abs(diff) < 1) {
+        matchStatus = 'exact';
+      } else if (diff > 0) {
+        matchStatus = 'higher';
+      } else {
+        matchStatus = 'lower';
+      }
+
+      return {
+        ...p,
+        matchedPricing,
+        currentPrice,
+        diff,
+        diffPct,
+        matchStatus
+      };
+    });
+  }, [ocrContractResult, pricingData]);
+
+  // Reconciled Selected Contract Products vs Pricing 2026
+  const selectedContractReconciled = useMemo(() => {
+    if (!selectedContract || !selectedContract.products) return [];
+    return selectedContract.products.map(p => {
+      const matchedPricing = findPriceRecord(pricingData, {
+        sku: p.productCode || p.productName,
+        name: p.productName,
+        customer: selectedContract.partnerName
+      });
+      const currentPrice = matchedPricing ? (parseNumber(matchedPricing['Đơn giá bán']) || parseNumber(matchedPricing['Đơn giá bán mới']) || parseNumber(matchedPricing['Giá bán'])) : 0;
+      const contractPrice = parseNumber(p.contractPrice) || 0;
+      const diff = currentPrice > 0 ? (contractPrice - currentPrice) : 0;
+      const diffPct = currentPrice > 0 ? (diff / currentPrice) * 100 : 0;
+      
+      let matchStatus: 'exact' | 'higher' | 'lower' | 'new' = 'exact';
+      if (!matchedPricing || currentPrice === 0) {
+        matchStatus = 'new';
+      } else if (Math.abs(diff) < 1) {
+        matchStatus = 'exact';
+      } else if (diff > 0) {
+        matchStatus = 'higher';
+      } else {
+        matchStatus = 'lower';
+      }
+
+      return {
+        ...p,
+        matchedPricing,
+        currentPrice,
+        diff,
+        diffPct,
+        matchStatus
+      };
+    });
+  }, [selectedContract, pricingData]);
+
+  // Load sample contract for rapid testing
+  const handleLoadSampleContract = (sample: 'ThangLong' | 'ThanhHoa' | 'BacSon') => {
+    if (sample === 'ThangLong') {
+      setOcrContractResult({
+        contractNumber: '177/HĐ-TLTL',
+        title: 'Hợp đồng mua bán bao bì carton & vỏ hộp thuốc lá năm 2026',
+        partnerName: 'Công ty TNHH MTV Thuốc lá Thăng Long',
+        partnerType: 'Khách hàng',
+        contractType: 'Bán hàng',
+        signDate: '2026-01-15',
+        effectiveDate: '2026-01-15',
+        expirationDate: '2026-12-31',
+        totalValue: 580000000,
+        paymentTerms: 'Chuyển khoản trong vòng 30 ngày kể từ ngày nhận đủ hóa đơn GTGT hợp lệ',
+        deliveryTerms: 'Giao hàng theo từng đợt tại kho bên mua - KCN Thạch Thất, Hà Nội',
+        aiExecutiveSummary: `• Hợp đồng nguyên tắc cung ứng bao bì carton và vỏ hộp thuốc lá Thăng Long năm 2026.
+• Đơn giá ký kết cố định trong 12 tháng, làm căn cứ áp bảng giá niêm yết Gsp_082.
+• Điều khoản thanh toán 30 ngày chuyển khoản sau đối soát hóa đơn GTGT.
+• Cam kết bảo hành chất lượng in ấn và định lượng giấy 100% theo tiêu chuẩn Specs ký duyệt.`,
+        attachmentName: '177_HD_TLTL_2026_Signed.pdf',
+        attachmentUrl: 'https://drive.google.com/drive/search?q=177/H%C4%90-TLTL',
+        products: [
+          { productCode: 'TH130/07', productName: 'Thùng carton Vỏ bao Thăng Long', unit: 'Thùng', contractPrice: 2700, quantity: 50000, notes: 'Quy cách sóng E, in offset 4 màu' },
+          { productCode: 'TH25/07', productName: 'Thùng carton Bao cứng Thăng Long', unit: 'Thùng', contractPrice: 2500, quantity: 30000, notes: 'Quy cách carton 3 lớp' },
+          { productCode: 'TH211/05', productName: 'Vỏ hộp Thuốc lá Thăng Long 20', unit: 'Hộp', contractPrice: 1800, quantity: 100000, notes: 'Giấy Ivory 300gsm' }
+        ]
+      });
+      toast.success("Đã nạp mẫu Hợp đồng Thuốc lá Thăng Long (177/HĐ-TLTL)!");
+    } else if (sample === 'ThanhHoa') {
+      setOcrContractResult({
+        contractNumber: '01/HĐ-TLTH',
+        title: 'Hợp đồng kinh tế cung ứng nhãn bao & thùng carton',
+        partnerName: 'Công ty Thuốc lá Thanh Hóa',
+        partnerType: 'Khách hàng',
+        contractType: 'Bán hàng',
+        signDate: '2026-02-01',
+        effectiveDate: '2026-02-01',
+        expirationDate: '2026-12-31',
+        totalValue: 340000000,
+        paymentTerms: 'Thanh toán chuyển khoản sau 45 ngày kể từ ngày ký biên bản giao nhận PXK',
+        deliveryTerms: 'Giao hàng tận kho Nhà máy Thuốc lá Thanh Hóa, TP. Thanh Hóa',
+        aiExecutiveSummary: `• Hợp đồng cung ứng nhãn bao và thùng carton đóng gói cho các dòng sản phẩm thuốc lá Thanh Hóa.
+• Cơ chế đơn giá đã bao gồm chi phí vận chuyển đến kho nhà máy Thanh Hóa.
+• Thời hạn thanh toán 45 ngày; bên mua có quyền phạt 0.05%/ngày nếu bên bán giao chậm tiến độ PO.`,
+        attachmentName: '01_HD_TLTH_2026_Scan.pdf',
+        attachmentUrl: 'https://drive.google.com/drive/search?q=01/H%C4%90-TLTH',
+        products: [
+          { productCode: 'LGTTS-002-95', productName: 'Nhãn bao Thuốc lá Thanh Hóa', unit: 'Tờ', contractPrice: 450, quantity: 120000, notes: 'Giấy Couche 80gsm cán màng' },
+          { productCode: 'TH25/07', productName: 'Thùng carton Thanh Hóa', unit: 'Thùng', contractPrice: 2700, quantity: 25000, notes: 'Thùng carton 5 lớp in Flexo' }
+        ]
+      });
+      toast.success("Đã nạp mẫu Hợp đồng Thuốc lá Thanh Hóa (01/HĐ-TLTH)!");
+    } else if (sample === 'BacSon') {
+      setOcrContractResult({
+        contractNumber: '102/HĐ2026-TLBS-TS',
+        title: 'Hợp đồng mua bán thùng carton chịu lực Bắc Sơn',
+        partnerName: 'Công ty Thuốc lá Bắc Sơn',
+        partnerType: 'Khách hàng',
+        contractType: 'Bán hàng',
+        signDate: '2026-01-20',
+        effectiveDate: '2026-01-20',
+        expirationDate: '2027-01-20',
+        totalValue: 420000000,
+        paymentTerms: 'Thanh toán đợt theo từng lệnh PO trong vòng 15 ngày sau đối soát công nợ',
+        deliveryTerms: 'Giao tại kho bên bán (FOB Kho TSG Hà Nội)',
+        aiExecutiveSummary: `• Hợp đồng mua bán bao bì carton chịu lực 5 lớp đặc chủng cho nhà máy Bắc Sơn.
+• Đơn giá tính theo xuất xưởng (FOB); bên mua tự chịu trách nhiệm điều xe vận tải.
+• Đối soát công nợ định kỳ vào ngày 25 hàng tháng.`,
+        attachmentName: '102_HD2026_TLBS_TS.pdf',
+        attachmentUrl: 'https://drive.google.com/drive/search?q=102/H%C4%902026-TLBS-TS',
+        products: [
+          { productCode: 'TH130/07', productName: 'Thùng carton Bắc Sơn 5 lớp', unit: 'Thùng', contractPrice: 3200, quantity: 40000, notes: 'Sóng BC chịu nén >450kg' },
+          { productCode: 'KN-01', productName: 'Khay chia ngăn carton Bắc Sơn', unit: 'Cái', contractPrice: 1100, quantity: 80000, notes: 'Mặt hàng mới cần bổ sung vào Bảng giá' }
+        ]
+      });
+      toast.success("Đã nạp mẫu Hợp đồng Thuốc lá Bắc Sơn (102/HĐ2026-TLBS-TS)!");
+    }
+  };
+
+  // Upload file OCR Contract
+  const handleUploadContractFile = async (file: File) => {
+    setIsOcrProcessing(true);
+    const toastId = toast.loading("Gemini AI đang bóc tách Hợp đồng & Bảng giá...");
+    try {
+      const result = await processContractOCR(file);
+      setOcrContractResult({
+        ...result,
+        attachmentName: file.name,
+        attachmentUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(result.contractNumber || file.name)}`
+      });
+      toast.success(`Đã bóc tách thành công Hợp đồng ${result.contractNumber || ''} với ${(result.products || []).length} mặt hàng!`, { id: toastId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Không thể xử lý OCR Hợp đồng. Vui lòng thử lại.", { id: toastId });
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  };
+
+  // Save OCR Contract to Firestore & System
+  const handleSaveOcrContract = async () => {
+    if (!ocrContractResult || !ocrContractResult.contractNumber) {
+      toast.error("Vui lòng quét hoặc nhập Số Hợp Đồng trước khi lưu!");
+      return;
+    }
+    const newContract: ContractItem = {
+      contractNumber: ocrContractResult.contractNumber || '',
+      title: ocrContractResult.title || 'Hợp đồng mua bán hàng hóa',
+      partnerName: ocrContractResult.partnerName || 'Chưa rõ đối tác',
+      partnerType: ocrContractResult.partnerType || 'Khách hàng',
+      contractType: ocrContractResult.contractType || 'Bán hàng',
+      signDate: ocrContractResult.signDate || new Date().toISOString().split('T')[0],
+      effectiveDate: ocrContractResult.effectiveDate || new Date().toISOString().split('T')[0],
+      expirationDate: ocrContractResult.expirationDate || '',
+      totalValue: ocrContractResult.totalValue || 0,
+      paymentTerms: ocrContractResult.paymentTerms || 'Chuyển khoản 30 ngày',
+      deliveryTerms: ocrContractResult.deliveryTerms || '',
+      aiExecutiveSummary: ocrContractResult.aiExecutiveSummary || '',
+      status: 'Hiệu lực',
+      attachmentName: ocrContractResult.attachmentName || `${ocrContractResult.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`,
+      attachmentUrl: ocrContractResult.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(ocrContractResult.contractNumber)}`,
+      notes: 'Được trích xuất và đối chiếu giá tự động bằng Gemini AI',
+      products: ocrContractResult.products || [],
+      appendices: []
+    };
+
+    if (onAddContract) {
+      await onAddContract(newContract);
+      toast.success(`Đã lưu Hợp đồng ${newContract.contractNumber} vào hệ thống & tạo hồ sơ đối chiếu giá!`);
+      setSelectedContract(newContract);
+      setIsOcrModalOpen(false);
+    }
+  };
 
   // Handle open Add/Edit Modal
   const handleOpenAdd = () => {
@@ -179,6 +397,8 @@ export default function ContractsView({
         expirationDate: formData.expirationDate || '',
         totalValue: parseNumber(formData.totalValue),
         paymentTerms: formData.paymentTerms || '',
+        deliveryTerms: formData.deliveryTerms || '',
+        aiExecutiveSummary: formData.aiExecutiveSummary || '',
         status: formData.status || 'Hiệu lực',
         products: formData.products || [],
         appendices: formData.appendices || []
@@ -235,22 +455,32 @@ export default function ContractsView({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
-              Pháp lý & Kế toán
+              Pháp lý & Bảng Giá
             </span>
             <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Quản lý hồ sơ Hợp đồng kinh tế, Phụ lục đơn giá cam kết làm chứng từ đối chiếu giá kế toán & OCR
+            Quét OCR hợp đồng, tóm tắt điều khoản AI, trích xuất bảng đơn giá cam kết và đối chiếu chéo Bảng Giá 2026
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => {
+              setIsOcrModalOpen(true);
+              if (!ocrContractResult) handleLoadSampleContract('ThangLong');
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <Sparkles size={15} className="animate-pulse" />
+            <span>Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá</span>
+          </button>
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-2xs active:scale-95 transition-all"
           >
-            <Plus size={16} />
-            Thêm Hợp Đồng Mới
+            <Plus size={15} />
+            <span>Thêm HĐ</span>
           </button>
         </div>
       </div>
@@ -595,8 +825,27 @@ export default function ContractsView({
                       <span className="text-slate-500">Điều khoản TT:</span>
                       <span className="font-medium text-slate-800 text-right">{selectedContract.paymentTerms}</span>
                     </div>
+                    {selectedContract.deliveryTerms && (
+                      <div className="flex justify-between border-t border-slate-200/60 pt-2">
+                        <span className="text-slate-500">Giao hàng:</span>
+                        <span className="font-medium text-slate-800 text-right">{selectedContract.deliveryTerms}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* AI Executive Summary Box (Nội dung sơ bộ AI) */}
+                {selectedContract.aiExecutiveSummary && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-indigo-600" />
+                      <span>Tóm Tắt Sơ Bộ Bởi AI</span>
+                    </h4>
+                    <div className="bg-gradient-to-br from-indigo-50/80 via-blue-50/60 to-purple-50/40 border border-indigo-200/70 p-3.5 rounded-2xl text-xs text-slate-700 leading-relaxed whitespace-pre-line shadow-2xs">
+                      {selectedContract.aiExecutiveSummary}
+                    </div>
+                  </div>
+                )}
 
                 {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) */}
                 <div className="space-y-2">
@@ -644,28 +893,51 @@ export default function ContractsView({
                   </div>
                 </div>
 
-                {/* Price Table in Contract (Căn cứ đối chiếu) */}
+                {/* Price Table & Reconciliation in Contract */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bảng Đơn Giá Ký Kết</h4>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đơn Giá Ký & Đối Chiếu 2026</h4>
                     <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                      {(selectedContract.products || []).length} mục
+                      {selectedContractReconciled.length} mục
                     </span>
                   </div>
 
-                  {(selectedContract.products || []).length === 0 ? (
+                  {selectedContractReconciled.length === 0 ? (
                     <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-200">
                       Chưa nhập danh mục đơn giá cam kết trong hợp đồng này.
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {(selectedContract.products || []).map((p, idx) => (
-                        <div key={idx} className="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.04] space-y-1.5 text-xs">
+                    <div className="space-y-2.5">
+                      {selectedContractReconciled.map((p, idx) => (
+                        <div key={idx} className="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.04] space-y-2 text-xs">
                           <div className="flex justify-between items-start">
                             <span className="font-bold text-slate-900">{p.productName}</span>
-                            <span className="font-bold text-blue-600 font-mono">{formatVND(p.contractPrice)}</span>
+                            <span className="font-bold text-blue-600 font-mono text-xs">{formatVND(p.contractPrice)}</span>
                           </div>
-                          <div className="flex justify-between text-[11px] text-slate-500">
+                          
+                          {/* Cross-Check with Pricing 2026 */}
+                          <div className="bg-white/80 p-2 rounded-lg border border-black/[0.04] flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500">Bảng giá 2026:</span>
+                            {p.currentPrice > 0 ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-slate-700 font-semibold">{formatVND(p.currentPrice)}</span>
+                                <span className={clsx(
+                                  "px-1.5 py-0.2 text-[9px] font-bold rounded",
+                                  p.matchStatus === 'exact' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                  p.matchStatus === 'higher' ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                  "bg-rose-50 text-rose-700 border border-rose-200"
+                                )}>
+                                  {p.matchStatus === 'exact' ? 'Khớp 100%' : (p.diff > 0 ? `+${p.diffPct.toFixed(1)}%` : `${p.diffPct.toFixed(1)}%`)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-semibold">
+                                Mặt hàng mới
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex justify-between text-[11px] text-slate-400">
                             <span>ĐVT: {p.unit}</span>
                             {p.quantity ? <span>Số lượng: {p.quantity.toLocaleString('vi-VN')}</span> : null}
                           </div>
@@ -714,7 +986,7 @@ export default function ContractsView({
               <FileText size={36} className="mb-2 text-slate-300 stroke-[1.5]" />
               <p className="text-xs font-bold text-slate-600">Chọn 1 Hợp Đồng</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                để xem chi tiết điều khoản, bảng đơn giá đối chiếu và phụ lục
+                để xem chi tiết điều khoản, tóm tắt AI, bảng đơn giá đối chiếu và phụ lục
               </p>
             </div>
           )}
@@ -756,6 +1028,19 @@ export default function ContractsView({
                   Trạng thái: {selectedContract.status}
                 </span>
               </div>
+
+              {/* AI Summary in Mobile */}
+              {selectedContract.aiExecutiveSummary && (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles size={12} />
+                    Tóm Tắt Sơ Bộ Bởi AI
+                  </h4>
+                  <div className="bg-indigo-50/70 border border-indigo-200/70 p-3 rounded-xl text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                    {selectedContract.aiExecutiveSummary}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-[#F5F5F7] p-4 rounded-2xl space-y-2.5 text-xs">
                 <div className="flex justify-between items-center">
@@ -823,21 +1108,30 @@ export default function ContractsView({
               {/* Price list in contract */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Bảng Đơn Giá Ký Kết ({(selectedContract.products || []).length} mục)
+                  Bảng Đơn Giá Ký Kết & Đối Chiếu ({selectedContractReconciled.length} mục)
                 </h4>
-                {(selectedContract.products || []).length === 0 ? (
+                {selectedContractReconciled.length === 0 ? (
                   <div className="p-3 bg-slate-50 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-200">
                     Chưa nhập danh mục đơn giá cam kết trong hợp đồng này.
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {(selectedContract.products || []).map((p, idx) => (
-                      <div key={idx} className="p-2.5 bg-[#F5F5F7] rounded-xl border border-black/[0.04] flex justify-between items-center text-xs">
-                        <div>
+                  <div className="space-y-2 max-h-56 overflow-y-auto">
+                    {selectedContractReconciled.map((p, idx) => (
+                      <div key={idx} className="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.04] space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
                           <p className="font-bold text-slate-900">{p.productName}</p>
-                          <span className="text-[10px] text-slate-500">ĐVT: {p.unit}</span>
+                          <span className="font-bold text-blue-600 font-mono">{formatVND(p.contractPrice)}</span>
                         </div>
-                        <span className="font-bold text-blue-600 font-mono">{formatVND(p.contractPrice)}</span>
+                        <div className="flex justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/40">
+                          <span>Bảng giá 2026: {p.currentPrice ? formatVND(p.currentPrice) : 'Mới'}</span>
+                          <span className={clsx(
+                            "font-bold",
+                            p.matchStatus === 'exact' ? "text-emerald-600" :
+                            p.matchStatus === 'higher' ? "text-amber-600" : "text-rose-600"
+                          )}>
+                            {p.matchStatus === 'exact' ? '✓ Khớp' : `${p.diff > 0 ? '+' : ''}${p.diffPct.toFixed(1)}%`}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1142,6 +1436,272 @@ export default function ContractsView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Contract OCR & Price Cross-Reference Modal */}
+      {isOcrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[92vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
+              <div className="flex items-center gap-3">
+                <MacTrafficLights onClose={() => setIsOcrModalOpen(false)} />
+                <div className="h-4 w-px bg-black/[0.08]" />
+                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+                  <Sparkles size={16} className="text-blue-600" />
+                  <span>Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)</span>
+                </h3>
+              </div>
+              <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200/50">
+                Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026
+              </span>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+              {/* Top: Upload Area & Quick Samples */}
+              <div className="bg-[#F5F5F7] p-4 rounded-2xl border border-black/[0.04] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <Camera size={14} className="text-blue-600" />
+                      Nạp Chứng Từ Hợp Đồng / Phụ Lục (PDF Scan hoặc Ảnh)
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Hệ thống tự động quét số HĐ, đối tác, điều khoản, tóm tắt sơ bộ AI và đối chiếu chéo đơn giá với Bảng Giá 2026.
+                    </p>
+                  </div>
+
+                  {/* Sample test buttons */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-400">Mẫu thử:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSampleContract('ThangLong')}
+                      className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                    >
+                      HĐ Thăng Long 177
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSampleContract('ThanhHoa')}
+                      className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                    >
+                      HĐ Thanh Hóa 01
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSampleContract('BacSon')}
+                      className="px-2.5 py-1 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                    >
+                      HĐ Bắc Sơn 102
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropzone */}
+                <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white/70 hover:bg-blue-50/30 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf,image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadContractFile(file);
+                    }}
+                  />
+                  {isOcrProcessing ? (
+                    <div className="flex items-center gap-2 text-blue-600 font-bold text-xs py-2">
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Gemini AI đang bóc tách điều khoản và đối chiếu giá...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-slate-600 text-xs py-1">
+                      <Upload size={18} className="text-blue-600" />
+                      <span>Kéo thả file PDF Hợp đồng / Ảnh scan hoặc <strong>Bấm vào đây để chọn tệp</strong></span>
+                    </div>
+                  )}
+                </label>
+              </div>
+
+              {/* Display Result in 3 Connected Sections */}
+              {ocrContractResult && (
+                <div className="space-y-5">
+                  {/* Grid 2 Columns: Col 1 = Contract Info & AI Summary | Col 2 = Products & Price Cross-Check */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    
+                    {/* Left: Column 1 - Legal Info & AI Executive Summary (5 cols) */}
+                    <div className="lg:col-span-5 space-y-4">
+                      {/* Legal Summary Card */}
+                      <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Thông Tin Pháp Lý</span>
+                          <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            {ocrContractResult.contractNumber || 'Chưa rõ số HĐ'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-[11px] text-slate-500 block">Tiêu đề hợp đồng:</span>
+                            <span className="font-bold text-slate-900 leading-snug">{ocrContractResult.title || 'Hợp đồng mua bán'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Đối tác:</span>
+                            <span className="font-bold text-slate-900 text-right">{ocrContractResult.partnerName}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 bg-[#F5F5F7] p-2.5 rounded-xl">
+                            <div>
+                              <span className="text-[10px] text-slate-500 block">Ngày ký</span>
+                              <span className="font-semibold text-slate-800">{formatDateForDisplay(ocrContractResult.signDate)}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-500 block">Thời hạn</span>
+                              <span className="font-semibold text-slate-800">{formatDateForDisplay(ocrContractResult.expirationDate) || '12 Tháng'}</span>
+                            </div>
+                          </div>
+                          <div className="bg-[#F5F5F7] p-2.5 rounded-xl space-y-1">
+                            <span className="text-[10px] text-slate-500 block">Điều khoản thanh toán:</span>
+                            <p className="font-medium text-slate-800 text-[11px] leading-relaxed">{ocrContractResult.paymentTerms}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AI Executive Summary Card */}
+                      <div className="bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-purple-50/50 p-4 rounded-2xl border border-indigo-200/80 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <Bot size={15} className="text-indigo-600" />
+                            <span>Tóm Tắt Sơ Bộ Bởi AI</span>
+                          </span>
+                          <span className="text-[10px] font-bold bg-indigo-200/60 text-indigo-800 px-2 py-0.5 rounded-full">
+                            Gemini 2.5
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-line bg-white/70 p-3 rounded-xl border border-indigo-100">
+                          {ocrContractResult.aiExecutiveSummary || 'Đang phân tích điều khoản hợp đồng...'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Column 2 & 3 - Product Pricing Extracted & Reconciliation Table (7 cols) */}
+                    <div className="lg:col-span-7 space-y-4">
+                      {/* Extracted Product Pricing & Reconciliation */}
+                      <div className="bg-white p-4 rounded-2xl border border-black/[0.06] shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                              <Scale size={14} className="text-emerald-600" />
+                              <span>Bảng Đơn Giá & Đối Chiếu Bảng Giá 2026</span>
+                            </h4>
+                            <p className="text-[11px] text-slate-500">So sánh đơn giá ký kết với Bảng giá hiện hành</p>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            {reconciledOcrProducts.length} mặt hàng
+                          </span>
+                        </div>
+
+                        {/* Comparison Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06]">
+                                <th className="py-2.5 px-3">Mặt hàng & Quy cách</th>
+                                <th className="py-2.5 px-2 text-center">ĐVT</th>
+                                <th className="py-2.5 px-3 text-right">Giá Hợp Đồng</th>
+                                <th className="py-2.5 px-3 text-right">Bảng Giá 2026</th>
+                                <th className="py-2.5 px-2 text-center">Đối Chiếu</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-black/[0.04]">
+                              {reconciledOcrProducts.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                                  <td className="py-3 px-3">
+                                    <p className="font-bold text-slate-900">{item.productName}</p>
+                                    <span className="font-mono text-[10px] text-slate-400">{item.productCode || item.notes || 'Quy cách chuẩn'}</span>
+                                  </td>
+                                  <td className="py-3 px-2 text-center text-slate-600 font-medium">{item.unit}</td>
+                                  <td className="py-3 px-3 text-right font-mono font-bold text-blue-700">
+                                    {formatVND(item.contractPrice)}
+                                  </td>
+                                  <td className="py-3 px-3 text-right font-mono text-slate-700">
+                                    {item.currentPrice > 0 ? (
+                                      <span className="font-semibold">{formatVND(item.currentPrice)}</span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 italic">Chưa niêm yết</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-2 text-center">
+                                    {item.matchStatus === 'exact' ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        <Check size={11} /> Khớp 100%
+                                      </span>
+                                    ) : item.matchStatus === 'higher' ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                        +{item.diffPct.toFixed(1)}% (Cao hơn)
+                                      </span>
+                                    ) : item.matchStatus === 'lower' ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                        {item.diffPct.toFixed(1)}% (Thấp hơn)
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                        Mặt hàng mới
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Note & Drive Link */}
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs text-slate-600">
+                          <div className="flex items-center gap-2">
+                            <FileText size={15} className="text-rose-600" />
+                            <span>File lưu trữ: <strong>{ocrContractResult.attachmentName || 'HopDong_Scan.pdf'}</strong> (Thư mục 📁 01_Hop_Dong_Goc_Va_Phu_Luc_PDF)</span>
+                          </div>
+                          <a
+                            href={ocrContractResult.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(ocrContractResult.contractNumber || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 font-bold text-xs flex items-center gap-1 hover:underline"
+                          >
+                            <span>Drive PDF</span>
+                            <ArrowUpRight size={12} />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="px-6 py-4 border-t border-black/[0.06] bg-[#F5F5F7] flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsOcrModalOpen(false)}
+                className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Đóng
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveOcrContract}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <CheckSquare size={14} />
+                  <span>Lưu Hợp Đồng & Bảng Giá Vào Hệ Thống</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
