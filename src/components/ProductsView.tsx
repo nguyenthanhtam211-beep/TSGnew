@@ -280,22 +280,25 @@ export default function ProductsView({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50/50 min-h-screen relative">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-black/[0.06] shadow-xs">
+      {/* 1. macOS Window Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-black/[0.06] shadow-xs">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
-              <Package size={22} />
+            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+              <Package size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900">Danh Mục Sản Phẩm & Liên Kết 360°</h1>
-                <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
-                  {metrics.total} Sản phẩm
+                <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F]">Danh Mục Sản Phẩm</h1>
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-bold rounded-md border border-slate-200">
+                  {metrics.total} sản phẩm
+                </span>
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-md border border-blue-200/60 flex items-center gap-1">
+                  <Sparkles size={11} /> Hồ sơ 360°
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Single Source of Truth liên kết đa chiều: Khách hàng • Nhà cung cấp • Bảng giá • Lợi nhuận • Đơn hàng • Specs kỹ thuật • Hợp đồng Drive
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Tổng quan liên kết: Khách hàng • Nhà cung cấp • Bảng giá • Lợi nhuận • Đơn hàng • Specs kỹ thuật • Hợp đồng Drive
               </p>
             </div>
           </div>
@@ -315,9 +318,9 @@ export default function ProductsView({
               });
               setIsAddModalOpen(true);
             }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             <span>Thêm sản phẩm</span>
           </button>
 
@@ -326,23 +329,23 @@ export default function ProductsView({
               onClick={() => setViewMode('table')}
               className={clsx(
                 "p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all",
-                viewMode === 'table' ? "bg-white text-blue-600 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                viewMode === 'table' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
               )}
-              title="Xem dạng bảng liên kết"
+              title="Xem dạng bảng"
             >
-              <List size={15} />
-              <span className="hidden sm:inline">Bảng chi tiết</span>
+              <List size={14} />
+              <span className="hidden sm:inline">Bảng</span>
             </button>
             <button
               onClick={() => setViewMode('cards')}
               className={clsx(
                 "p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all",
-                viewMode === 'cards' ? "bg-white text-blue-600 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                viewMode === 'cards' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
               )}
-              title="Xem dạng lưới thẻ 360°"
+              title="Xem dạng thẻ"
             >
-              <LayoutGrid size={15} />
-              <span className="hidden sm:inline">Thẻ 360°</span>
+              <LayoutGrid size={14} />
+              <span className="hidden sm:inline">Thẻ</span>
             </button>
           </div>
         </div>
@@ -350,62 +353,62 @@ export default function ProductsView({
 
       {/* 2. Key Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500">Tổng sản phẩm kinh doanh</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{metrics.total}</h3>
+            <p className="text-xs font-semibold text-slate-500">Tổng danh mục</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{metrics.total}</h3>
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">100% đồng bộ Firestore</p>
           </div>
-          <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-            <Package size={22} />
+          <div className="w-10 h-10 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center">
+            <Package size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500">Đã liên kết Bảng Giá 2026</p>
-            <h3 className="text-2xl font-bold text-emerald-600 mt-1">{metrics.withPricing} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">Có đơn giá mua & bán</p>
+            <p className="text-xs font-semibold text-slate-500">Bảng giá 2026</p>
+            <h3 className="text-2xl font-bold text-emerald-600 mt-0.5">{metrics.withPricing} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Đã có đơn giá mua & bán</p>
           </div>
-          <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
-            <DollarSign size={22} />
+          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+            <DollarSign size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-slate-500">Đã có Tiêu chuẩn Specs & CAD</p>
-            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{metrics.withSpecs} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
-            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">Chuẩn ISO mẫu kiểm định</p>
+            <p className="text-xs font-semibold text-slate-500">Tiêu chuẩn Specs & CAD</p>
+            <h3 className="text-2xl font-bold text-indigo-600 mt-0.5">{metrics.withSpecs} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
+            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">Chuẩn ISO kiểm định</p>
           </div>
-          <div className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-            <ShieldCheck size={22} />
+          <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+            <ShieldCheck size={20} />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500">Doanh thu phát sinh PO</p>
-            <h3 className="text-xl font-bold text-slate-900 mt-1">{formatVND(metrics.totalRev)}</h3>
-            <p className="text-[11px] text-blue-600 font-medium mt-0.5">{metrics.withOrders} sản phẩm đã có PO</p>
+            <h3 className="text-xl font-bold text-slate-900 mt-0.5">{formatVND(metrics.totalRev)}</h3>
+            <p className="text-[11px] text-blue-600 font-medium mt-0.5">{metrics.withOrders} sản phẩm đã giao</p>
           </div>
-          <div className="w-11 h-11 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
-            <TrendingUp size={22} />
+          <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
+            <TrendingUp size={20} />
           </div>
         </div>
       </div>
 
       {/* 3. Filters & Search Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center gap-3">
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center gap-3">
         {/* Search */}
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
           <input
             type="text"
-            placeholder="Tìm theo mã SP, tên sản phẩm, khách hàng, nhà cung cấp..."
+            placeholder="Tìm kiếm theo mã SP, tên sản phẩm, khách hàng, NCC..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
           />
         </div>
 
@@ -459,7 +462,7 @@ export default function ProductsView({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-3.5 px-4">Sản Phẩm & Tên Chi Tiết</th>
+                  <th className="py-3.5 px-4">Sản Phẩm & Mã Hiệu</th>
                   <th className="py-3.5 px-4">Khách Hàng Mua</th>
                   <th className="py-3.5 px-4">Nhà Cung Cấp SX</th>
                   <th className="py-3.5 px-4 text-right">Đơn Giá & Biên LN</th>
@@ -473,9 +476,9 @@ export default function ProductsView({
                 {filteredProducts.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-slate-400">
-                      <Package size={40} className="mx-auto mb-2 opacity-40 text-slate-400" />
-                      <p className="font-semibold text-slate-600">Không tìm thấy sản phẩm nào phù hợp</p>
-                      <p className="text-xs text-slate-400 mt-1">Thử thay đổi từ khóa hoặc bộ lọc nhóm hàng / đối tác</p>
+                      <Package size={36} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                      <p className="font-semibold text-slate-600">Không tìm thấy sản phẩm nào</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Thử thay đổi từ khóa hoặc bộ lọc nhóm hàng / đối tác</p>
                     </td>
                   </tr>
                 ) : (
@@ -483,22 +486,22 @@ export default function ProductsView({
                     <tr 
                       key={p.code || idx}
                       onClick={() => onSelectProductDetails(p.code || p.name)}
-                      className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
+                      className="hover:bg-blue-50/30 transition-colors group cursor-pointer"
                     >
                       {/* Product Name & Code */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
-                            <Package size={17} />
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                            <Package size={16} />
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-sm">
+                              <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                                 {p.name}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/80">
                                 {p.code}
                               </span>
                               <span className="text-[11px] text-slate-400">• {p.category}</span>
@@ -509,7 +512,7 @@ export default function ProductsView({
                       </td>
 
                       {/* Customers */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {p.relatedCustomers.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {p.relatedCustomers.map((c, cidx) => (
@@ -528,7 +531,7 @@ export default function ProductsView({
                       </td>
 
                       {/* Suppliers */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {p.relatedSuppliers.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {p.relatedSuppliers.map((s, sidx) => (
@@ -547,13 +550,13 @@ export default function ProductsView({
                       </td>
 
                       {/* Price & Margin */}
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 px-4 text-right">
                         {p.sellPrice > 0 ? (
                           <div>
                             <p className="font-bold text-slate-900">{formatVND(p.sellPrice)}</p>
                             <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[11px]">
                               <span className="text-slate-400">Mua: {formatVND(p.buyPrice)}</span>
-                              <span className="font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded">
+                              <span className="font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/50">
                                 {p.marginPct}
                               </span>
                             </div>
@@ -564,7 +567,7 @@ export default function ProductsView({
                       </td>
 
                       {/* Latest PO */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {p.latestPO ? (
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -591,7 +594,7 @@ export default function ProductsView({
                       </td>
 
                       {/* Technical Specs */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {p.primarySpec ? (
                           <div className="flex items-center gap-1.5">
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-[11px] rounded border border-blue-200">
@@ -607,7 +610,7 @@ export default function ProductsView({
                       </td>
 
                       {/* Contracts & Drive Link */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {p.contractNumber ? (
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-[11px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
@@ -632,24 +635,24 @@ export default function ProductsView({
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={(e) => handleOpenEdit(p, e)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 transition-colors"
-                            title="Chỉnh sửa thông tin sản phẩm"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
+                            title="Chỉnh sửa thông tin"
                           >
-                            <Edit3 size={14} />
+                            <Edit3 size={13} />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onSelectProductDetails(p.code || p.name);
                             }}
-                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
+                            className="px-2.5 py-1 bg-slate-900 hover:bg-blue-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
                           >
-                            <Sparkles size={13} />
-                            <span>360°</span>
+                            <Sparkles size={12} />
+                            <span>Hồ sơ 360°</span>
                           </button>
                         </div>
                       </td>
@@ -673,7 +676,7 @@ export default function ProductsView({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded-md">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded-md border border-slate-200/70">
                       {p.code}
                     </span>
                     <span className="text-xs text-slate-500">• {p.category}</span>
@@ -685,24 +688,24 @@ export default function ProductsView({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={(e) => handleOpenEdit(p, e)}
-                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 flex items-center justify-center transition-colors"
+                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors"
                   >
-                    <Edit3 size={15} />
+                    <Edit3 size={13} />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelectProductDetails(p.code || p.name);
                     }}
-                    className="w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
+                    className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
                   >
-                    <Eye size={16} />
+                    <Eye size={14} />
                   </button>
                 </div>
               </div>
 
               {/* 360 Relational Pills */}
-              <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-xs">
+              <div className="space-y-2 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 text-xs">
                 {/* Customers */}
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 flex items-center gap-1 font-medium">
@@ -755,13 +758,13 @@ export default function ProductsView({
               </div>
 
               {/* Card Footer */}
-              <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
+              <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
                 <span className="flex items-center gap-1 font-mono text-[11px]">
                   <HardDrive size={12} className="text-amber-500" />
                   {p.contractNumber || 'HĐ 2026'}
                 </span>
                 <span className="font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  Xem chi tiết 360° <ChevronRight size={13} />
+                  Hồ sơ 360° <ChevronRight size={13} />
                 </span>
               </div>
             </div>
@@ -780,10 +783,10 @@ export default function ProductsView({
               transition={{ type: 'spring', damping: 25, stiffness: 250 }}
               className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-sm shadow-amber-500/20">
-                    <Edit3 size={20} />
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold shadow-xs">
+                    <Edit3 size={18} />
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-base">Chỉnh Sửa Thông Tin Sản Phẩm</h3>
@@ -794,7 +797,7 @@ export default function ProductsView({
                   onClick={() => setIsEditModalOpen(false)}
                   className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
 
@@ -942,10 +945,10 @@ export default function ProductsView({
               exit={{ scale: 0.95, opacity: 0 }}
               className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">
-                    <Plus size={20} />
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">
+                    <Plus size={18} />
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-base">Thêm Mới Sản Phẩm</h3>
@@ -956,7 +959,7 @@ export default function ProductsView({
                   onClick={() => setIsAddModalOpen(false)}
                   className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
 

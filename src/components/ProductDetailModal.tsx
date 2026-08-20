@@ -24,7 +24,11 @@ import {
   Printer,
   Sparkles,
   ChevronRight,
-  CheckCircle2
+  CheckCircle2,
+  Maximize2,
+  Minimize2,
+  Copy,
+  Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
@@ -66,7 +70,7 @@ export function ProductDetailModal({
   onNavigateToCustomer,
   onNavigateToSupplier
 }: ProductDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<'360_hub' | 'pricing_margin' | 'orders_delivery' | 'specs_tds' | 'contracts_drive'>('360_hub');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pricing' | 'orders' | 'specs' | 'contracts'>('overview');
   const [isMaximized, setIsMaximized] = useState(false);
   
   // Find current product
@@ -81,7 +85,7 @@ export function ProductDetailModal({
   }, [productNameOrId, productData]);
 
   const productCode = (product['Mã sản phẩm'] || product['SKU'] || product['Mã hàng'] || '').trim();
-  const productName = (product['Tên sản phẩm'] || product['Sản phẩm'] || productNameOrId).trim();
+  let productName = (product['Tên sản phẩm'] || product['Sản phẩm'] || productNameOrId).trim();
 
   // 1. Relational Pricing & Margins
   const matchedPricings = useMemo(() => {
@@ -91,6 +95,18 @@ export function ProductDetailModal({
       return (productCode && prCode === productCode) || (productName && prName === productName);
     });
   }, [pricingData, productCode, productName]);
+
+  // Fallback product name from pricing or specs if empty
+  if (!productName || productName === productCode) {
+    if (matchedPricings.length > 0 && matchedPricings[0]['Tên sản phẩm']) {
+      productName = matchedPricings[0]['Tên sản phẩm'].trim();
+    } else {
+      const matchedSp = specsData.find(s => (s['Mã sản phẩm'] || '').trim() === productCode);
+      if (matchedSp && (matchedSp['Tên tiêu chuẩn'] || matchedSp['Sản phẩm liên kết'])) {
+        productName = (matchedSp['Tên tiêu chuẩn'] || matchedSp['Sản phẩm liên kết']).trim();
+      }
+    }
+  }
 
   const primaryPricing = matchedPricings[0] || null;
   const buyPrice = primaryPricing ? parseNumber(primaryPricing['Đơn giá mua'] || primaryPricing['Đơn giá nhập'] || 0) : 0;
@@ -178,19 +194,7 @@ export function ProductDetailModal({
     return relatedPoLines.reduce((sum, po) => sum + parseNumber(po['Thành tiền dòng'] || 0), 0);
   }, [relatedPoLines]);
 
-  // 5. Relational Deliveries
-  const relatedDeliveries = useMemo(() => {
-    return deliveryData.filter(del => 
-      del['Tên sản phẩm'] === productName || 
-      (productCode && del['Mã sản phẩm'] === productCode)
-    );
-  }, [deliveryData, productName, productCode]);
-
-  const totalDeliveredQty = useMemo(() => {
-    return relatedDeliveries.reduce((sum, del) => sum + parseNumber(del['Số lượng giao'] || del['Số lượng'] || 0), 0);
-  }, [relatedDeliveries]);
-
-  // 6. Relational Specs
+  // 5. Relational Specs
   const matchedSpecs = useMemo(() => {
     return specsData.filter(s => {
       const sLink = (s['Sản phẩm liên kết'] || '').trim();
@@ -202,7 +206,7 @@ export function ProductDetailModal({
 
   const primarySpec = matchedSpecs[0] || null;
 
-  // 7. Relational Contracts & Google Drive Path
+  // 6. Relational Contracts & Google Drive Path
   const relatedContracts = useMemo(() => {
     const list: any[] = [];
     const cNumSet = new Set<string>();
@@ -259,95 +263,104 @@ export function ProductDetailModal({
             />
             <div className="h-4 w-px bg-black/[0.08]" />
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-blue-500/20">
-                <Package size={20} />
+              <div className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 shadow-xs">
+                <Package size={18} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs bg-slate-200 text-slate-800 px-2 py-0.5 rounded-md">
+                  <span className="font-mono font-bold text-xs bg-white text-slate-800 px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
                     {productCode || 'SKU'}
                   </span>
-                  <h2 className="text-base font-bold text-[#1D1D1F]">{productName}</h2>
+                  <h2 className="text-sm sm:text-base font-bold text-[#1D1D1F]">{productName}</h2>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {product['Nhóm hàng'] || 'Sản phẩm TSG'} • ĐVT: {product['Đơn Vị Tính'] || 'Cái'} • Tình trạng: <span className="font-bold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {product['Nhóm hàng'] || 'Sản phẩm TSG'} • ĐVT: <strong className="text-slate-700">{product['Đơn Vị Tính'] || 'Cái'}</strong> • Trạng thái: <span className="font-bold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span>
                 </p>
               </div>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="hidden sm:flex w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-300 items-center justify-center text-slate-600 transition-colors"
+              title={isMaximized ? "Thu nhỏ" : "Mở rộng"}
+            >
+              {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition-colors"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 px-6 bg-white shrink-0 overflow-x-auto gap-1">
-          {[
-            { id: '360_hub', label: '🌟 Quan Hệ Thực Thể 360°', icon: Sparkles },
-            { id: 'pricing_margin', label: '💰 Bảng Giá & Lợi Nhuận', count: matchedPricings.length, icon: DollarSign },
-            { id: 'orders_delivery', label: '📦 Đơn Hàng & Giao Hàng', count: relatedPoLines.length, icon: ShoppingCart },
-            { id: 'specs_tds', label: '📐 Tiêu Chuẩn Kỹ Thuật (Specs)', count: matchedSpecs.length, icon: ShieldCheck },
-            { id: 'contracts_drive', label: '📑 Hợp Đồng & Google Drive', count: relatedContracts.length, icon: HardDrive },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={clsx(
-                  "py-3 px-3.5 font-bold text-xs border-b-2 flex items-center gap-1.5 transition-all whitespace-nowrap",
-                  isActive 
-                    ? "border-blue-600 text-blue-600 bg-blue-50/40" 
-                    : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                )}
-              >
-                <Icon size={14} className={isActive ? "text-blue-600" : "text-slate-400"} />
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span className={clsx(
-                    "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
-                    isActive ? "bg-blue-100 text-blue-800 font-bold" : "bg-slate-100 text-slate-600"
-                  )}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {/* macOS Apple Segmented Tab Bar */}
+        <div className="px-6 py-2.5 border-b border-slate-200/80 bg-white shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl w-fit border border-slate-200/60">
+            {[
+              { id: 'overview', label: 'Tổng quan', icon: Sparkles },
+              { id: 'pricing', label: 'Bảng giá', count: matchedPricings.length, icon: DollarSign },
+              { id: 'orders', label: 'Đơn hàng & PO', count: relatedPoLines.length, icon: ShoppingCart },
+              { id: 'specs', label: 'Kỹ thuật (TDS)', count: matchedSpecs.length, icon: ShieldCheck },
+              { id: 'contracts', label: 'Hợp đồng & Drive', count: relatedContracts.length, icon: HardDrive },
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={clsx(
+                    "py-1.5 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap",
+                    isActive 
+                      ? "bg-white text-slate-900 shadow-xs" 
+                      : "text-slate-500 hover:text-slate-900 hover:bg-white/50"
+                  )}
+                >
+                  <Icon size={13} className={isActive ? "text-blue-600" : "text-slate-400"} />
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className={clsx(
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                      isActive ? "bg-blue-50 text-blue-700 font-bold border border-blue-200/60" : "bg-slate-200/70 text-slate-600"
+                    )}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC]">
           
-          {/* TAB 1: 360° RELATIONAL HUB */}
-          {activeTab === '360_hub' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
+          {/* TAB 1: TỔNG QUAN (Bento Grid 360°) */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
               
-              {/* 6 Key Cross-linked Cards Grid */}
+              {/* Bento Grid: 6 Pillars */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 
-                {/* 1. Khách Hàng Đặt Mua */}
+                {/* 1. Khách Hàng */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
-                        <Building2 size={18} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Khách Hàng Đặt Mua</h4>
-                        <p className="text-[11px] text-slate-500">Đơn vị tiêu thụ sản phẩm</p>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
+                      <Building2 size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Khách Hàng Mua</h4>
+                      <p className="text-[11px] text-slate-500">Đơn vị tiêu thụ & điểm giao</p>
                     </div>
                   </div>
                   <div className="space-y-2 pt-2 border-t border-slate-100">
                     {relatedCustomers.length > 0 ? (
                       relatedCustomers.map((cust, idx) => (
-                        <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                        <div key={idx} className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
                           <div>
                             <p className="font-bold text-slate-900">{cust.name}</p>
                             <p className="text-[10px] text-slate-500">Giao đến: {cust.location}</p>
@@ -359,28 +372,26 @@ export function ProductDetailModal({
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin khách hàng gán</p>
+                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin khách hàng</p>
                     )}
                   </div>
                 </div>
 
-                {/* 2. Nhà Cung Cấp Sản Xuất */}
+                {/* 2. Nhà Cung Cấp */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                        <Building2 size={18} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Nhà Cung Cấp SX</h4>
-                        <p className="text-[11px] text-slate-500">Đơn vị gia công / sản xuất</p>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                      <Building2 size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Nhà Cung Cấp SX</h4>
+                      <p className="text-[11px] text-slate-500">Đơn vị gia công & vật liệu</p>
                     </div>
                   </div>
                   <div className="space-y-2 pt-2 border-t border-slate-100">
                     {relatedSuppliers.length > 0 ? (
                       relatedSuppliers.map((supp, idx) => (
-                        <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                        <div key={idx} className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <CompanyLogo name={supp.name} className="w-6 h-6 rounded-full shrink-0" />
                             <div>
@@ -388,30 +399,30 @@ export function ProductDetailModal({
                               <p className="text-[10px] text-slate-500">{supp.materialGroup}</p>
                             </div>
                           </div>
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">
-                            Đối tác chiến lược
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md border border-amber-200/60">
+                            Chiến lược
                           </span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin nhà cung cấp</p>
+                      <p className="text-xs text-slate-400 italic py-2">Chưa có thông tin NCC</p>
                     )}
                   </div>
                 </div>
 
-                {/* 3. Đơn Giá & Biên Lợi Nhuận */}
+                {/* 3. Giá & Biên Lợi Nhuận */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                        <DollarSign size={18} />
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                        <DollarSign size={16} />
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Giá Bán & Lợi Nhuận</h4>
-                        <p className="text-[11px] text-slate-500">Căn cứ Bảng giá 2026</p>
+                        <p className="text-[11px] text-slate-500">Bảng giá niêm yết 2026</p>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg">
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200/60">
                       {marginPct}
                     </span>
                   </div>
@@ -431,24 +442,25 @@ export function ProductDetailModal({
                   </div>
                 </div>
 
-                {/* 4. Đơn Hàng Gần Nhất (Recent PO) */}
+                {/* 4. Đơn Hàng Gần Nhất */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
-                        <ShoppingCart size={18} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Đơn Hàng Gần Nhất</h4>
-                        <p className="text-[11px] text-slate-500">Lịch sử đặt & giao PO</p>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                      <ShoppingCart size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Đơn Hàng Gần Nhất</h4>
+                      <p className="text-[11px] text-slate-500">Lịch sử đặt & tiến độ giao</p>
                     </div>
                   </div>
                   <div className="pt-2 border-t border-slate-100 text-xs">
                     {latestPO ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                          <span 
+                            onClick={() => onPoClick?.(latestPO['Số đơn hàng'] || latestPO['Đơn hàng'])}
+                            className="font-mono font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200 cursor-pointer hover:bg-teal-100"
+                          >
                             {latestPO['Số đơn hàng'] || latestPO['Đơn hàng']}
                           </span>
                           <span className="text-[11px] text-slate-500">{latestPO['Ngày đặt']}</span>
@@ -470,22 +482,20 @@ export function ProductDetailModal({
 
                 {/* 5. Tiêu Chuẩn Kỹ Thuật (Specs) */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                        <ShieldCheck size={18} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Tiêu Chuẩn Kỹ Thuật</h4>
-                        <p className="text-[11px] text-slate-500">Hồ sơ TDS & CAD ISO</p>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      <ShieldCheck size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Tiêu Chuẩn Kỹ Thuật</h4>
+                      <p className="text-[11px] text-slate-500">Hồ sơ TDS & CAD kiểm định</p>
                     </div>
                   </div>
                   <div className="pt-2 border-t border-slate-100 text-xs">
                     {primarySpec ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                             {primarySpec['Mã Spec']}
                           </span>
                           <span className="text-[11px] text-slate-500">v{primarySpec['Phiên bản'] || '1.0'}</span>
@@ -501,27 +511,25 @@ export function ProductDetailModal({
 
                 {/* 6. Hợp Đồng & Thư Mục Drive */}
                 <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                        <HardDrive size={18} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Hợp Đồng & Drive</h4>
-                        <p className="text-[11px] text-slate-500">Lưu trữ Google Drive</p>
-                      </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                      <HardDrive size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Hợp Đồng & Drive</h4>
+                      <p className="text-[11px] text-slate-500">Lưu trữ Google Drive</p>
                     </div>
                   </div>
                   <div className="pt-2 border-t border-slate-100 text-xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                      <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
                         {relatedContracts[0]?.contractNumber || primaryPricing?.['Số hợp đồng'] || '177/HĐ-TLTL'}
                       </span>
                       <a
                         href={driveInfo.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md"
                       >
                         <span>Mở Drive</span>
                         <ArrowUpRight size={12} />
@@ -535,25 +543,25 @@ export function ProductDetailModal({
 
               </div>
 
-              {/* Visual Reference & Specs Matrix Preview */}
+              {/* Quick Specs Matrix Preview */}
               {primarySpec && (
                 <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-2xs space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 text-sm uppercase tracking-wide flex items-center gap-2">
-                      <Layers size={16} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Trọng Điểm ({primarySpec['Mã Spec']})
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wide flex items-center gap-2">
+                      <Layers size={15} className="text-blue-600" /> Bảng Chỉ Tiêu Kỹ Thuật Trọng Điểm ({primarySpec['Mã Spec']})
                     </h4>
                     <button
-                      onClick={() => setActiveTab('specs_tds')}
+                      onClick={() => setActiveTab('specs')}
                       className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
                     >
-                      Xem toàn bộ hồ sơ TDS <ChevronRight size={14} />
+                      Xem toàn bộ hồ sơ TDS <ChevronRight size={13} />
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px]">
+                        <tr className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
                           <th className="py-2.5 px-4">CHỈ TIÊU</th>
                           <th className="py-2.5 px-3 text-center">ĐVT</th>
                           <th className="py-2.5 px-4">TIÊU CHUẨN MẪU</th>
@@ -561,7 +569,7 @@ export function ProductDetailModal({
                           <th className="py-2.5 px-4">PHƯƠNG PHÁP THỬ</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200">
+                      <tbody className="divide-y divide-slate-100">
                         {(primarySpec['Thông số kỹ thuật'] || []).slice(0, 4).map((p: any, idx: number) => (
                           <tr key={idx} className="hover:bg-slate-50">
                             <td className="py-2.5 px-4 font-bold text-slate-900">{p.criterion}</td>
@@ -580,14 +588,14 @@ export function ProductDetailModal({
             </div>
           )}
 
-          {/* TAB 2: PRICING & MARGIN */}
-          {activeTab === 'pricing_margin' && (
-            <div className="space-y-5 animate-in fade-in duration-300">
+          {/* TAB 2: BẢNG GIÁ */}
+          {activeTab === 'pricing' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
               <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
                 <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Bảng Giá 2026 Của Sản Phẩm</h3>
-                    <p className="text-xs text-slate-500">Đơn giá mua, bán, biên lợi nhuận theo từng khách hàng & địa điểm giao</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Đơn giá mua, bán, biên lợi nhuận theo từng khách hàng & địa điểm giao</p>
                   </div>
                   <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200">
                     {matchedPricings.length} tầng giá
@@ -633,14 +641,14 @@ export function ProductDetailModal({
             </div>
           )}
 
-          {/* TAB 3: ORDERS & DELIVERIES */}
-          {activeTab === 'orders_delivery' && (
-            <div className="space-y-5 animate-in fade-in duration-300">
+          {/* TAB 3: ĐƠN HÀNG & PO */}
+          {activeTab === 'orders' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
               <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
                 <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Danh Sách Đơn Hàng PO Đã Đặt</h3>
-                    <p className="text-xs text-slate-500">Tổng cộng: {totalOrderedQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'} • Doanh thu: {formatVND(totalRevenue)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Tổng cộng: {totalOrderedQty.toLocaleString('vi-VN')} {product['Đơn Vị Tính'] || 'Cái'} • Doanh thu: {formatVND(totalRevenue)}</p>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -659,7 +667,12 @@ export function ProductDetailModal({
                     <tbody className="divide-y divide-slate-100">
                       {relatedPoLines.map((po, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3 px-4 font-mono font-bold text-teal-700">{po['Số đơn hàng'] || po['Đơn hàng']}</td>
+                          <td 
+                            onClick={() => onPoClick?.(po['Số đơn hàng'] || po['Đơn hàng'])}
+                            className="py-3 px-4 font-mono font-bold text-teal-700 cursor-pointer hover:underline"
+                          >
+                            {po['Số đơn hàng'] || po['Đơn hàng']}
+                          </td>
                           <td className="py-3 px-4 font-bold text-slate-900">{po['Khách hàng'] || product['Khách hàng']}</td>
                           <td className="py-3 px-4 text-right font-bold text-slate-900">{Number(po['Số lượng']).toLocaleString('vi-VN')}</td>
                           <td className="py-3 px-4 text-right text-slate-600">{formatVND(parseNumber(po['Đơn giá bán'] || 0))}</td>
@@ -676,8 +689,8 @@ export function ProductDetailModal({
           )}
 
           {/* TAB 4: SPECS & TDS */}
-          {activeTab === 'specs_tds' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
+          {activeTab === 'specs' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
               {primarySpec ? (
                 <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden p-6 space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
@@ -686,7 +699,7 @@ export function ProductDetailModal({
                         {primarySpec['Mã Spec']} - v{primarySpec['Phiên bản'] || '1.0'}
                       </span>
                       <h3 className="text-lg font-bold text-slate-900 mt-1.5">{primarySpec['Tên tiêu chuẩn']}</h3>
-                      <p className="text-xs text-slate-500">Khách hàng áp dụng: {primarySpec['Khách hàng']} | Người duyệt: {primarySpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Khách hàng áp dụng: {primarySpec['Khách hàng']} | Người duyệt: {primarySpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</p>
                     </div>
                   </div>
 
@@ -744,8 +757,8 @@ export function ProductDetailModal({
           )}
 
           {/* TAB 5: CONTRACTS & DRIVE */}
-          {activeTab === 'contracts_drive' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
+          {activeTab === 'contracts' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
               <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-6">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Hợp Đồng Pháp Lý & Thư Mục Google Drive</h3>
