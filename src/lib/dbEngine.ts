@@ -31,10 +31,12 @@ export type CollectionName =
   | 'file_storage'
   | 'tasks'
   | 'projects'
-  | 'activities';
+  | 'activities'
+  | 'commissions';
 
 class TSGDataEngine {
   private memoryCache: Map<string, Map<string, any>> = new Map();
+  private fallbackStore: Map<string, any[]> = new Map();
   private listeners: Map<string, Set<(data: any[]) => void>> = new Map();
 
   constructor() {
@@ -46,12 +48,15 @@ class TSGDataEngine {
           this.notifySubscribers(colName as CollectionName);
         }
       });
+    }
+  }
 
-      window.addEventListener(DB_CHANGE_EVENT, (e: any) => {
-        if (e.detail?.collectionName) {
-          this.notifySubscribers(e.detail.collectionName);
-        }
-      });
+  /**
+   * Register or update fallback dataset for a collection
+   */
+  public registerFallback(colName: CollectionName, fallbackData: any[]) {
+    if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+      this.fallbackStore.set(colName, fallbackData);
     }
   }
 
@@ -101,11 +106,23 @@ class TSGDataEngine {
    * Load collection from Local Storage into Memory
    */
   private loadCollection(colName: CollectionName, fallbackData: any[] = []): Map<string, any> {
+    // Check if we have active memory cache
+    if (this.memoryCache.has(colName) && (!fallbackData || fallbackData.length === 0)) {
+      return this.memoryCache.get(colName)!;
+    }
+
     const colMap = new Map<string, any>();
 
-    // 1. Load fallback data as base
-    if (Array.isArray(fallbackData)) {
-      fallbackData.forEach(item => {
+    // 1. Resolve fallback data
+    if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+      this.fallbackStore.set(colName, fallbackData);
+    }
+    const resolvedFallback = (Array.isArray(fallbackData) && fallbackData.length > 0) 
+      ? fallbackData 
+      : (this.fallbackStore.get(colName) || []);
+
+    if (Array.isArray(resolvedFallback)) {
+      resolvedFallback.forEach(item => {
         const key = getItemKey(item, colName);
         if (key) colMap.set(key, { ...item });
       });
@@ -116,7 +133,7 @@ class TSGDataEngine {
       const cached = localStorage.getItem(this.getStorageKey(colName));
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           parsed.forEach(item => {
             const key = getItemKey(item, colName);
             if (key) {
@@ -209,10 +226,10 @@ class TSGDataEngine {
       console.warn(`LocalStorage write warning for ${colName}:`, e);
     }
 
-    // 5. Dispatch Reactive Event
-    this.dispatchChangeEvent(colName);
+    // 5. Notify subscribers
+    this.notifySubscribers(colName);
 
-    // 6. Non-blocking Background Sync to Firestore (with 3-second timeout safeguard)
+    // 6. Non-blocking Background Sync to Firestore (with 3.5s safeguard)
     this.backgroundFirestoreSync(colName, sanitizedKey, updatedPayload);
 
     return { success: true, id: sanitizedKey, item: updatedPayload };
@@ -243,8 +260,8 @@ class TSGDataEngine {
       console.warn(`LocalStorage write warning for ${colName}:`, e);
     }
 
-    // 4. Dispatch Reactive Event
-    this.dispatchChangeEvent(colName);
+    // 4. Notify subscribers
+    this.notifySubscribers(colName);
 
     // 5. Non-blocking Background Sync to Firestore
     this.backgroundFirestoreSync(colName, sanitizedKey, { isDeleted: true, deletedAt: new Date().toISOString() });
@@ -257,23 +274,12 @@ class TSGDataEngine {
    */
   private async backgroundFirestoreSync(colName: string, docId: string, payload: any) {
     try {
-      // Don't block UI; timeout after 3.5s if offline or slow
       const firestoreWrite = setDoc(doc(db, colName, docId), payload, { merge: true });
       const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 3500));
       await Promise.race([firestoreWrite, timeoutPromise]);
     } catch (err) {
       console.warn(`Background Firestore sync for ${colName}/${docId}:`, err);
     }
-  }
-
-  /**
-   * Dispatch change event to DOM and active subscribers
-   */
-  private dispatchChangeEvent(colName: CollectionName) {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(DB_CHANGE_EVENT, { detail: { collectionName: colName } }));
-    }
-    this.notifySubscribers(colName);
   }
 
   /**
@@ -301,11 +307,6 @@ class TSGDataEngine {
       this.listeners.set(colName, new Set());
     }
     this.listeners.get(colName)!.add(callback);
-
-    // Immediately invoke with current state
-    try {
-      callback(this.getAll(colName));
-    } catch (e) {}
 
     return () => {
       this.listeners.get(colName)?.delete(callback);

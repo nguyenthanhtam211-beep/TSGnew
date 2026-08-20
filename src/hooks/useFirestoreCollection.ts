@@ -88,13 +88,18 @@ export function getItemKey(item: any, collectionName?: string): string {
 export function useFirestoreCollection(collectionName: string, fallbackData: any[]) {
   const [data, setData] = useState<any[]>(() => {
     try {
-      return dbEngine.getAll(collectionName as CollectionName, fallbackData);
+      const initial = dbEngine.getAll(collectionName as CollectionName, fallbackData);
+      if (Array.isArray(initial) && initial.length > 0) return initial;
     } catch (e) {
-      return fallbackData;
+      // ignore
     }
+    return fallbackData || [];
   });
 
   useEffect(() => {
+    // Register fallback data in data engine
+    dbEngine.registerFallback(collectionName as CollectionName, fallbackData);
+
     // 1. Subscribe to local reactive Data Engine (instant local updates)
     const unsubLocal = dbEngine.subscribe(collectionName as CollectionName, (updatedData) => {
       if (Array.isArray(updatedData) && updatedData.length > 0) {
@@ -110,7 +115,9 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
       unsubFirestore = onSnapshot(colRef, (snapshot) => {
         if (!snapshot.empty) {
           const currentAll = dbEngine.getAll(collectionName as CollectionName, fallbackData);
-          setData(currentAll);
+          if (Array.isArray(currentAll) && currentAll.length > 0) {
+            setData(currentAll);
+          }
         }
       }, (error) => {
         // Silently fallback without crashing UI
