@@ -13,6 +13,7 @@ import {
 import * as XLSX from 'xlsx';
 import CompanyLogo from './CompanyLogo';
 import { getItemKey } from '../hooks/useFirestoreCollection';
+import dbEngine from '../lib/dbEngine';
 import { toast } from 'react-hot-toast';
 import { cleanCompanyName, isNameRepetitive } from '../lib/companyUtils';
 import { getAvatarInitials, isExecutive } from './ContactView';
@@ -326,23 +327,16 @@ export default function SupplierView({
 
     const toastId = toast.loading("Đang lưu thông tin nhân sự...");
     try {
-      const targetId = editingContact?.id || editingContact?.ID || getItemKey(contactFormData, 'contacts') || contactFormData.ID || doc(collection(db, 'contacts')).id;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-
       const payload = {
+        ...(editingContact || {}),
         ...contactFormData,
-        id: docId,
-        ID: contactFormData.ID || docId,
         updatedAt: new Date().toISOString()
       };
 
-      await Promise.race([
-        setDoc(doc(db, 'contacts', docId), payload, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
-      ]);
+      const result = await dbEngine.save('contacts', payload);
       
-      if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === docId)) {
-        setSelectedContactDetail({ ...selectedContactDetail, ...payload });
+      if (selectedContactDetail && (selectedContactDetail.id === result.id || selectedContactDetail.ID === result.id)) {
+        setSelectedContactDetail({ ...selectedContactDetail, ...result.item });
       }
       toast.success(editingContact ? "Đã cập nhật nhân sự!" : "Đã thêm nhân sự vào danh bạ nhà cung cấp!", { id: toastId });
       setIsContactModalOpen(false);
@@ -358,14 +352,9 @@ export default function SupplierView({
     const loadingToast = toast.loading("Đang xóa...");
     try {
       const targetId = contact.id || getItemKey(contact, 'contacts') || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+      await dbEngine.delete('contacts', targetId);
       
-      await Promise.race([
-        setDoc(doc(db, 'contacts', docId), { ...contact, isDeleted: true, deletedAt: new Date().toISOString() }, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
-      ]);
-      
-      if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === contact.ID)) {
+      if (selectedContactDetail && (selectedContactDetail.id === targetId || selectedContactDetail.ID === targetId)) {
         setSelectedContactDetail(null);
       }
       toast.success("Đã xóa nhân sự!", { id: loadingToast });
@@ -392,21 +381,19 @@ export default function SupplierView({
       }
 
       const payload = {
+        ...(editingSupplier || {}),
         ...formData,
         logoUrl: finalLogoUrl,
         updatedAt: new Date().toISOString()
       };
 
-      const rawDocId = editingSupplier?.id || getItemKey(editingSupplier || payload, 'suppliers') || formData["Mã nhà cung cấp"];
-      const docId = String(rawDocId).replace(/[/\\#?%[\]\s.]+/g, '_');
-
-      await setDoc(doc(db, 'suppliers', docId), payload, { merge: true });
+      await dbEngine.save('suppliers', payload);
 
       toast.success(editingSupplier ? "Đã cập nhật nhà cung cấp!" : "Đã thêm nhà cung cấp mới!", { id: loadingToast });
       setIsModalOpen(false);
     } catch (error) {
+      console.error("Supplier save error:", error);
       toast.error("Đã xảy ra lỗi khi lưu thông tin!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.WRITE, 'suppliers');
     }
   };
 
@@ -416,16 +403,15 @@ export default function SupplierView({
     const loadingToast = toast.loading("Đang xoá nhà cung cấp...");
     try {
       const targetId = id || getItemKey({ "Mã nhà cung cấp": supplierId }, 'suppliers') || supplierId;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-      await setDoc(doc(db, 'suppliers', docId), { isDeleted: true }, { merge: true });
+      await dbEngine.delete('suppliers', targetId);
 
       toast.success("Đã xoá nhà cung cấp!", { id: loadingToast });
-      if (selectedSupplierDetail?.id === docId || selectedSupplierDetail?.["Mã nhà cung cấp"] === supplierId) {
+      if (selectedSupplierDetail?.id === targetId || selectedSupplierDetail?.["Mã nhà cung cấp"] === supplierId) {
         setSelectedSupplierDetail(null);
       }
     } catch (error) {
+      console.error("Supplier delete error:", error);
       toast.error("Không thể xoá nhà cung cấp!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.DELETE, `suppliers/${id || supplierId}`);
     }
   };
 

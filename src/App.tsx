@@ -16,6 +16,7 @@ import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, writ
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
 import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
+import dbEngine from "./lib/dbEngine";
 import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances, parseDateToISO, formatDateForDisplay } from './lib/business-logic';
 import { SYSTEM_PROMPT } from "./prompt";
 import { sendGeminiPrompt } from "./lib/gemini";
@@ -358,12 +359,7 @@ export default function App() {
         if (row[k] !== undefined) cleanedRow[k] = row[k];
       });
 
-      const key = getItemKey(cleanedRow, colName);
-      const cleanKey = key ? String(key).replace(/[/\\#?%[\]\s.]+/g, '_') : `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      
-      const setPromise = setDoc(doc(db, colName, cleanKey), cleanedRow, { merge: true });
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
-      await Promise.race([setPromise, timeoutPromise]);
+      await dbEngine.save(colName as any, cleanedRow);
     } catch (err) {
       console.error(`Failed to add to ${colName}`, err);
     }
@@ -372,21 +368,13 @@ export default function App() {
   const handleBatchAddToFirestore = async (colName: string, rows: any[]) => {
     if (!rows || rows.length === 0) return;
     try {
-      const batch = writeBatch(db);
-      rows.forEach(row => {
+      for (const row of rows) {
         const cleanedRow: any = {};
         Object.keys(row || {}).forEach(k => {
           if (row[k] !== undefined) cleanedRow[k] = row[k];
         });
-
-        const key = getItemKey(cleanedRow, colName) || cleanedRow.STT || cleanedRow.id || `gen_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const cleanKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
-        const ref = doc(db, colName, cleanKey);
-        batch.set(ref, cleanedRow, { merge: true });
-      });
-      const commitPromise = batch.commit();
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
-      await Promise.race([commitPromise, timeoutPromise]);
+        await dbEngine.save(colName as any, cleanedRow);
+      }
     } catch (err) {
       console.error(`Failed to batch add to ${colName}`, err);
     }
@@ -398,7 +386,6 @@ export default function App() {
       if (!rawId) {
         throw new Error("Không thể xác định ID của dòng dữ liệu");
       }
-      const id = String(rawId).replace(/[/\\#?%[\]\s.]+/g, '_');
       
       // Clean data: remove only transient summary/analytics calculations before saving
       const dataToSave = { ...row };
@@ -417,13 +404,7 @@ export default function App() {
       if (row['Mã sản phẩm']) dataToSave['Mã sản phẩm'] = row['Mã sản phẩm'];
       if (row['Đơn Vị Tính']) dataToSave['Đơn Vị Tính'] = row['Đơn Vị Tính'];
       
-      const setPromise = setDoc(doc(db, colName, id), { 
-        ...dataToSave, 
-        updatedAt: new Date().toISOString() 
-      }, { merge: true });
-
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
-      await Promise.race([setPromise, timeoutPromise]);
+      await dbEngine.save(colName as any, dataToSave);
     } catch (err) {
       console.error(`Failed to update ${colName}`, err);
       throw err;
@@ -432,55 +413,10 @@ export default function App() {
 
   const handleDeleteFromFirestore = async (colName: string, row: any) => {
     try {
-      const batch = writeBatch(db);
-      let deletedCount = 0;
-
-      // 1. Standard delete by IDs
-      const id = row.id ? String(row.id).replace(/\//g, '_') : null;
-      const businessIdRaw = getItemKey(row, colName);
-      const businessId = businessIdRaw ? String(businessIdRaw).replace(/\//g, '_') : null;
-      
-      if (id) {
-        batch.delete(doc(db, colName, id));
-        deletedCount++;
+      const targetId = row.id || getItemKey(row, colName) || row['Mã sản phẩm'] || row['Mã hàng'] || row.Customer_ID || row['Mã nhà cung cấp'];
+      if (targetId) {
+        await dbEngine.delete(colName as any, targetId);
       }
-      if (businessId && businessId !== id) {
-        batch.delete(doc(db, colName, businessId));
-        deletedCount++;
-      }
-
-      // 2. Aggressive delete by exact field match for critical collections
-      let fieldToQuery = '';
-      if (colName === 'delivery_plans') fieldToQuery = 'Mã kế hoạch';
-      else if (colName === 'products') fieldToQuery = 'Mã hàng';
-      else if (colName === 'customers') fieldToQuery = 'Mã KH';
-      else if (colName === 'suppliers') fieldToQuery = 'Mã NCC';
-      
-      if (fieldToQuery && row[fieldToQuery]) {
-        const q = query(collection(db, colName), where(fieldToQuery, '==', row[fieldToQuery]));
-        const snapshot = await getDocs(q);
-        snapshot.forEach(d => {
-          batch.delete(d.ref);
-          deletedCount++;
-        });
-      }
-
-      if (deletedCount === 0) {
-        throw new Error("Không thể xác định dữ liệu để xóa");
-      }
-
-      // Add audit log
-      const auditRef = doc(collection(db, 'audit_logs'));
-      batch.set(auditRef, {
-        action: 'delete',
-        collection: colName,
-        documentId: id || businessId || (fieldToQuery ? row[fieldToQuery] : 'unknown'),
-        user: auth.currentUser?.email || 'Unknown',
-        timestamp: new Date().toISOString(),
-      });
-
-      await batch.commit();
-
       toast.success("Xóa thành công!");
     } catch (err) {
       console.error(`Failed to delete from ${colName}`, err);

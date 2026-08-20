@@ -18,6 +18,7 @@ import { toast } from 'react-hot-toast';
 import { cleanCompanyName, isNameRepetitive } from '../lib/companyUtils';
 import CompanyLogo from './CompanyLogo';
 import { getItemKey } from '../hooks/useFirestoreCollection';
+import dbEngine from '../lib/dbEngine';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, formatShortCompanyName } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
@@ -392,23 +393,16 @@ export default function CustomerView({
 
     const toastId = toast.loading("Đang lưu thông tin nhân sự...");
     try {
-      const targetId = editingContact?.id || editingContact?.ID || getItemKey(contactFormData, 'contacts') || contactFormData.ID || doc(collection(db, 'contacts')).id;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-
       const payload = {
+        ...(editingContact || {}),
         ...contactFormData,
-        id: docId,
-        ID: contactFormData.ID || docId,
         updatedAt: new Date().toISOString()
       };
 
-      await Promise.race([
-        setDoc(doc(db, 'contacts', docId), payload, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
-      ]);
+      const result = await dbEngine.save('contacts', payload);
       
-      if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === docId)) {
-        setSelectedContactDetail({ ...selectedContactDetail, ...payload });
+      if (selectedContactDetail && (selectedContactDetail.id === result.id || selectedContactDetail.ID === result.id)) {
+        setSelectedContactDetail({ ...selectedContactDetail, ...result.item });
       }
       toast.success(editingContact ? "Đã cập nhật nhân sự!" : "Đã thêm nhân sự vào danh bạ khách hàng!", { id: toastId });
       setIsContactModalOpen(false);
@@ -424,14 +418,9 @@ export default function CustomerView({
     const loadingToast = toast.loading("Đang xóa...");
     try {
       const targetId = contact.id || getItemKey(contact, 'contacts') || contact.ID || `${contact["Tên"]}-${contact["Công ty"]}`;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
+      await dbEngine.delete('contacts', targetId);
       
-      await Promise.race([
-        setDoc(doc(db, 'contacts', docId), { ...contact, isDeleted: true, deletedAt: new Date().toISOString() }, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7000))
-      ]);
-      
-      if (selectedContactDetail && (selectedContactDetail.id === docId || selectedContactDetail.ID === contact.ID)) {
+      if (selectedContactDetail && (selectedContactDetail.id === targetId || selectedContactDetail.ID === targetId)) {
         setSelectedContactDetail(null);
       }
       toast.success("Đã xóa nhân sự!", { id: loadingToast });
@@ -458,21 +447,19 @@ export default function CustomerView({
       }
 
       const payload = {
+        ...(editingCustomer || {}),
         ...formData,
         logoUrl: finalLogoUrl,
         updatedAt: new Date().toISOString()
       };
 
-      const rawDocId = editingCustomer?.id || getItemKey(editingCustomer || payload, 'customers') || formData.Customer_ID;
-      const docId = String(rawDocId).replace(/[/\\#?%[\]\s.]+/g, '_');
-
-      await setDoc(doc(db, 'customers', docId), payload, { merge: true });
+      await dbEngine.save('customers', payload);
 
       toast.success(editingCustomer ? "Đã cập nhật hồ sơ khách hàng!" : "Đã thêm khách hàng mới!", { id: loadingToast });
       setIsModalOpen(false);
     } catch (error) {
+      console.error("Customer save error:", error);
       toast.error("Đã xảy ra lỗi khi lưu thông tin!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.WRITE, 'customers');
     }
   };
 
@@ -482,16 +469,15 @@ export default function CustomerView({
     const loadingToast = toast.loading("Đang xoá khách hàng...");
     try {
       const targetId = id || getItemKey({ Customer_ID: customerId }, 'customers') || customerId;
-      const docId = String(targetId).replace(/[/\\#?%[\]\s.]+/g, '_');
-      await setDoc(doc(db, 'customers', docId), { isDeleted: true }, { merge: true });
+      await dbEngine.delete('customers', targetId);
 
       toast.success("Đã xoá khách hàng thành công!", { id: loadingToast });
-      if (selectedCustomerDetail?.id === docId || selectedCustomerDetail?.["Customer_ID"] === customerId) {
+      if (selectedCustomerDetail?.id === targetId || selectedCustomerDetail?.["Customer_ID"] === customerId) {
         setSelectedCustomerDetail(null);
       }
     } catch (error) {
+      console.error("Customer delete error:", error);
       toast.error("Không thể xoá khách hàng!", { id: loadingToast });
-      handleFirestoreError(error, OperationType.DELETE, `customers/${id || customerId}`);
     }
   };
 

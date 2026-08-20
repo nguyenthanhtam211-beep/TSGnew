@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import dbEngine, { CollectionName } from '../lib/dbEngine';
 
 export function getItemKey(item: any, collectionName?: string): string {
   if (!item || typeof item !== 'object') return '';
@@ -87,65 +88,29 @@ export function getItemKey(item: any, collectionName?: string): string {
 export function useFirestoreCollection(collectionName: string, fallbackData: any[]) {
   const [data, setData] = useState<any[]>(() => {
     try {
-      const cached = localStorage.getItem(`tsg_cache_${collectionName}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
+      return dbEngine.getAll(collectionName as CollectionName, fallbackData);
     } catch (e) {
-      // ignore
+      return fallbackData;
     }
-    return fallbackData;
   });
 
   useEffect(() => {
-    let unsubscribe = () => {};
+    // 1. Subscribe to local reactive Data Engine (instant local updates)
+    const unsubLocal = dbEngine.subscribe(collectionName as CollectionName, (updatedData) => {
+      if (Array.isArray(updatedData) && updatedData.length > 0) {
+        setData(updatedData);
+      }
+    });
+
+    // 2. Subscribe to remote Firestore for cloud synchronization
+    let unsubFirestore = () => {};
 
     try {
       const colRef = collection(db, collectionName);
-      unsubscribe = onSnapshot(colRef, (snapshot) => {
+      unsubFirestore = onSnapshot(colRef, (snapshot) => {
         if (!snapshot.empty) {
-          const firestoreData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          
-          const mergedMap = new Map<string, any>();
-          
-          if (Array.isArray(fallbackData)) {
-            fallbackData.forEach(item => {
-              const key = getItemKey(item, collectionName);
-              if (key) mergedMap.set(key, { ...item });
-            });
-          }
-          
-          firestoreData.forEach(item => {
-            const key = getItemKey(item, collectionName);
-            if (key) {
-              if (item.isDeleted === true) {
-                mergedMap.delete(key);
-              } else {
-                const existing = mergedMap.get(key) || {};
-                const mergedItem = { ...existing, ...item };
-                // Keep fallback critical identifiers if Firestore document had stripped them
-                if (!mergedItem['Tên sản phẩm'] && existing['Tên sản phẩm']) {
-                  mergedItem['Tên sản phẩm'] = existing['Tên sản phẩm'];
-                }
-                if (!mergedItem['Mã sản phẩm'] && existing['Mã sản phẩm']) {
-                  mergedItem['Mã sản phẩm'] = existing['Mã sản phẩm'];
-                }
-                if (!mergedItem['Đơn Vị Tính'] && existing['Đơn Vị Tính']) {
-                  mergedItem['Đơn Vị Tính'] = existing['Đơn Vị Tính'];
-                }
-                mergedMap.set(key, mergedItem);
-              }
-            }
-          });
-          
-          const result = Array.from(mergedMap.values());
-          setData(result);
-          try {
-            localStorage.setItem(`tsg_cache_${collectionName}`, JSON.stringify(result));
-          } catch (e) {}
-        } else {
-          setData(fallbackData);
+          const currentAll = dbEngine.getAll(collectionName as CollectionName, fallbackData);
+          setData(currentAll);
         }
       }, (error) => {
         // Silently fallback without crashing UI
@@ -157,9 +122,11 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
       // Handle missing db or initialization errors gracefully
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubLocal();
+      unsubFirestore();
+    };
   }, [collectionName, fallbackData]);
 
   return data;
 }
-
