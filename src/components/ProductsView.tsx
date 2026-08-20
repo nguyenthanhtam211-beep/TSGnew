@@ -308,26 +308,26 @@ export default function ProductsView({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50/50 min-h-screen relative">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 bg-[#F8F9FA] min-h-screen relative font-sans">
       {/* 1. macOS Window Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-black/[0.06] shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
-              <Package size={20} />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-2xs font-bold shrink-0">
+              <Package size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F]">Danh Mục Sản Phẩm</h1>
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-bold rounded-md border border-slate-200">
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Danh Mục Sản Phẩm</h1>
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-md border border-slate-200">
                   {metrics.total} sản phẩm
                 </span>
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-md border border-blue-200/60 flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold rounded-md border border-blue-200/60 flex items-center gap-1">
                   <Sparkles size={11} /> Hồ sơ 360°
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Tổng quan liên kết: Khách hàng • Nhà cung cấp • Bảng giá • Lợi nhuận • Đơn hàng • Specs kỹ thuật • Hợp đồng Drive
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tổng quan liên kết đa chiều: Khách hàng • Nhà cung cấp • Bảng giá • Đơn hàng • Specs kỹ thuật • Hợp đồng Drive
               </p>
             </div>
           </div>
@@ -347,7 +347,7 @@ export default function ProductsView({
               });
               setIsAddModalOpen(true);
             }}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all"
           >
             <Plus size={14} />
             <span>Thêm sản phẩm</span>
@@ -357,8 +357,8 @@ export default function ProductsView({
             <button
               onClick={() => setViewMode('table')}
               className={clsx(
-                "p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all",
-                viewMode === 'table' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                "p-1.5 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all",
+                viewMode === 'table' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
               )}
               title="Xem dạng bảng"
             >
@@ -368,8 +368,8 @@ export default function ProductsView({
             <button
               onClick={() => setViewMode('cards')}
               className={clsx(
-                "p-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all",
-                viewMode === 'cards' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                "p-1.5 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all",
+                viewMode === 'cards' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
               )}
               title="Xem dạng thẻ"
             >
@@ -380,74 +380,27 @@ export default function ProductsView({
         </div>
       </div>
 
-      {/* 2. Key Metrics Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500">Tổng danh mục</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{metrics.total}</h3>
-            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">100% đồng bộ Firestore</p>
-          </div>
-          <div className="w-10 h-10 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center">
-            <Package size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500">Bảng giá 2026</p>
-            <h3 className="text-2xl font-bold text-emerald-600 mt-0.5">{metrics.withPricing} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">Đã có đơn giá mua & bán</p>
-          </div>
-          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-            <DollarSign size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500">Tiêu chuẩn Specs & CAD</p>
-            <h3 className="text-2xl font-bold text-indigo-600 mt-0.5">{metrics.withSpecs} <span className="text-xs text-slate-400 font-normal">/ {metrics.total}</span></h3>
-            <p className="text-[11px] text-indigo-600 font-medium mt-0.5">Chuẩn ISO kiểm định</p>
-          </div>
-          <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-            <ShieldCheck size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500">Doanh thu phát sinh PO</p>
-            <h3 className="text-xl font-bold text-slate-900 mt-0.5">{formatVND(metrics.totalRev)}</h3>
-            <p className="text-[11px] text-blue-600 font-medium mt-0.5">{metrics.withOrders} sản phẩm đã giao</p>
-          </div>
-          <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
-            <TrendingUp size={20} />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Filters & Search Toolbar */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center gap-3">
+      {/* 2. Filters & Search Toolbar */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center gap-2.5 text-xs">
         {/* Search */}
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
           <input
             type="text"
-            placeholder="Tìm kiếm theo mã SP, tên sản phẩm, khách hàng, NCC..."
+            placeholder="Tìm theo mã SP, tên sản phẩm, đối tác..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+            className="w-full pl-8 pr-3 py-1.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
           />
         </div>
 
         {/* Category Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-bold text-slate-500 px-2">Nhóm:</span>
+        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
+          <span className="text-[11px] font-medium text-slate-500">Nhóm:</span>
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none py-1 pr-2"
+            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 cursor-pointer"
           >
             {categories.map((c) => (
               <option key={c} value={c}>{c === 'All' ? 'Tất cả nhóm' : c}</option>
@@ -456,12 +409,12 @@ export default function ProductsView({
         </div>
 
         {/* Customer Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-bold text-slate-500 px-2">Khách:</span>
+        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
+          <span className="text-[11px] font-medium text-slate-500">Khách:</span>
           <select
             value={selectedCustomer}
             onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none py-1 pr-2 max-w-[150px] truncate"
+            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 max-w-[140px] truncate cursor-pointer"
           >
             {customersList.map((c) => (
               <option key={c} value={c}>{c === 'All' ? 'Tất cả khách hàng' : c}</option>
@@ -470,12 +423,12 @@ export default function ProductsView({
         </div>
 
         {/* Supplier Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-bold text-slate-500 px-2">NCC:</span>
+        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
+          <span className="text-[11px] font-medium text-slate-500">NCC:</span>
           <select
             value={selectedSupplier}
             onChange={(e) => setSelectedSupplier(e.target.value)}
-            className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none py-1 pr-2 max-w-[150px] truncate"
+            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 max-w-[140px] truncate cursor-pointer"
           >
             {suppliersList.map((s) => (
               <option key={s} value={s}>{s === 'All' ? 'Tất cả NCC' : s}</option>
@@ -484,30 +437,30 @@ export default function ProductsView({
         </div>
       </div>
 
-      {/* 4. Products Table View */}
+      {/* 3. Products Table View */}
       {viewMode === 'table' ? (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-3.5 px-4">Sản Phẩm & Mã Hiệu</th>
-                  <th className="py-3.5 px-4">Khách Hàng Mua</th>
-                  <th className="py-3.5 px-4">Nhà Cung Cấp SX</th>
-                  <th className="py-3.5 px-4 text-right">Đơn Giá & Biên LN</th>
-                  <th className="py-3.5 px-4">Đơn Hàng Gần Nhất (PO)</th>
-                  <th className="py-3.5 px-4">Tiêu Chuẩn Specs</th>
-                  <th className="py-3.5 px-4">Hợp Đồng & Drive</th>
-                  <th className="py-3.5 px-4 text-center">Thao Tác</th>
+                <tr className="bg-[#F8F9FA] text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-3 px-4 w-[28%]">Sản Phẩm & Mã Hiệu</th>
+                  <th className="py-3 px-3 w-[13%]">Khách Hàng</th>
+                  <th className="py-3 px-3 w-[13%]">Nhà Cung Cấp</th>
+                  <th className="py-3 px-3 w-[14%] text-right">Đơn Giá & Biên LN</th>
+                  <th className="py-3 px-3 w-[12%]">Đơn Gần Nhất</th>
+                  <th className="py-3 px-3 w-[10%]">Specs</th>
+                  <th className="py-3 px-3 w-[10%]">Hợp Đồng</th>
+                  <th className="py-3 px-4 text-center w-[10%]">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-slate-400">
-                      <Package size={36} className="mx-auto mb-2 opacity-40 text-slate-400" />
-                      <p className="font-semibold text-slate-600">Không tìm thấy sản phẩm nào</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Thử thay đổi từ khóa hoặc bộ lọc nhóm hàng / đối tác</p>
+                      <Package size={32} className="mx-auto mb-2 opacity-30 text-slate-400" />
+                      <p className="font-medium text-slate-600">Không tìm thấy sản phẩm nào</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Thử thay đổi từ khóa hoặc bộ lọc</p>
                     </td>
                   </tr>
                 ) : (
@@ -515,75 +468,72 @@ export default function ProductsView({
                     <tr 
                       key={p.code || idx}
                       onClick={() => onSelectProductDetails(p.code || p.name)}
-                      className="hover:bg-blue-50/30 transition-colors group cursor-pointer"
+                      className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                     >
                       {/* Product Name & Code */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
-                            <Package size={16} />
+                      <td className="py-2.5 px-4">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-blue-50 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                            <Package size={14} />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                                {p.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/80">
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate" title={p.name}>
+                              {p.name}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[11px]">
+                              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1 py-0.2 rounded border border-slate-200/80 shrink-0">
                                 {p.code}
                               </span>
-                              <span className="text-[11px] text-slate-400">• {p.category}</span>
-                              <span className="text-[11px] text-slate-400">• ĐVT: {p.unit}</span>
+                              <span className="text-slate-400 truncate">• {p.category}</span>
+                              <span className="text-slate-400 shrink-0">• ĐVT: {p.unit}</span>
                             </div>
                           </div>
                         </div>
                       </td>
 
                       {/* Customers */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         {p.relatedCustomers.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {p.relatedCustomers.map((c, cidx) => (
                               <span 
                                 key={cidx}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-sky-50 text-sky-800 rounded-md text-[11px] font-semibold border border-sky-200/60"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px] font-medium border border-slate-200/80"
                               >
-                                <Building2 size={11} className="text-sky-600 shrink-0" />
-                                <span className="truncate max-w-[120px]">{c}</span>
+                                <span className="truncate max-w-[100px]">{c}</span>
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa gán KH</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Suppliers */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         {p.relatedSuppliers.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {p.relatedSuppliers.map((s, sidx) => (
                               <span 
                                 key={sidx}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-900 rounded-md text-[11px] font-semibold border border-amber-200/60"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px] font-medium border border-slate-200/80"
                               >
-                                <CompanyLogo name={s} className="w-3.5 h-3.5 rounded-full shrink-0" />
-                                <span className="truncate max-w-[110px]">{s}</span>
+                                <Building2 size={11} className="text-slate-500 shrink-0" />
+                                <span className="truncate max-w-[95px]">{s}</span>
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa gán NCC</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Price & Margin */}
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-2.5 px-3 text-right">
                         {p.sellPrice > 0 ? (
                           <div>
-                            <p className="font-bold text-slate-900">{formatVND(p.sellPrice)}</p>
-                            <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[11px]">
+                            <p className="font-bold text-slate-900 text-xs">{formatVND(p.sellPrice)}</p>
+                            <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[10.5px]">
                               <span className="text-slate-400">Mua: {formatVND(p.buyPrice)}</span>
                               <span className="font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/50">
                                 {p.marginPct}
@@ -591,58 +541,48 @@ export default function ProductsView({
                             </div>
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa có giá</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Latest PO */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         {p.latestPO ? (
                           <div>
-                            <div className="flex items-center gap-1.5">
-                              <span 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onSelectPoDetails?.(p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng']);
-                                }}
-                                className="font-mono font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 px-1.5 py-0.5 rounded border border-teal-200/70 text-[11px] cursor-pointer"
-                              >
-                                {p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng']}
-                              </span>
-                              <span className="text-[11px] font-medium text-slate-500">
-                                {p.latestPO['Số lượng']} {p.unit}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              Giao: {p.latestPO['Ngày giao hàng'] || p.latestPO['Ngày đặt'] || '---'}
+                            <span 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectPoDetails?.(p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng']);
+                              }}
+                              className="font-mono font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 px-1.5 py-0.5 rounded border border-teal-200/70 text-[11px] cursor-pointer inline-block"
+                            >
+                              {p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng']}
+                            </span>
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                              {p.latestPO['Số lượng']} {p.unit}
                             </p>
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa phát sinh PO</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Technical Specs */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         {p.primarySpec ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-[11px] rounded border border-blue-200">
-                              {p.primarySpec['Mã Spec']}
-                            </span>
-                            <span className="text-[11px] text-slate-600 truncate max-w-[100px]" title={p.primarySpec['Tên tiêu chuẩn']}>
-                              {p.primarySpec['Tên tiêu chuẩn']}
-                            </span>
-                          </div>
+                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-mono font-bold text-[11px] rounded border border-blue-200 inline-block truncate max-w-[90px]">
+                            {p.primarySpec['Mã Spec']}
+                          </span>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa lập Spec</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Contracts & Drive Link */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         {p.contractNumber ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[11px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-[11px] font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 truncate max-w-[70px]">
                               {p.contractNumber}
                             </span>
                             <a
@@ -650,25 +590,24 @@ export default function ProductsView({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded"
+                              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-1 py-0.5 rounded shrink-0"
                               title="Xem file trên Drive"
                             >
-                              <HardDrive size={11} className="text-blue-500" />
-                              <span>Drive</span>
-                              <ArrowUpRight size={10} />
+                              <HardDrive size={10} />
+                              <ArrowUpRight size={9} />
                             </a>
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Chưa gán HĐ</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={(e) => handleOpenEdit(p, e)}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                             title="Chỉnh sửa thông tin"
                           >
                             <Edit3 size={13} />
@@ -678,10 +617,10 @@ export default function ProductsView({
                               e.stopPropagation();
                               onSelectProductDetails(p.code || p.name);
                             }}
-                            className="px-2.5 py-1 bg-slate-900 hover:bg-blue-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
+                            className="px-2 py-1 bg-slate-900 hover:bg-blue-600 text-white rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 shadow-2xs active:scale-95 transition-all"
                           >
-                            <Sparkles size={12} />
-                            <span>Hồ sơ 360°</span>
+                            <Sparkles size={11} />
+                            <span>360°</span>
                           </button>
                         </div>
                       </td>
@@ -694,106 +633,96 @@ export default function ProductsView({
         </div>
       ) : (
         /* Cards View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4.5">
           {filteredProducts.map((p, idx) => (
             <div
               key={p.code || idx}
               onClick={() => onSelectProductDetails(p.code || p.name)}
-              className="bg-white rounded-3xl border border-slate-200/80 p-5 hover:shadow-xl hover:shadow-blue-500/5 transition-all cursor-pointer group space-y-4"
+              className="bg-white rounded-2xl border border-slate-200/80 p-4.5 hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer group space-y-3.5 shadow-2xs"
             >
               {/* Card Header */}
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded-md border border-slate-200/70">
+                    <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 font-mono font-bold text-[11px] rounded border border-slate-200/80">
                       {p.code}
                     </span>
-                    <span className="text-xs text-slate-500">• {p.category}</span>
+                    <span className="text-[11px] text-slate-500">• {p.category}</span>
                   </div>
-                  <h3 className="font-bold text-base text-slate-900 group-hover:text-blue-600 transition-colors mt-1">
+                  <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors mt-1 line-clamp-1">
                     {p.name}
                   </h3>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={(e) => handleOpenEdit(p, e)}
-                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
                   >
-                    <Edit3 size={13} />
+                    <Edit3 size={12} />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelectProductDetails(p.code || p.name);
                     }}
-                    className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
+                    className="w-6 h-6 rounded-md bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors"
                   >
-                    <Eye size={14} />
+                    <Eye size={12} />
                   </button>
                 </div>
               </div>
 
               {/* 360 Relational Pills */}
-              <div className="space-y-2 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 text-xs">
+              <div className="space-y-1.5 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-xs">
                 {/* Customers */}
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1 font-medium">
-                    <Building2 size={13} className="text-sky-500" /> Khách hàng:
-                  </span>
-                  <span className="font-bold text-slate-800 truncate max-w-[160px]">
-                    {p.relatedCustomers.join(', ') || 'Chưa gán'}
+                  <span className="text-slate-500 font-medium text-[11px]">Khách hàng:</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[150px] text-[11px]">
+                    {p.relatedCustomers.join(', ') || '—'}
                   </span>
                 </div>
 
                 {/* Suppliers */}
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1 font-medium">
-                    <Building2 size={13} className="text-amber-500" /> Nhà cung cấp:
-                  </span>
-                  <span className="font-bold text-slate-800 truncate max-w-[160px]">
-                    {p.relatedSuppliers.join(', ') || 'Chưa gán'}
+                  <span className="text-slate-500 font-medium text-[11px]">Nhà cung cấp:</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[150px] text-[11px]">
+                    {p.relatedSuppliers.join(', ') || '—'}
                   </span>
                 </div>
 
                 {/* Price & Margin */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                  <span className="text-slate-500 flex items-center gap-1 font-medium">
-                    <DollarSign size={13} className="text-emerald-500" /> Giá bán & LN:
-                  </span>
-                  <span className="font-bold text-slate-900">
-                    {p.sellPrice > 0 ? (formatVND(p.sellPrice) + ' (' + p.marginPct + ')') : 'Chưa có giá'}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
+                  <span className="text-slate-500 font-medium text-[11px]">Giá bán & LN:</span>
+                  <span className="font-bold text-slate-900 text-[11px]">
+                    {p.sellPrice > 0 ? (formatVND(p.sellPrice) + ' (' + p.marginPct + ')') : '—'}
                   </span>
                 </div>
 
                 {/* Latest PO */}
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1 font-medium">
-                    <Truck size={13} className="text-teal-500" /> Đơn gần nhất:
-                  </span>
-                  <span className="font-mono font-semibold text-teal-700">
-                    {p.latestPO ? p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng'] : 'Chưa có PO'}
+                  <span className="text-slate-500 font-medium text-[11px]">Đơn gần nhất:</span>
+                  <span className="font-mono font-medium text-teal-700 text-[11px]">
+                    {p.latestPO ? p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng'] : '—'}
                   </span>
                 </div>
 
                 {/* Specs */}
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 flex items-center gap-1 font-medium">
-                    <ShieldCheck size={13} className="text-blue-500" /> Tiêu chuẩn Specs:
-                  </span>
-                  <span className="font-mono font-semibold text-blue-700">
-                    {p.primarySpec ? p.primarySpec['Mã Spec'] : 'Chưa lập'}
+                  <span className="text-slate-500 font-medium text-[11px]">Specs:</span>
+                  <span className="font-mono font-medium text-blue-700 text-[11px]">
+                    {p.primarySpec ? p.primarySpec['Mã Spec'] : '—'}
                   </span>
                 </div>
               </div>
 
               {/* Card Footer */}
-              <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
-                <span className="flex items-center gap-1 font-mono text-[11px]">
-                  <HardDrive size={12} className="text-amber-500" />
+              <div className="flex items-center justify-between pt-0.5 text-xs text-slate-500">
+                <span className="flex items-center gap-1 font-mono text-[10.5px] text-slate-400">
+                  <HardDrive size={11} />
                   {p.contractNumber || 'HĐ 2026'}
                 </span>
-                <span className="font-bold text-blue-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  Hồ sơ 360° <ChevronRight size={13} />
+                <span className="font-semibold text-blue-600 text-xs group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                  Hồ sơ 360° <ChevronRight size={12} />
                 </span>
               </div>
             </div>
@@ -865,7 +794,7 @@ export default function ProductsView({
                   </div>
                 </div>
 
-                {/* Customer Selector Dropdown + Datalist */}
+                {/* Customer Selector Dropdown */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1.5">Khách hàng:</label>
@@ -972,7 +901,7 @@ export default function ProductsView({
         )}
       </AnimatePresence>
 
-      {/* Add Product Modal with Dropdowns */}
+      {/* Add Product Modal */}
       <AnimatePresence>
         {isAddModalOpen && (
           <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -980,7 +909,7 @@ export default function ProductsView({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
+              className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
             >
               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-3 min-w-0">
