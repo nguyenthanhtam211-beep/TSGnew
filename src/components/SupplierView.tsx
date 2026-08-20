@@ -628,7 +628,7 @@ export default function SupplierView({
 
   return (
     <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
+      <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
         {/* Apple macOS Unified Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -819,7 +819,7 @@ export default function SupplierView({
               viewMode === 'table' ? (
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm text-left border-collapse">
+                    <table className="w-full min-w-[1100px] text-xs sm:text-sm text-left border-collapse">
                       <thead className="bg-[#F8F9FA] text-slate-500 font-semibold border-b border-slate-200/80 text-[11px] uppercase tracking-wider">
                         <tr>
                           <th className="px-4 py-3 w-[26%]">Nhà Cung Cấp</th>

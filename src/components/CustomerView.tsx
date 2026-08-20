@@ -699,7 +699,7 @@ export default function CustomerView({
 
   return (
     <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
+      <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
         {/* Apple macOS Unified Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -900,7 +900,7 @@ export default function CustomerView({
               viewMode === 'table' ? (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm text-left border-collapse">
+                    <table className="w-full min-w-[1100px] text-xs sm:text-sm text-left border-collapse">
                       <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
                         <tr>
                           <th className="px-5 py-3.5">Mã & Doanh nghiệp</th>
