@@ -23,7 +23,7 @@ import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DA
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
-  StorageView, SpecsView, ContractsView, CommissionView, ProductDetailModal, PODetailModal, 
+  StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
@@ -964,7 +964,25 @@ export default function App() {
             onProductClick={(val) => setSelectedProductDetails(val)}
           />
         )}
-        {activeTab === "products" && <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Sản phẩm" data={productData} showAddButton={true} onAdd={(row) => handleAddToFirestore("products", row)} onEdit={(row) => handleUpdateToFirestore("products", row)} onDelete={(row) => handleDeleteFromFirestore("products", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "products" && (
+          <ProductsView 
+            productData={productData}
+            pricingData={pricingData}
+            poLinesData={enrichedPoLinesData}
+            poHeaderData={poHeaderData}
+            deliveryData={enrichedDeliveryData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+            specsData={specsData}
+            contractsData={contractsData}
+            customerData={customerData}
+            supplierData={supplierData}
+            onAddProduct={async (row) => await handleAddToFirestore("products", row)}
+            onEditProduct={async (row) => await handleUpdateToFirestore("products", row)}
+            onDeleteProduct={async (row) => await handleDeleteFromFirestore("products", row)}
+            onSelectProductDetails={(val) => setSelectedProductDetails(val)}
+            onSelectPoDetails={(val) => setSelectedPoDetails(val)}
+          />
+        )}
         {activeTab === "specs" && (
           <div className="p-3 sm:p-5 lg:p-8">
             <SpecsView 
@@ -1049,6 +1067,9 @@ export default function App() {
             deliveryPlanData={enrichedDeliveryPlanData}
             deliveryData={enrichedDeliveryData}
             specsData={specsData}
+            contractsData={contractsData}
+            customerData={customerData}
+            supplierData={supplierData}
             onPoClick={(val) => setSelectedPoDetails(val)}
         />
       )}

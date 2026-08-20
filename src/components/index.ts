@@ -13,6 +13,7 @@ export { default as StorageView } from "./StorageView";
 export { default as SpecsView } from "./SpecsView";
 export { default as ContractsView } from "./ContractsView";
 export { default as CommissionView } from "./CommissionView";
+export { default as ProductsView } from "./ProductsView";
 
 // Modals
 export { DualPODocumentModal } from "./DualPODocumentModal";
