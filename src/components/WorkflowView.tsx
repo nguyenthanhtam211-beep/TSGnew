@@ -1640,35 +1640,37 @@ export default function WorkflowView({
                     <p className="text-xs text-slate-400">Chọn sản phẩm ở khối số 2 hoặc bấm vào một trong các Mẫu PO ở trên để nạp nhanh</p>
                   </div>
                 ) : (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         {/* Tier 1 Header: Functional Groups */}
-                        <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] uppercase font-extrabold text-slate-700">
-                          <th className="px-3 py-2 text-center border-r border-slate-200 w-10" rowSpan={2}>#</th>
-                          <th className="px-3 py-2 border-r border-slate-200" colSpan={2}>Thông Tin Mặt Hàng & Hợp Đồng</th>
-                          <th className="px-3 py-2 text-center border-r border-slate-200 w-28" rowSpan={2}>Số Lượng Đặt</th>
-                          <th className="px-3 py-2 text-center bg-blue-100/70 text-blue-900 border-r border-blue-200" colSpan={2}>
-                            🛒 Đơn Bán Khách Hàng (SO)
+                        <tr className="bg-slate-100 text-[11px] font-extrabold text-slate-700 border-b border-slate-200">
+                          <th className="px-3.5 py-2.5 text-center w-12 border-r border-slate-200" rowSpan={2}>#</th>
+                          <th className="px-4 py-2.5 border-r border-slate-200" colSpan={3}>
+                            📦 THÔNG TIN MẶT HÀNG & HỢP ĐỒNG
                           </th>
-                          <th className="px-3 py-2 text-center bg-purple-100/70 text-purple-900 border-r border-purple-200" colSpan={2}>
-                            🏭 Đơn Mua Xưởng Sản Xuất (PO)
+                          <th className="px-4 py-2.5 text-center bg-blue-100/70 text-blue-900 border-r border-blue-200 font-black" colSpan={2}>
+                            🛒 ĐƠN BÁN KHÁCH HÀNG (SO)
                           </th>
-                          <th className="px-3 py-2 text-center bg-emerald-100/70 text-emerald-900 border-r border-slate-200" colSpan={2}>
-                            📈 Hiệu Quả Kinh Doanh
+                          <th className="px-4 py-2.5 text-center bg-purple-100/70 text-purple-900 border-r border-purple-200 font-black" colSpan={2}>
+                            🏭 ĐƠN MUA XƯỞNG SẢN XUẤT (PO)
                           </th>
-                          <th className="px-2 py-2 text-center w-12" rowSpan={2}>Xóa</th>
+                          <th className="px-4 py-2.5 text-center bg-emerald-100/70 text-emerald-900 border-r border-slate-200 font-black" colSpan={2}>
+                            📈 HIỆU QUẢ KINH DOANH
+                          </th>
+                          <th className="px-3 py-2.5 text-center w-12" rowSpan={2}>Xóa</th>
                         </tr>
                         {/* Tier 2 Header: Detail Columns */}
                         <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500">
-                          <th className="px-3 py-2 border-r border-slate-200">Tên Mặt Hàng & Quy Cách</th>
-                          <th className="px-3 py-2 border-r border-slate-200 w-32">HĐ Gốc / Mã Giá</th>
-                          <th className="px-3 py-2 text-right bg-blue-50/60 text-blue-800 border-r border-slate-200">Đơn Giá Bán</th>
-                          <th className="px-3 py-2 text-right bg-blue-50/60 text-blue-900 font-extrabold border-r border-blue-200">Doanh Thu (SO)</th>
-                          <th className="px-3 py-2 text-right bg-purple-50/60 text-purple-800 border-r border-slate-200">Xưởng / Giá Mua</th>
-                          <th className="px-3 py-2 text-right bg-purple-50/60 text-purple-900 font-extrabold border-r border-purple-200">Giá Vốn (PO)</th>
-                          <th className="px-3 py-2 text-right bg-emerald-50/60 text-emerald-900 font-extrabold border-r border-slate-200">Lãi Gộp</th>
-                          <th className="px-2 py-2 text-center bg-emerald-50/60 text-emerald-800 border-r border-slate-200 w-20">Biên LN (%)</th>
+                          <th className="px-4 py-2.5 border-r border-slate-200">Tên Mặt Hàng & Quy Cách</th>
+                          <th className="px-3.5 py-2.5 border-r border-slate-200 w-28">HĐ Gốc / Mã Giá</th>
+                          <th className="px-3.5 py-2.5 text-center border-r border-slate-200 w-28">Số Lượng Đặt</th>
+                          <th className="px-3.5 py-2.5 text-right bg-blue-50/60 text-blue-800 border-r border-slate-200 w-28">Đơn Giá Bán</th>
+                          <th className="px-4 py-2.5 text-right bg-blue-50/60 text-blue-900 font-black border-r border-blue-200 w-36">Doanh Thu (SO)</th>
+                          <th className="px-3.5 py-2.5 text-right bg-purple-50/60 text-purple-800 border-r border-slate-200 w-32">NCC / Giá Mua</th>
+                          <th className="px-4 py-2.5 text-right bg-purple-50/60 text-purple-900 font-black border-r border-purple-200 w-36">Giá Vốn (PO)</th>
+                          <th className="px-4 py-2.5 text-right bg-emerald-50/60 text-emerald-900 font-black border-r border-slate-200 w-36">Lãi Gộp</th>
+                          <th className="px-3 py-2.5 text-center bg-emerald-50/60 text-emerald-800 border-r border-slate-200 w-24">Biên LN (%)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
@@ -1686,11 +1688,12 @@ export default function WorkflowView({
                           const contractNo = line.contractNo || line["Số hợp đồng"] || "177/HĐ-TLTL";
                           const priceCode = line.priceCode || line["Mã giá bán"] || "Gsp_082";
                           const supplier = line.supplier || line["RP_Nhà cung cấp"] || "Tâm Sen";
+                          const suppShort = getSupplierShortCode(supplier);
 
                           return (
                             <tr key={idx} className="hover:bg-slate-50/90 transition-colors">
-                              <td className="px-3 py-3 text-center font-mono text-slate-400 font-bold border-r border-slate-100">{idx + 1}</td>
-                              <td className="px-3 py-3 border-r border-slate-100">
+                              <td className="px-3.5 py-3.5 text-center font-mono text-slate-400 font-bold border-r border-slate-100">{idx + 1}</td>
+                              <td className="px-4 py-3.5 border-r border-slate-100">
                                 <div className="font-bold text-slate-900 text-xs">{prodName}</div>
                                 <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 mt-1">
                                   <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold">{prodCode}</span>
@@ -1717,12 +1720,12 @@ export default function WorkflowView({
                                   />
                                 </div>
                               </td>
-                              <td className="px-3 py-3 border-r border-slate-100">
+                              <td className="px-3.5 py-3.5 border-r border-slate-100">
                                 <div className="font-bold text-blue-700 font-mono text-xs">{contractNo}</div>
                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5">{priceCode}</div>
                               </td>
-                              <td className="px-3 py-3 text-center border-r border-slate-100">
-                                <div className="inline-flex items-center gap-1">
+                              <td className="px-3.5 py-3.5 text-center border-r border-slate-100 bg-slate-50/30">
+                                <div className="inline-flex items-center justify-center">
                                   <input
                                     type="number"
                                     min="1"
@@ -1738,43 +1741,43 @@ export default function WorkflowView({
                                       };
                                       setPoLines(updated);
                                     }}
-                                    className="w-20 text-center font-mono font-bold text-slate-900 border border-slate-300 rounded-lg py-1 px-1 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white text-xs shadow-2xs"
+                                    className="w-24 text-center font-mono font-bold text-slate-900 border border-slate-300 rounded-lg py-1 px-1.5 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-xs shadow-2xs"
                                   />
                                 </div>
                               </td>
-                              <td className="px-3 py-3 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
+                              <td className="px-3.5 py-3.5 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
                                 {formatCurrency(sell)}
                               </td>
-                              <td className="px-3 py-3 text-right bg-blue-50/30 font-mono font-extrabold text-blue-900 border-r border-blue-100 text-xs">
+                              <td className="px-4 py-3.5 text-right font-mono font-extrabold text-blue-900 bg-blue-50/40 border-r border-blue-100">
                                 {formatCurrency(lineRev)}
                               </td>
-                              <td className="px-3 py-3 text-right border-r border-slate-100">
+                              <td className="px-3.5 py-3.5 text-right border-r border-slate-100">
                                 <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 mb-0.5">
-                                  {supplier}
+                                  {suppShort}
                                 </span>
-                                <div className="font-mono text-[11px] text-slate-600 font-semibold">{formatCurrency(buy)}</div>
+                                <div className="font-mono text-slate-500 text-[11px] mt-0.5">{formatCurrency(buy)}</div>
                               </td>
-                              <td className="px-3 py-3 text-right bg-purple-50/30 font-mono font-bold text-purple-900 border-r border-purple-100 text-xs">
+                              <td className="px-4 py-3.5 text-right font-mono font-bold text-purple-900 bg-purple-50/40 border-r border-purple-100">
                                 {formatCurrency(lineCost)}
                               </td>
-                              <td className="px-3 py-3 text-right bg-emerald-50/30 font-mono font-extrabold text-emerald-700 border-r border-slate-100 text-xs">
+                              <td className="px-4 py-3.5 text-right font-mono font-black text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
                                 {formatCurrency(lineProfit)}
                               </td>
-                              <td className="px-2 py-3 text-center border-r border-slate-100">
-                                <span className={`px-2 py-1 rounded-full text-[10px] font-extrabold inline-flex items-center gap-0.5 ${
+                              <td className="px-3 py-3.5 text-center border-r border-slate-100">
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold inline-flex items-center gap-0.5 ${
                                   lineMargin >= 20 ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-amber-100 text-amber-800 border border-amber-300"
                                 }`}>
                                   {lineMargin.toFixed(1)}%
                                 </span>
                               </td>
-                              <td className="px-2 py-3 text-center">
+                              <td className="px-2 py-3.5 text-center">
                                 <button
                                   type="button"
                                   onClick={() => setPoLines(poLines.filter((_, i) => i !== idx))}
                                   className="text-slate-300 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"
                                   title="Xóa dòng sản phẩm này"
                                 >
-                                  <Trash2 size={15} />
+                                  <Trash2 size={16} />
                                 </button>
                               </td>
                             </tr>
@@ -1800,31 +1803,31 @@ export default function WorkflowView({
                         return (
                           <tfoot>
                             <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300 text-slate-800 text-xs">
-                              <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider text-[11px] text-slate-600 border-r border-slate-200">
+                              <td colSpan={3} className="px-4 py-3.5 text-right uppercase tracking-wider text-[11px] text-slate-600 border-r border-slate-200">
                                 Tổng Cộng ({poLines.length} mặt hàng):
                               </td>
-                              <td className="px-3 py-3 text-center font-mono font-extrabold text-slate-900 border-r border-slate-200">
+                              <td className="px-3.5 py-3.5 text-center font-mono font-black text-slate-900 border-r border-slate-200">
                                 {totalQty.toLocaleString("vi-VN")}
                               </td>
-                              <td className="px-3 py-3 border-r border-slate-200"></td>
-                              <td className="px-3 py-3 text-right font-mono font-black text-blue-900 bg-blue-100/50 border-r border-blue-200 text-sm">
+                              <td className="px-3.5 py-3.5 border-r border-slate-200"></td>
+                              <td className="px-4 py-3.5 text-right font-mono font-black text-blue-900 bg-blue-100/50 border-r border-blue-200 text-sm">
                                 {formatCurrency(totalRev)}
                               </td>
-                              <td className="px-3 py-3 border-r border-slate-200"></td>
-                              <td className="px-3 py-3 text-right font-mono font-bold text-purple-900 bg-purple-100/50 border-r border-purple-200">
+                              <td className="px-3.5 py-3.5 border-r border-slate-200"></td>
+                              <td className="px-4 py-3.5 text-right font-mono font-bold text-purple-900 bg-purple-100/50 border-r border-purple-200">
                                 {formatCurrency(totalCost)}
                               </td>
-                              <td className="px-3 py-3 text-right font-mono font-black text-emerald-800 bg-emerald-100/50 border-r border-slate-200 text-sm">
+                              <td className="px-4 py-3.5 text-right font-mono font-black text-emerald-800 bg-emerald-100/50 border-r border-slate-200 text-sm">
                                 {formatCurrency(totalProfit)}
                               </td>
-                              <td className="px-2 py-3 text-center border-r border-slate-200">
-                                <span className={`px-2 py-1 rounded-full text-[11px] font-black ${
+                              <td className="px-3 py-3.5 text-center border-r border-slate-200">
+                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
                                   avgMargin >= 20 ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
                                 }`}>
                                   {avgMargin.toFixed(1)}%
                                 </span>
                               </td>
-                              <td className="px-2 py-3"></td>
+                              <td className="px-2 py-3.5"></td>
                             </tr>
                           </tfoot>
                         );

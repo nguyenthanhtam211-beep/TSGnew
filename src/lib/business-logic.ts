@@ -464,20 +464,22 @@ export const findUnifiedProductEntity = (params: {
 
 /**
  * Standardize Supplier Abbreviated Short Code
+ * Tâm Sen -> TSG
  * Tuấn Bằng -> TB
  * Thuận Hòa Phát -> THP
  * YFY Hà Nam -> YFY
- * Tâm Sen -> TSG
+ * Bao Bì Đồng Nai -> BBDN
+ * Xương Giang -> XG
  */
 export function getSupplierShortCode(suppName: string): string {
-  if (!suppName) return "TB";
+  if (!suppName) return "TSG";
   const s = suppName.toLowerCase().trim();
+  if (s.includes("tâm sen") || s.includes("tam sen") || s === "tsg" || s === "ts") return "TSG";
   if (s.includes("tuấn bằng") || s.includes("tuan bang") || s === "tb") return "TB";
   if (s.includes("thuận hoà phát") || s.includes("thuận hòa phát") || s.includes("thp")) return "THP";
-  if (s.includes("yfy") || s.includes("vĩnh huê") || s.includes("vinh hue")) return "YFY";
+  if (s.includes("yfy") || s.includes("vĩnh huê") || s.includes("vinh hue") || s.includes("yong feng yu")) return "YFY";
   if (s.includes("đồng nai") || s.includes("dong nai") || s.includes("bbdn")) return "BBDN";
   if (s.includes("xương giang") || s.includes("xuong giang")) return "XG";
-  if (s.includes("tâm sen") || s.includes("tam sen") || s.includes("tsg")) return "TSG";
   return suppName.toUpperCase().replace(/\s+/g, "");
 }
 
@@ -489,7 +491,27 @@ export function getDefaultSpecs(name: string = "", code: string = "", unit: stri
   const c = (code || "").toLowerCase();
   const u = (unit || "").toLowerCase();
 
-  // 1. Nhãn in, tờ in thuốc lá (Tuấn Bằng, Bắc Sơn, Thăng Long...)
+  // 1. Lưỡi gà trắng, lưỡi gà vàng, giấy cuộn lưỡi gà (Tâm Sen TSG, Bắc Sơn, Thăng Long...)
+  if (n.includes("lưỡi gà") || n.includes("luoi ga") || c.includes("lg") || c.includes("lgtts")) {
+    return "Cuộn giấy lưỡi gà trắng khổ rộng 95mm x dài 800m, định lượng 230gsm (±5%), quấn lõi chuyên dụng cho máy đóng bao thuốc lá, đạt TCKT đã duyệt.";
+  }
+
+  // 2. Băng xé, Màng BOPP, Màng co
+  if (n.includes("băng xé") || n.includes("bang xe") || n.includes("bopp") || n.includes("màng") || n.includes("mang")) {
+    return "Băng xé / Màng BOPP cuộn chuyên dụng cho bao bì thuốc lá, độ bám dính và độ bền kéo đạt tiêu chuẩn kỹ thuật (TCKT) đã duyệt.";
+  }
+
+  // 3. Giấy nhôm, Giấy lót, Giấy thiếc
+  if (n.includes("nhôm") || n.includes("nhom") || n.includes("lót") || n.includes("lot") || n.includes("thiếc")) {
+    return "Giấy nhôm/giấy lót cuộn dập nổi, tráng phủ chuyên dụng bao gói thuốc lá theo tiêu chuẩn kỹ thuật (TCKT) đã duyệt.";
+  }
+
+  // 4. Cây đầu lọc thuốc lá
+  if (n.includes("đầu lọc") || n.includes("dau loc") || n.includes("acetate") || n.includes("filter")) {
+    return "Cây đầu lọc Acetate chuyên dụng cho sản xuất điếu thuốc lá theo kích thước và TCKT đã duyệt.";
+  }
+
+  // 5. Nhãn in, tờ in thuốc lá (Tuấn Bằng, Bắc Sơn, Thăng Long...)
   if (n.includes("nhãn") || n.includes("tờ") || n.includes("decal") || n.includes("label") || u === "tờ" || c.startsWith("nh") || c.startsWith("tu") || c.startsWith("tsbs")) {
     if (n.includes("tút") || c.startsWith("tu")) {
       return "Nhãn tút thuốc lá in Offset nhiều màu trên giấy Couche chuyên dụng, cán màng bóng, bế định hình theo TCKT và Ma-két đã duyệt.";
@@ -497,7 +519,7 @@ export function getDefaultSpecs(name: string = "", code: string = "", unit: stri
     return "Nhãn bao thuốc lá in Offset nhiều màu trên giấy Couche chuyên dụng, phủ vecni/cán bóng, bế định hình theo TCKT và Ma-két đã duyệt.";
   }
 
-  // 2. Thùng carton, bao bì sóng (YFY, THP, Đồng Nai...)
+  // 6. Thùng carton, bao bì sóng (YFY, THP, Đồng Nai...)
   if (n.includes("thùng") || n.includes("carton") || n.includes("hộp") || c.startsWith("th") || c.startsWith("ps-15") || c.startsWith("c48")) {
     if (n.includes("c48") || n.includes("15kg") || n.includes("xuất khẩu")) {
       return "Thùng nâu 5 lớp sóng AB (KP250/3M330/KP250). KT trong: 1.140x700x715 (±5mm), 1.120x680x705 (±5mm). Trọng lượng 15kg (±0.4kg). Dập ghim, TCKT đã duyệt.";

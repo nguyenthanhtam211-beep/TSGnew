@@ -93,21 +93,33 @@ export function DualPODocumentModal({
   const poTamSenRef = useRef<HTMLDivElement>(null);
   const poAVPRef = useRef<HTMLDivElement>(null);
 
-  // 1. Identify Supplier Short Code (e.g. TB, THP, YFY, BBDN, XG)
+  // 1. Identify Supplier Short Code (e.g. TSG, TB, THP, YFY, BBDN, XG)
   const supplierCode = useMemo(() => {
     for (const line of poLines) {
       const supp = line.supplier || line["RP_Nhà cung cấp"] || line["Nhà cung cấp"] || "";
-      if (supp && supp !== "Tâm Sen") return getSupplierShortCode(supp);
-      const code = line.code || line["Mã sản phẩm"] || "";
+      if (supp) return getSupplierShortCode(supp);
+      const code = (line.code || line["Mã sản phẩm"] || "").toUpperCase();
+      const name = (line.name || line["Tên sản phẩm"] || "").toLowerCase();
+      if (code.includes("LGTTS") || code.includes("TSG") || name.includes("lưỡi gà") || name.includes("tâm sen")) return "TSG";
       if (code.includes("PS-15") || code.includes("C48") || code.includes("THP")) return "THP";
       if (code.includes("YFY")) return "YFY";
       if (code.includes("TB") || code.includes("NH") || code.includes("TU") || code.includes("TSBS")) return "TB";
     }
-    return "TB";
+    return "TSG";
   }, [poLines]);
 
   // Supplier Full Info
   const supplierInfo = useMemo(() => {
+    if (supplierCode === "TSG" || supplierCode === "TS") {
+      return {
+        name: "CÔNG TY TNHH THƯƠNG MẠI VÀ ĐẦU TƯ TẬP ĐOÀN TÂM SEN",
+        shortName: "TSG",
+        address: "Số 123 đường N3C (Dự án KĐT Sài Gòn Bình An), P. Bình Trưng, TP. Thủ Đức, TP. Hồ Chí Minh",
+        email: "admin@tamsengroup.vn",
+        phone: "02473 028 288"
+      };
+    }
+
     if (supplierCode === "TB") {
       return {
         name: "CÔNG TY TNHH THƯƠNG MẠI IN BAO BÌ TUẤN BẰNG",
@@ -187,7 +199,11 @@ export function DualPODocumentModal({
       const prodName = line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm";
       const prodCode = line.code || line["Mã sản phẩm"] || line.masterProductCode || "-";
       const prodUnit = line["ĐVT"] || line.unit || "Cái";
-      const rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || getDefaultSpecs(prodName, prodCode, prodUnit);
+      let rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || "";
+      const pNameLower = prodName.toLowerCase();
+      if (!rawSpecs || (rawSpecs.toLowerCase().includes("thùng carton") && (pNameLower.includes("lưỡi gà") || pNameLower.includes("nhãn") || pNameLower.includes("băng xé") || pNameLower.includes("nhôm")))) {
+        rawSpecs = getDefaultSpecs(prodName, prodCode, prodUnit);
+      }
       
       // Multi-batch delivery date parser
       let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
@@ -235,7 +251,11 @@ export function DualPODocumentModal({
       const prodName = line["Tên sản phẩm"] || line.name || line.masterProductName || "Sản phẩm";
       const prodCode = line.code || line["Mã sản phẩm"] || line.masterProductCode || "-";
       const prodUnit = line["ĐVT"] || line.unit || "Cái";
-      const rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || getDefaultSpecs(prodName, prodCode, prodUnit);
+      let rawSpecs = line.specs || line["Quy cách"] || line["Quy cách kỹ thuật"] || line["Thông số kỹ thuật"] || "";
+      const pNameLower = prodName.toLowerCase();
+      if (!rawSpecs || (rawSpecs.toLowerCase().includes("thùng carton") && (pNameLower.includes("lưỡi gà") || pNameLower.includes("nhãn") || pNameLower.includes("băng xé") || pNameLower.includes("nhôm")))) {
+        rawSpecs = getDefaultSpecs(prodName, prodCode, prodUnit);
+      }
 
       let deliverySchedule = line.deliverySchedule || line.deliveryDate || formattedPoDate;
       let deliveryBatches: { batch: number; date: string; qty: number }[] = [];
@@ -385,7 +405,9 @@ export function DualPODocumentModal({
         
         {/* Header Modal Bar */}
         <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-black/[0.06]">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <MacTrafficLights onClose={onClose} />
+            <div className="h-6 w-px bg-slate-200" />
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-md">
               <Layers className="w-5 h-5" />
             </div>
@@ -402,9 +424,13 @@ export function DualPODocumentModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <MacTrafficLights onClose={onClose} />
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 rounded-xl transition"
+          >
+            Đóng [ESC]
+          </button>
         </div>
 
         {/* Workflow 3-Steps Progress Indicator */}
