@@ -18,6 +18,7 @@ export { default as ProductsView } from "./ProductsView";
 
 // Modals
 export { DualPODocumentModal } from "./DualPODocumentModal";
+export { default as MemoryStorageModal } from "./MemoryStorageModal";
 export { default as GoogleSheetsSyncModal } from "./GoogleSheetsSyncModal";
 export { default as PDFExportModal } from "./PDFExportModal";
 export { PODetailModal } from "./PODetailModal";

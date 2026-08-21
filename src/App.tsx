@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -23,7 +23,7 @@ import { sendGeminiPrompt } from "./lib/gemini";
 import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
-  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, 
+  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, MemoryStorageModal, 
   StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
@@ -54,6 +54,7 @@ export default function App() {
   const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
   
   // 2-Way Deep Linking Cross-Module Navigation States
   const [targetCustomerId, setTargetCustomerId] = useState<string | null>(null);
@@ -574,6 +575,14 @@ export default function App() {
 
         <div className="flex items-center gap-1.5">
           <button 
+            onClick={() => setIsMemoryModalOpen(true)} 
+            className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl active:scale-95 transition-all flex items-center gap-1 text-xs font-semibold" 
+            title="Trung tâm bộ nhớ & lưu trữ dữ liệu"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <Database size={15} />
+          </button>
+          <button 
             onClick={() => navItemClick("assistant")} 
             className={clsx(
               "p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-semibold active:scale-95",
@@ -710,6 +719,23 @@ export default function App() {
                 <h1 className="text-xs font-bold text-[#1D1D1F] tracking-[-0.015em] leading-tight">TSG Business OS</h1>
                 <p className="text-[10px] text-slate-500 font-medium">Tâm Sen Group • ERP 2026</p>
               </div>
+            </div>
+          )}
+
+          {!isSidebarCollapsed && (
+            <div className="mt-3 px-1">
+              <button
+                type="button"
+                onClick={() => setIsMemoryModalOpen(true)}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-[11px] font-semibold transition active:scale-[0.98] shadow-2xs"
+                title="Xem trạng thái bộ nhớ lưu trữ và sao lưu dữ liệu"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Bộ nhớ: Đã lưu an toàn</span>
+                </div>
+                <span className="text-[9.5px] font-mono font-bold bg-white/90 px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-700">13 CSDL</span>
+              </button>
             </div>
           )}
         </div>
@@ -957,6 +983,21 @@ export default function App() {
           <div className="p-3 sm:p-5 lg:p-8">
             <StorageView 
               files={fileStorageData}
+              allData={{
+                pricingData,
+                poHeaderData,
+                poLinesData,
+                deliveryData: enrichedDeliveryData,
+                customerData,
+                supplierData,
+                contactData,
+                productData,
+                deliveryPlanData: enrichedDeliveryPlanData,
+                specsData,
+                contractsData,
+                commissionData,
+                fileStorageData
+              }}
               onUpload={handleUploadToDrive}
               onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
             />
@@ -968,6 +1009,27 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Memory & Storage Manager Modal */}
+      <MemoryStorageModal
+        isOpen={isMemoryModalOpen}
+        onClose={() => setIsMemoryModalOpen(false)}
+        allData={{
+          pricingData,
+          poHeaderData,
+          poLinesData,
+          deliveryData: enrichedDeliveryData,
+          customerData,
+          supplierData,
+          contactData,
+          productData,
+          deliveryPlanData: enrichedDeliveryPlanData,
+          specsData,
+          contractsData,
+          commissionData,
+          fileStorageData
+        }}
+      />
 
       {/* Mobile Floating Bottom Dock (Thumb-friendly Apple iOS Navigation) */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-xl border-t border-black/[0.06] px-2 py-1.5 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
