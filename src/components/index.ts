@@ -9,6 +9,7 @@ export { default as TasksView } from "./TasksView";
 export { default as WorkflowView } from "./WorkflowView";
 export { default as DeliveryView } from "./DeliveryView";
 export { default as DeliveryPlanView } from "./DeliveryPlanView";
+export { default as MasterCalendarView } from "./MasterCalendarView";
 export { default as StorageView } from "./StorageView";
 export { default as SpecsView } from "./SpecsView";
 export { default as ContractsView } from "./ContractsView";

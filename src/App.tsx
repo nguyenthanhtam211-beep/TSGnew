@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -23,7 +23,7 @@ import { sendGeminiPrompt } from "./lib/gemini";
 import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
-  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, 
+  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, 
   StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
@@ -629,6 +629,7 @@ export default function App() {
               <NavItem icon={<FileText size={16} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => navItemClick("po")} />
               <NavItem icon={<FileText size={16} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => navItemClick("polines")} />
               <NavItem icon={<CheckCircle size={16} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => navItemClick("delivery_plan")} />
+              <NavItem icon={<CalendarDays size={16} />} iconBg="bg-blue-600" label="Lịch giao nhận (4 Tầng)" isActive={activeTab === "calendar"} onClick={() => navItemClick("calendar")} />
               <NavItem icon={<Truck size={16} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => navItemClick("delivery")} />
               <NavItem icon={<TrendingUp size={16} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => navItemClick("profit_report")} />
               
@@ -727,6 +728,7 @@ export default function App() {
           <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
           <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
           <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
+          <NavItem icon={<CalendarDays size={15} />} iconBg="bg-blue-600" label="Lịch giao nhận (4 Tầng)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "calendar"} onClick={() => setActiveTab("calendar")} />
           <NavItem icon={<Truck size={15} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
           <NavItem icon={<TrendingUp size={15} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isCollapsed={isSidebarCollapsed} isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
           
@@ -904,6 +906,18 @@ export default function App() {
             onAddPlan={(row) => handleAddToFirestore("delivery_plans", row)}
             onUpdatePlan={(row) => handleUpdateToFirestore("delivery_plans", row)}
             onDeletePlan={(row) => handleDeleteFromFirestore("delivery_plans", row)}
+            onPoClick={(val) => setSelectedPoDetails(val)}
+            onProductClick={(val) => setSelectedProductDetails(val)}
+          />
+        )}
+        {activeTab === "calendar" && (
+          <MasterCalendarView
+            deliveryPlans={enrichedDeliveryPlanData}
+            deliveries={enrichedDeliveryData}
+            poLines={enrichedPoLinesData}
+            poHeaders={poHeaderData}
+            customers={customerData}
+            products={productData}
             onPoClick={(val) => setSelectedPoDetails(val)}
             onProductClick={(val) => setSelectedProductDetails(val)}
           />
