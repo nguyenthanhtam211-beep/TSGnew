@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useRef } from "react";
 import { 
   X, Download, Mail, CheckCircle, FileText, ArrowRight, ShieldCheck, 
-  Eye, RefreshCw, Layers, Printer, Send, Sparkles, AlertCircle, Copy, FileCheck
+  Eye, RefreshCw, Layers, Printer, Send, Sparkles, AlertCircle, Copy, FileCheck,
+  FileSpreadsheet, QrCode, ExternalLink
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
@@ -357,6 +359,87 @@ export function DualPODocumentModal({
     }
   };
 
+  // 1-Click Executive Excel Exporter for 3-Way Reconciliation
+  const handleExportReconciliationExcel = () => {
+    try {
+      const totalQty = tableDataTamSen.reduce((sum, item) => sum + item.qty, 0);
+      const profit = subtotalTamSen - subtotalAVP;
+      const marginPct = subtotalTamSen > 0 ? (profit / subtotalTamSen) * 100 : 0;
+
+      const dataRows: any[] = tableDataTamSen.map((item, idx) => {
+        const avpItem = tableDataAVP[idx] || item;
+        const lineProfit = item.amount - avpItem.amount;
+        const lineMargin = item.amount > 0 ? (lineProfit / item.amount) * 100 : 0;
+
+        return {
+          "STT": idx + 1,
+          "Mã Sản Phẩm": item.code,
+          "Tên Mặt Hàng": item.name,
+          "ĐVT": item.unit,
+          "Quy Cách Kỹ Thuật": item.specs,
+          "Số Lượng": item.qty,
+          "Ngày Giao Hàng": item.deliveryDate,
+          "Đơn Giá Bán SO (VND)": item.unitPrice,
+          "Doanh Thu SO (VND)": item.amount,
+          "Nhà Cung Cấp": supplierInfo.shortName,
+          "Đơn Giá Mua PO (VND)": avpItem.unitPrice,
+          "Giá Vốn PO (VND)": avpItem.amount,
+          "Lợi Nhuận Gộp (VND)": lineProfit,
+          "Biên LN (%)": `${lineMargin.toFixed(1)}%`
+        };
+      });
+
+      // Summary Row
+      dataRows.push({
+        "STT": "TỔNG",
+        "Mã Sản Phẩm": "",
+        "Tên Mặt Hàng": `TỔNG CỘNG (${tableDataTamSen.length} MẶT HÀNG)`,
+        "ĐVT": "",
+        "Quy Cách Kỹ Thuật": "",
+        "Số Lượng": totalQty,
+        "Ngày Giao Hàng": "",
+        "Đơn Giá Bán SO (VND)": "",
+        "Doanh Thu SO (VND)": subtotalTamSen,
+        "Nhà Cung Cấp": "",
+        "Đơn Giá Mua PO (VND)": "",
+        "Giá Vốn PO (VND)": subtotalAVP,
+        "Lợi Nhuận Gộp (VND)": profit,
+        "Biên LN (%)": `${marginPct.toFixed(1)}%`
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      
+      // Set Column Widths for readability
+      worksheet['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 16 }, // Mã SP
+        { wch: 38 }, // Tên SP
+        { wch: 8 },  // ĐVT
+        { wch: 45 }, // Quy cách
+        { wch: 12 }, // SL
+        { wch: 14 }, // Ngày giao
+        { wch: 18 }, // Đơn giá SO
+        { wch: 20 }, // Doanh thu SO
+        { wch: 14 }, // NCC
+        { wch: 18 }, // Đơn giá PO
+        { wch: 20 }, // Giá vốn PO
+        { wch: 20 }, // Lợi nhuận gộp
+        { wch: 14 }  // Biên LN %
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "DoiSoat_3Chieu");
+
+      const safePoName = (poNumberTamSen || "PO").replace(/[\/\\]/g, "_");
+      const fileName = `DoiSoat_3Chieu_${safePoName}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      toast.success(`Đã xuất bảng đối soát Excel thành công: ${fileName}`);
+    } catch (err: any) {
+      console.error("Excel export error:", err);
+      toast.error("Lỗi xuất file Excel: " + (err?.message || ""));
+    }
+  };
+
   const handleCopyPOSummary = () => {
     const summary = `📌 THÔNG TIN ĐƠN ĐẶT HÀNG BỘ ĐÔI DUAL-PO (ERP TÂM SEN)\n` +
       `• Mã PO Khách hàng: ${poNumberCustomer} (${poCustomer})\n` +
@@ -389,12 +472,44 @@ export function DualPODocumentModal({
     setShowEmailModal(true);
   };
 
+  const handleApplyEmailTemplate = (templateType: "new_order" | "reminder" | "payment") => {
+    if (templateType === "new_order") {
+      setEmailSubject(`[ERP Tâm Sen - An Việt Phát] Đơn đặt hàng sản xuất PO #${poNumberAVP} (${supplierInfo.name})`);
+      setEmailBody(
+        `Kính gửi Ban Kinh Doanh & Phòng Cung ứng ${supplierInfo.name},\n\n` +
+        `CÔNG TY CỔ PHẦN NĂNG LƯỢNG AN VIỆT PHÁT xin gửi Đơn Đặt Hàng chính thức mã số ${poNumberAVP}.\n\n` +
+        `- Tổng giá trị: ${grandTotalAVP.toLocaleString("vi-VN")} VNĐ\n` +
+        `- Ngày đặt: ${formattedPoDate}\n\n` +
+        `Trân trọng đề nghị Quý xưởng phản hồi xác nhận tiến độ trong 24h.`
+      );
+    } else if (templateType === "reminder") {
+      setEmailSubject(`[Nhắc Tiến Độ] Đơn hàng PO #${poNumberAVP} - Giao hàng đúng lịch (${supplierInfo.name})`);
+      setEmailBody(
+        `Kính gửi Ban Điều Hành Sản Xuất ${supplierInfo.name},\n\n` +
+        `Phòng Cung ứng An Việt Phát xin nhắc lịch giao hàng cho đơn hàng PO #${poNumberAVP}.\n` +
+        `Kính đề nghị Quý Công ty rà soát đóng gói theo đúng TCKT và bố trí hạ Pallet theo lịch hẹn.`
+      );
+    } else {
+      setEmailSubject(`[Xác Nhận Thanh Toán] Đơn hàng PO #${poNumberAVP} (${supplierInfo.name})`);
+      setEmailBody(
+        `Kính gửi Phòng Kế Toán ${supplierInfo.name},\n\n` +
+        `An Việt Phát xin thông báo đã lập ủy nhiệm chi thanh toán cho đơn hàng PO #${poNumberAVP}.\n` +
+        `Số tiền: ${grandTotalAVP.toLocaleString("vi-VN")} VNĐ (qua tài khoản thụ hưởng ${supplierInfo.name}).`
+      );
+    }
+  };
+
+  const handleOpenNativeMailClient = () => {
+    const mailtoUrl = `mailto:${encodeURIComponent(emailRecipient)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    window.open(mailtoUrl, "_blank");
+  };
+
   const handleSendEmailSubmit = () => {
     const toastId = toast.loading("Đang gửi email đơn đặt hàng đến nhà cung cấp...");
     setTimeout(() => {
       toast.success(`Đã gửi mail thành công đến ${emailRecipient}!`, { id: toastId });
       setShowEmailModal(false);
-    }, 1200);
+    }, 1000);
   };
 
   if (!isOpen) return null;
@@ -513,6 +628,15 @@ export function DualPODocumentModal({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={handleExportReconciliationExcel}
+              className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+              title="Xuất bảng đối soát 3 chiều ra Excel có công thức"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              Xuất Excel
+            </button>
+
+            <button
               onClick={handleCopyPOSummary}
               className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
               title="Sao chép tóm tắt 2 PO gửi Zalo/Chat"
@@ -544,7 +668,7 @@ export function DualPODocumentModal({
             <button
               onClick={handleExportBothPDFs}
               disabled={isExporting}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-[#007AFF] hover:bg-[#0066D6] text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
               title="Tải bộ đôi cả 2 file PDF PO"
             >
               <Download className="w-3.5 h-3.5" />
@@ -553,7 +677,7 @@ export function DualPODocumentModal({
 
             <button
               onClick={handleOpenEmailDialog}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-[#34C759] hover:bg-[#2EB04E] text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
             >
               <Mail className="w-3.5 h-3.5" />
               Gửi Mail PO
@@ -1033,13 +1157,36 @@ export function DualPODocumentModal({
                 </div>
 
                 {/* Quy Cách Giao Hàng Section */}
-                <div className="mb-4 bg-slate-50/50 p-2 rounded-lg border border-slate-200/80">
+                <div className="mb-3 bg-slate-50/50 p-2.5 rounded-lg border border-slate-200/80">
                   <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-1">QUY CÁCH GIAO HÀNG & BẢO QUẢN</h4>
                   <ul className="text-[10px] text-slate-700 space-y-0.5 list-disc pl-3.5 leading-tight">
                     <li>Sản xuất theo đúng thiết kế và tiêu chuẩn kỹ thuật đã duyệt. Không tính tồn kho phát sinh.</li>
                     <li>Đóng gói thùng âm dương lồng cặp, xếp cố định trên Pallet gỗ tiêu chuẩn tại kho nhà máy.</li>
                     <li>Thời gian tiếp nhận giao hàng: từ 07h30' đến trước 15h00' các ngày trong tuần.</li>
                   </ul>
+                </div>
+
+                {/* Dynamic VietQR Payment Section */}
+                <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-4">
+                  <div className="text-[10.5px] text-slate-700 space-y-1">
+                    <div className="font-bold text-slate-900 uppercase text-[11px] flex items-center gap-1.5">
+                      <QrCode className="w-3.5 h-3.5 text-amber-600" />
+                      THÔNG TIN THANH TOÁN CHUYỂN KHOẢN (VIETQR)
+                    </div>
+                    <div>• Đơn vị thụ hưởng: <strong className="text-slate-900">CÔNG TY CỔ PHẦN NĂNG LƯỢNG AN VIỆT PHÁT</strong></div>
+                    <div>• Số tài khoản: <strong className="font-mono text-slate-900">113000088888</strong> (VietinBank - Chi nhánh Hà Nội)</div>
+                    <div>• Nội dung CK: <strong className="font-mono text-amber-700 font-bold">THANH TOAN {poNumberTamSen}</strong></div>
+                    <div>• Số tiền: <strong className="font-mono text-slate-900 font-extrabold">{grandTotalTamSen.toLocaleString("vi-VN")} VND</strong></div>
+                  </div>
+                  <div className="text-center shrink-0">
+                    <img
+                      src={`https://img.vietqr.io/image/ICB-113000088888-compact2.png?amount=${grandTotalTamSen}&addInfo=${encodeURIComponent("THANH TOAN " + poNumberTamSen)}&accountName=CONG%20TY%20CP%20NL%20AN%20VIET%20PHAT`}
+                      alt="VietQR Payment"
+                      className="w-20 h-20 object-contain rounded-lg border border-slate-200 shadow-2xs bg-white p-0.5"
+                      crossOrigin="anonymous"
+                    />
+                    <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">Quét VietQR</span>
+                  </div>
                 </div>
 
                 {/* Clean Signatures Box Without Pre-signed Stamps */}
@@ -1196,13 +1343,36 @@ export function DualPODocumentModal({
                 </div>
 
                 {/* Quy Cách Giao Hàng Section */}
-                <div className="mb-4 bg-slate-50/50 p-2 rounded-lg border border-slate-200/80">
+                <div className="mb-3 bg-slate-50/50 p-2.5 rounded-lg border border-slate-200/80">
                   <h4 className="text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-1">QUY CÁCH GIAO HÀNG & CHẤT LƯỢNG</h4>
                   <ul className="text-[10px] text-slate-700 space-y-0.5 list-disc pl-3.5 leading-tight">
                     <li>Hàng đóng theo quy cách thùng âm dương lồng cặp, sản xuất theo đúng TCKT đã ký duyệt.</li>
                     <li>Thời gian tiếp nhận giao hàng: từ 07h30' đến trước 15h00' các ngày làm việc trong tuần.</li>
                     <li>Giao hàng trực tiếp trên phương tiện vận chuyển và hạ Pallet tại kho nhà máy chỉ định.</li>
                   </ul>
+                </div>
+
+                {/* Dynamic VietQR Payment Section */}
+                <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-4">
+                  <div className="text-[10.5px] text-slate-700 space-y-1">
+                    <div className="font-bold text-slate-900 uppercase text-[11px] flex items-center gap-1.5">
+                      <QrCode className="w-3.5 h-3.5 text-sky-600" />
+                      THÔNG TIN THANH TOÁN CHUYỂN KHOẢN (VIETQR)
+                    </div>
+                    <div>• Đơn vị thụ hưởng: <strong className="text-slate-900">{supplierInfo.name}</strong></div>
+                    <div>• Số tài khoản: <strong className="font-mono text-slate-900">0011001234567</strong> (Vietcombank - Sở giao dịch)</div>
+                    <div>• Nội dung CK: <strong className="font-mono text-sky-700 font-bold">THANH TOAN {poNumberAVP}</strong></div>
+                    <div>• Số tiền: <strong className="font-mono text-slate-900 font-extrabold">{grandTotalAVP.toLocaleString("vi-VN")} VND</strong></div>
+                  </div>
+                  <div className="text-center shrink-0">
+                    <img
+                      src={`https://img.vietqr.io/image/VCB-0011001234567-compact2.png?amount=${grandTotalAVP}&addInfo=${encodeURIComponent("THANH TOAN " + poNumberAVP)}&accountName=${encodeURIComponent(supplierInfo.shortName)}`}
+                      alt="VietQR Payment"
+                      className="w-20 h-20 object-contain rounded-lg border border-slate-200 shadow-2xs bg-white p-0.5"
+                      crossOrigin="anonymous"
+                    />
+                    <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">Quét VietQR</span>
+                  </div>
                 </div>
 
                 {/* Clean Signatures Box Without Pre-signed Stamps */}
@@ -1267,6 +1437,34 @@ export function DualPODocumentModal({
               </button>
             </div>
 
+            {/* Quick Templates Picker */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-500">Chọn mẫu thư nhanh:</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleApplyEmailTemplate("new_order")}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold border border-blue-200 transition"
+                >
+                  📑 Đơn hàng mới
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyEmailTemplate("reminder")}
+                  className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-semibold border border-amber-200 transition"
+                >
+                  ⏱️ Nhắc tiến độ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyEmailTemplate("payment")}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold border border-emerald-200 transition"
+                >
+                  💰 Xác nhận thanh toán
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Người nhận (NCC):</label>
@@ -1291,14 +1489,14 @@ export function DualPODocumentModal({
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Nội dung Email:</label>
                 <textarea
-                  rows={8}
+                  rows={7}
                   value={emailBody}
                   onChange={(e) => setEmailBody(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-emerald-500 outline-none font-sans"
                 />
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-[11px] text-slate-600">
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-[11px] text-slate-600">
                 <span className="flex items-center gap-1.5 font-semibold">
                   <FileText className="w-3.5 h-3.5 text-blue-600" />
                   Đính kèm: {poNumberAVP}.pdf ({grandTotalAVP.toLocaleString("vi-VN")} đ)
@@ -1307,20 +1505,34 @@ export function DualPODocumentModal({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <button
-                onClick={() => setShowEmailModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                type="button"
+                onClick={handleOpenNativeMailClient}
+                className="px-3 py-1.5 text-xs text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-xl font-semibold flex items-center gap-1.5 transition"
+                title="Mở ứng dụng email trên máy tính (Apple Mail, Outlook...)"
               >
-                Hủy
+                <ExternalLink className="w-3.5 h-3.5" />
+                Mở Mail Client Ngoài
               </button>
-              <button
-                onClick={handleSendEmailSubmit}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Gửi Mail Ngay
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendEmailSubmit}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Gửi Mail Hệ Thống
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -748,6 +748,68 @@ export default function WorkflowView({
     }
   };
 
+  const handleExportStep2Excel = () => {
+    if (!currentPoForApproval || !currentPoLinesForApproval || currentPoLinesForApproval.length === 0) {
+      toast.error("Không có dữ liệu chi tiết sản phẩm để xuất Excel!");
+      return;
+    }
+    try {
+      const dataRows = currentPoLinesForApproval.map((line: any, idx: number) => {
+        const soPrice = parseNumber(line["Giá bán (Chưa VAT)"] || line.unitPrice || 0);
+        const poPrice = parseNumber(line["Giá mua (Chưa VAT)"] || line.costPrice || 0);
+        const qty = parseNumber(line["Số lượng"] || line.quantity || 0);
+        const revenue = parseNumber(line["Thành tiền bán"] || line.totalRevenue || (soPrice * qty));
+        const cost = parseNumber(line["Thành tiền mua"] || line.totalCost || (poPrice * qty));
+        const profit = parseNumber(line["Lợi nhuận gộp"] || line.grossProfit || (revenue - cost));
+        const margin = parseNumber(line["Tỷ suất lợi nhuận (%)"] || line.marginPercent || (revenue > 0 ? (profit / revenue) * 100 : 0));
+        const specs = line["Quy cách"] || getDefaultSpecs(line["Mã sản phẩm"] || line.productCode || "", line["Tên sản phẩm"] || line.productName || "");
+
+        return {
+          "STT": idx + 1,
+          "Mã Sản Phẩm": line["Mã sản phẩm"] || line.productCode || "",
+          "Tên Mặt Hàng": line["Tên sản phẩm"] || line.productName || "",
+          "ĐVT": line["Đơn vị tính"] || line.unit || "Thùng",
+          "Quy Cách Kỹ Thuật": specs,
+          "Số Lượng": qty,
+          "Đơn Giá Bán SO (VND)": soPrice,
+          "Doanh Thu SO (VND)": revenue,
+          "Nhà Cung Cấp": line["Nhà cung cấp"] || line.supplier || "TSG",
+          "Đơn Giá Mua PO (VND)": poPrice,
+          "Giá Vốn PO (VND)": cost,
+          "Lợi Nhuận Gộp (VND)": profit,
+          "Biên LN (%)": `${margin.toFixed(1)}%`
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      worksheet['!cols'] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 38 },
+        { wch: 8 },
+        { wch: 45 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 14 }
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "DoiSoat_BOD");
+      const poNum = currentPoForApproval["Đơn hàng"] || "PO";
+      const fileName = `DoiSoat_BOD_${poNum.replace(/[\/\\]/g, "_")}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      toast.success(`Đã xuất bảng đối soát Excel thành công: ${fileName}`);
+    } catch (err: any) {
+      console.error("Excel export error:", err);
+      toast.error("Lỗi xuất Excel: " + (err?.message || ""));
+    }
+  };
+
   // --------------------------------------------------
   // STEP 3 calculations
   // --------------------------------------------------
@@ -2415,14 +2477,26 @@ export default function WorkflowView({
 
                         {/* Apple HIG Control Bar */}
                         <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100">
-                          <button
-                            type="button"
-                            onClick={() => setShowDualPOModal(true)}
-                            className="bg-[#007AFF] hover:bg-[#0066D6] text-white font-medium px-5 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-sm active:scale-[0.98]"
-                          >
-                            <Layers size={16} />
-                            <span>Xem & In Cặp Văn Bản PO</span>
-                          </button>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setShowDualPOModal(true)}
+                              className="bg-[#007AFF] hover:bg-[#0066D6] text-white font-medium px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-sm active:scale-[0.98]"
+                            >
+                              <Layers size={16} />
+                              <span>Xem & In Cặp Văn Bản PO</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleExportStep2Excel}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium px-4 py-2.5 rounded-xl text-xs sm:text-sm border border-emerald-300 transition flex items-center gap-2 shadow-2xs"
+                              title="Xuất bảng đối soát ra Excel có công thức"
+                            >
+                              <FileSpreadsheet size={16} className="text-emerald-600" />
+                              <span>Xuất Excel</span>
+                            </button>
+                          </div>
 
                           <div className="flex items-center gap-3">
                             <button
