@@ -1119,33 +1119,49 @@ export default function WorkflowView({
   // --------------------------------------------------
   const reconciliationData = useMemo(() => {
     return combinedPoLinesData.filter(line => !line.isDeleted).map(line => {
-      const associatedDeliveries = combinedDeliveryData.filter(d => !d.isDeleted && d["Chi tiết đơn hàng"] === line["STT"]);
-      const associatedPlans = combinedDeliveryPlanData.filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === line["STT"]);
+      const lineStt = String(line["STT"] || line.id || "").trim();
+      const poNum = String(line["Số đơn hàng"] || line["Đơn hàng"] || "").trim();
+      const prodName = String(line["Tên sản phẩm"] || "").trim();
+
+      const associatedDeliveries = combinedDeliveryData.filter(d => 
+        !d.isDeleted && (
+          (d["Chi tiết đơn hàng"] && String(d["Chi tiết đơn hàng"]).trim() === lineStt) ||
+          (d["Đơn hàng"] && String(d["Đơn hàng"]).trim() === poNum && (d["Tên sản phẩm"] || d["Sản phẩm"]) && String(d["Tên sản phẩm"] || d["Sản phẩm"]).trim() === prodName)
+        )
+      );
+
+      const associatedPlans = combinedDeliveryPlanData.filter(p => 
+        !p.isDeleted && (
+          (p["Chi tiết đơn hàng"] && String(p["Chi tiết đơn hàng"]).trim() === lineStt) ||
+          (p["Đơn hàng"] && String(p["Đơn hàng"]).trim() === poNum && p["Sản phẩm"] && String(p["Sản phẩm"]).trim() === prodName)
+        )
+      );
       
-      const totalDelivered = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d["Số lượng giao"]), 0);
+      const totalDelivered = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d["Số lượng thực nhận"] || d["Số lượng giao"] || d["Đã giao"] || d["Số lượng"]), 0);
       const totalPlanned = associatedPlans.reduce((sum, p) => sum + parseNumber(p["Số lượng kế hoạch"] || p["Số lượng"]), 0);
       const ordered = parseNumber(line["Số lượng"]);
       
-      const diffVsOrder = totalDelivered - ordered;
-      const diffVsPlan = totalDelivered - totalPlanned;
+      // Clean float rounding
+      const diffVsOrder = Math.round((totalDelivered - ordered) * 100) / 100;
+      const diffVsPlan = Math.round((totalDelivered - totalPlanned) * 100) / 100;
 
       let status = "Chưa giao";
-      let statusColor = "text-gray-500 bg-gray-50";
+      let statusColor = "text-slate-500 bg-slate-100 border border-slate-200";
       if (totalDelivered === 0) {
         status = "Chưa giao";
-        statusColor = "text-yellow-600 bg-yellow-50";
-      } else if (totalDelivered === ordered) {
+        statusColor = "text-amber-700 bg-amber-50 border border-amber-200";
+      } else if (Math.abs(totalDelivered - ordered) < 0.001) {
         status = "Khớp 100%";
-        statusColor = "text-green-600 bg-green-50";
+        statusColor = "text-emerald-700 bg-emerald-50 border border-emerald-200";
       } else if (totalDelivered < ordered) {
         status = "Giao thiếu";
-        statusColor = "text-orange-600 bg-orange-50";
+        statusColor = "text-rose-700 bg-rose-50 border border-rose-200";
       } else {
         status = "Giao thừa";
-        statusColor = "text-purple-600 bg-purple-50";
+        statusColor = "text-purple-700 bg-purple-50 border border-purple-200";
       }
 
-      const incidents = associatedDeliveries.filter(d => d["Sự cố"] === "1" || d["Sự cố"] === 1);
+      const incidents = associatedDeliveries.filter(d => d["Sự cố"] === "1" || d["Sự cố"] === 1 || Boolean(d["Chi tiết sự cố"]));
 
       return {
         line,
@@ -3463,43 +3479,169 @@ export default function WorkflowView({
           {/* ================================================== */}
           {activeStep === 5 && (
             <div className="space-y-6">
-              {/* Alert Metrics bar */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Tổng số dòng PO</span>
-                  <span className="text-2xl font-extrabold text-slate-800 mt-2">{reconcileStats.totalLines}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Khớp giao 100%</span>
-                  <span className="text-2xl font-extrabold text-emerald-600 mt-2">{reconcileStats.matched}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Giao thiếu hàng</span>
-                  <span className="text-2xl font-extrabold text-amber-600 mt-2">{reconcileStats.short}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Giao thừa hàng</span>
-                  <span className="text-2xl font-extrabold text-purple-600 mt-2">{reconcileStats.over}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-red-500 uppercase flex items-center gap-1">
-                    <AlertCircle size={10} />
-                    Sự cố ghi nhận
+              {/* Interactive Clickable Bento KPI Metrics Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* 1. Tổng số dòng PO */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("all")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "all"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-slate-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider ${reconcileFilter === "all" ? "text-slate-300" : "text-slate-400"}`}>
+                      Tổng Số Dòng PO
+                    </span>
+                    {reconcileFilter === "all" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className="text-2xl font-bold font-sans tabular-nums mt-2">
+                    {reconcileStats.totalLines}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "all" ? "text-slate-300" : "text-slate-400"}`}>
+                    Toàn bộ đơn hàng
                   </span>
-                  <span className="text-2xl font-extrabold text-red-600 mt-2">{reconcileStats.incidents}</span>
-                </div>
+                </button>
+
+                {/* 2. Khớp giao 100% */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("Khớp 100%")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "Khớp 100%"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-emerald-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider ${reconcileFilter === "Khớp 100%" ? "text-emerald-100" : "text-slate-400"}`}>
+                      Khớp Giao 100%
+                    </span>
+                    {reconcileFilter === "Khớp 100%" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className={`text-2xl font-bold font-sans tabular-nums mt-2 ${reconcileFilter === "Khớp 100%" ? "text-white" : "text-emerald-600"}`}>
+                    {reconcileStats.matched}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "Khớp 100%" ? "text-emerald-100" : "text-slate-400"}`}>
+                    Đã giao đủ số lượng
+                  </span>
+                </button>
+
+                {/* 3. Giao thiếu hàng */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("Giao thiếu")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "Giao thiếu"
+                      ? "bg-amber-500 text-white border-amber-500 shadow-md ring-2 ring-amber-400"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-amber-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider ${reconcileFilter === "Giao thiếu" ? "text-amber-100" : "text-slate-400"}`}>
+                      Giao Thiếu Hàng
+                    </span>
+                    {reconcileFilter === "Giao thiếu" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className={`text-2xl font-bold font-sans tabular-nums mt-2 ${reconcileFilter === "Giao thiếu" ? "text-white" : "text-amber-600"}`}>
+                    {reconcileStats.short}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "Giao thiếu" ? "text-amber-100" : "text-slate-400"}`}>
+                    Cần xuất bù giao tiếp
+                  </span>
+                </button>
+
+                {/* 4. Giao thừa hàng */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("Giao thừa")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "Giao thừa"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-md ring-2 ring-purple-500"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-purple-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider ${reconcileFilter === "Giao thừa" ? "text-purple-100" : "text-slate-400"}`}>
+                      Giao Thừa Hàng
+                    </span>
+                    {reconcileFilter === "Giao thừa" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className={`text-2xl font-bold font-sans tabular-nums mt-2 ${reconcileFilter === "Giao thừa" ? "text-white" : "text-purple-600"}`}>
+                    {reconcileStats.over}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "Giao thừa" ? "text-purple-100" : "text-slate-400"}`}>
+                    Vượt số lượng đặt
+                  </span>
+                </button>
+
+                {/* 5. Chưa giao */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("Chưa giao")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "Chưa giao"
+                      ? "bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-blue-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider ${reconcileFilter === "Chưa giao" ? "text-blue-100" : "text-slate-400"}`}>
+                      Chưa Giao Hàng
+                    </span>
+                    {reconcileFilter === "Chưa giao" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className={`text-2xl font-bold font-sans tabular-nums mt-2 ${reconcileFilter === "Chưa giao" ? "text-white" : "text-blue-600"}`}>
+                    {reconcileStats.unserved}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "Chưa giao" ? "text-blue-100" : "text-slate-400"}`}>
+                    Chưa phát sinh PXK
+                  </span>
+                </button>
+
+                {/* 6. Sự cố ghi nhận */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileFilter("incident")}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    reconcileFilter === "incident"
+                      ? "bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-500"
+                      : "bg-white text-slate-800 border-slate-200/80 hover:border-rose-300 hover:shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1 ${reconcileFilter === "incident" ? "text-rose-100" : "text-rose-600"}`}>
+                      <AlertCircle size={12} />
+                      <span>Sự Cố Ghi Nhận</span>
+                    </span>
+                    {reconcileFilter === "incident" && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-bold">ĐANG LỌC</span>}
+                  </div>
+                  <div className={`text-2xl font-bold font-sans tabular-nums mt-2 ${reconcileFilter === "incident" ? "text-white" : "text-rose-600"}`}>
+                    {reconcileStats.incidents}
+                  </div>
+                  <span className={`text-[10px] mt-1 ${reconcileFilter === "incident" ? "text-rose-100" : "text-slate-400"}`}>
+                    Cần xử lý bù lô
+                  </span>
+                </button>
               </div>
 
-              {/* Data Table */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* Data Table Container */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                   <div>
-                    <h3 className="font-bold text-slate-800 text-base">Hệ thống đối soát chéo Đơn đặt (PO) và Thực giao (PXK)</h3>
-                    <p className="text-xs text-slate-500">Tự động phát hiện chênh lệch sản lượng, lỗi giao nhận và các lô hàng bị sự cố</p>
+                    <h3 className="font-bold text-slate-900 text-base">
+                      Hệ Thống Đối Soát Chéo Đơn Đặt (PO) & Thực Giao (PXK)
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Đang hiển thị <strong className="text-blue-600">{filteredReconciliation.length} dòng</strong> khớp với bộ lọc ({reconcileFilter === "all" ? "Tất cả" : reconcileFilter === "incident" ? "Có sự cố" : reconcileFilter})
+                    </p>
                   </div>
+
                   {/* Status Filters & CTA */}
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="bg-[#F5F5F7] p-1 rounded-xl flex items-center border border-slate-200/60 text-xs font-semibold">
                       {[
                         { key: "all", label: "Tất cả" },
                         { key: "Khớp 100%", label: "Khớp 100%" },
@@ -3510,11 +3652,12 @@ export default function WorkflowView({
                       ].map((btn) => (
                         <button
                           key={btn.key}
+                          type="button"
                           onClick={() => setReconcileFilter(btn.key)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          className={`px-3 py-1.5 rounded-lg transition-all ${
                             reconcileFilter === btn.key
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                              ? "bg-white text-[#007AFF] shadow-xs font-bold"
+                              : "text-slate-600 hover:text-slate-900"
                           }`}
                         >
                           {btn.label}
@@ -3523,73 +3666,98 @@ export default function WorkflowView({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => setActiveStep(6)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm active:scale-[0.98]"
                     >
-                      <span>Lập Hóa đơn & Quyết toán Kế toán</span>
+                      <span>Lập Hóa Đơn & Quyết Toán Kế Toán</span>
                       <ArrowRight size={14} />
                     </button>
                   </div>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left border-collapse">
+                <div className="rounded-xl border border-slate-200/80 overflow-hidden overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
-                        <th className="px-4 py-3">Mã dòng PO</th>
-                        <th className="px-4 py-3">Số Đơn Hàng PO</th>
-                        <th className="px-4 py-3">Khách hàng</th>
-                        <th className="px-4 py-3">Sản phẩm</th>
-                        <th className="px-4 py-3 text-right">S.Lượng Đặt</th>
-                        <th className="px-4 py-3 text-right">Lên KH</th>
-                        <th className="px-4 py-3 text-right">Thực Giao</th>
-                        <th className="px-4 py-3 text-right">Hụt PO</th>
-                        <th className="px-4 py-3 text-right">Hụt KH</th>
-                        <th className="px-4 py-3">Hiện trạng</th>
-                        <th className="px-4 py-3 text-center">Sự cố</th>
+                      <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase text-slate-600 font-bold tracking-wider">
+                        <th className="px-3.5 py-3 text-center w-14">Mã Dòng PO</th>
+                        <th className="px-3.5 py-3 text-center">Số Đơn Hàng PO</th>
+                        <th className="px-3.5 py-3">Khách Hàng</th>
+                        <th className="px-4 py-3">Sản Phẩm</th>
+                        <th className="px-3.5 py-3 text-right">S.Lượng Đặt</th>
+                        <th className="px-3.5 py-3 text-right bg-blue-50/40 text-blue-800">Lên KH</th>
+                        <th className="px-3.5 py-3 text-right">Thực Giao</th>
+                        <th className="px-3.5 py-3 text-right">Hụt PO</th>
+                        <th className="px-3.5 py-3 text-right">Hụt KH</th>
+                        <th className="px-3.5 py-3 text-center">Hiện Trạng</th>
+                        <th className="px-3.5 py-3 text-center">Sự Cố</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                    <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                       {filteredReconciliation.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="text-center py-6 text-slate-400 italic">
-                            Không có kết quả đối soát khớp với bộ lọc!
+                          <td colSpan={11} className="text-center py-10 text-slate-400 font-normal">
+                            Không có kết quả đối soát nào khớp với bộ lọc đang chọn!
                           </td>
                         </tr>
                       ) : (
                         filteredReconciliation.map((rec, index) => {
                           const hasIncidentFlag = rec.incidents.length > 0;
                           return (
-                            <tr key={index} className="hover:bg-slate-50">
-                              <td className="px-4 py-3 font-mono font-medium text-slate-500">{rec.line["STT"]}</td>
-                              <td className="px-4 py-3 font-semibold">{rec.line["Số đơn hàng"]}</td>
-                              <td className="px-4 py-3 font-medium">{rec.line["Khách hàng"]}</td>
-                              <td className="px-4 py-3 truncate max-w-[150px]" title={rec.line["Tên sản phẩm"]}>{rec.line["Tên sản phẩm"]}</td>
-                              <td className="px-4 py-3 text-right font-bold text-slate-600">{(rec.ordered || 0).toLocaleString("vi-VN")}</td>
-                              <td className="px-4 py-3 text-right font-bold text-blue-600 bg-blue-50/30">{(rec.totalPlanned || 0).toLocaleString("vi-VN")}</td>
-                              <td className="px-4 py-3 text-right font-bold text-slate-800">{(rec.totalDelivered || 0).toLocaleString("vi-VN")}</td>
-                              <td className={`px-4 py-3 text-right font-bold ${
-                                rec.diffVsOrder === 0 ? "text-slate-500" : rec.diffVsOrder > 0 ? "text-purple-600" : "text-amber-600"
-                              }`}>
-                                {rec.diffVsOrder > 0 ? `+${rec.diffVsOrder}` : rec.diffVsOrder}
+                            <tr key={index} className="hover:bg-[#FBFBFD] transition">
+                              <td className="px-3.5 py-3 text-center font-mono text-slate-400">{rec.line["STT"]}</td>
+                              <td className="px-3.5 py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => onPoClick?.(rec.line["Số đơn hàng"] || rec.line["Đơn hàng"])}
+                                  className="font-mono font-bold text-slate-900 hover:text-blue-600 hover:underline transition cursor-pointer"
+                                  title="Xem hồ sơ đơn hàng PO"
+                                >
+                                  {rec.line["Số đơn hàng"] || rec.line["Đơn hàng"]}
+                                </button>
                               </td>
-                              <td className={`px-4 py-3 text-right font-bold ${
-                                rec.diffVsPlan === 0 ? "text-slate-500" : rec.diffVsPlan > 0 ? "text-purple-600" : "text-amber-600"
-                              }`}>
-                                {rec.diffVsPlan > 0 ? `+${rec.diffVsPlan}` : rec.diffVsPlan}
+                              <td className="px-3.5 py-3 text-slate-800 font-medium">{rec.line["Khách hàng"]}</td>
+                              <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate">
+                                <button
+                                  type="button"
+                                  onClick={() => onProductClick?.(rec.line["Tên sản phẩm"] || rec.line["Sản phẩm"] || rec.line["Mã sản phẩm"])}
+                                  className="hover:text-blue-600 hover:underline cursor-pointer text-left font-semibold transition truncate max-w-[200px] block"
+                                  title="Xem chi tiết 360° sản phẩm"
+                                >
+                                  {rec.line["Tên sản phẩm"] || rec.line["Sản phẩm"]}
+                                </button>
                               </td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold ${rec.statusColor}`}>
+                              <td className="px-3.5 py-3 text-right font-bold text-slate-900 tabular-nums">
+                                {(rec.ordered || 0).toLocaleString("vi-VN")}
+                              </td>
+                              <td className="px-3.5 py-3 text-right font-bold text-blue-700 tabular-nums bg-blue-50/30">
+                                {(rec.totalPlanned || 0).toLocaleString("vi-VN")}
+                              </td>
+                              <td className="px-3.5 py-3 text-right font-bold text-slate-900 tabular-nums">
+                                {(rec.totalDelivered || 0).toLocaleString("vi-VN")}
+                              </td>
+                              <td className={`px-3.5 py-3 text-right font-bold tabular-nums ${
+                                rec.diffVsOrder === 0 ? "text-slate-400" : rec.diffVsOrder > 0 ? "text-purple-600" : "text-amber-600"
+                              }`}>
+                                {rec.diffVsOrder === 0 ? "0" : rec.diffVsOrder > 0 ? `+${rec.diffVsOrder.toLocaleString("vi-VN")}` : rec.diffVsOrder.toLocaleString("vi-VN")}
+                              </td>
+                              <td className={`px-3.5 py-3 text-right font-bold tabular-nums ${
+                                rec.diffVsPlan === 0 ? "text-slate-400" : rec.diffVsPlan > 0 ? "text-purple-600" : "text-amber-600"
+                              }`}>
+                                {rec.diffVsPlan === 0 ? "0" : rec.diffVsPlan > 0 ? `+${rec.diffVsPlan.toLocaleString("vi-VN")}` : rec.diffVsPlan.toLocaleString("vi-VN")}
+                              </td>
+                              <td className="px-3.5 py-3 text-center">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold inline-block ${rec.statusColor}`}>
                                   {rec.status}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-3.5 py-3 text-center">
                                 {hasIncidentFlag ? (
-                                  <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block border border-red-100 animate-pulse" title={rec.incidents.map(i => i["Chi tiết sự cố"]).join("; ")}>
+                                  <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-md inline-block" title={rec.incidents.map(i => i["Chi tiết sự cố"]).join("; ")}>
                                     {rec.incidents.length} lỗi
                                   </span>
                                 ) : (
-                                  <span className="text-slate-400 font-medium">-</span>
+                                  <span className="text-slate-300 font-medium">-</span>
                                 )}
                               </td>
                             </tr>
@@ -3603,7 +3771,6 @@ export default function WorkflowView({
             </div>
           )}
 
-          {/* ================================================== */}
           {/* STEP 6: HÓA ĐƠN VAT, CÔNG NỢ & BÁO CÁO TÀI CHÍNH */}
           {/* ================================================== */}
           {activeStep === 6 && (
