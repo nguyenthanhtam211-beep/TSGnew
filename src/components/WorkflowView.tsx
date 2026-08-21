@@ -4,7 +4,7 @@ import {
   ShoppingCart, FileText, Calendar, Truck, CheckSquare, BarChart3, 
   ArrowRight, Plus, CheckCircle, AlertTriangle, AlertCircle, 
   TrendingUp, DollarSign, Download, Users, Package, RefreshCw, ChevronRight, Calculator, Check, FileSpreadsheet,
-  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award, Info, Trash2, Search, CheckCheck
+  Camera, Upload, Sparkles, ShieldCheck, Eye, Layers, Loader2, Award, Info, Trash2, Search, CheckCheck, CalendarDays, CalendarRange, Clock, ExternalLink, ChevronLeft, Share2
 } from "lucide-react";
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
@@ -175,6 +175,8 @@ export default function WorkflowView({
   const [plannedQty, setPlannedQty] = useState<number>(0);
   const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split("T")[0]);
   const [planNotes, setPlanNotes] = useState("");
+  const [step3ViewMode, setStep3ViewMode] = useState<"weekly" | "list">("weekly");
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0);
 
   // States for Step 4 (Giao hàng & BBBG)
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
@@ -836,10 +838,97 @@ export default function WorkflowView({
     });
   }, [combinedPoLinesData, combinedDeliveryPlanData]);
 
+  const currentWeekDays = useMemo(() => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distanceToMonday + (selectedWeekOffset * 7));
+
+    const days = [];
+    const dayNames = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const dateFormattedSlash = `${dd}/${mm}/${yyyy}`;
+      const dateFormattedIso = `${yyyy}-${mm}-${dd}`;
+      const isToday = new Date().toDateString() === d.toDateString();
+
+      days.push({
+        dayIndex: i,
+        dayName: dayNames[i],
+        dateSlash: dateFormattedSlash,
+        dateIso: dateFormattedIso,
+        dateObj: d,
+        isToday
+      });
+    }
+    return days;
+  }, [selectedWeekOffset]);
+
+  const generateGoogleCalendarUrl = (plan: any) => {
+    const qty = parseNumber(plan["Số lượng kế hoạch"] || plan["Số lượng"]).toLocaleString("vi-VN");
+    const title = `[Giao Hàng TSG] ${plan["Khách hàng"]} - PO ${plan["Đơn hàng"]} (${qty} ${plan["ĐVT"] || "sp"})`;
+    const rawDate = String(plan["Ngày giao kế hoạch"] || "");
+    let startIso = "";
+    let endIso = "";
+    if (rawDate.includes("/")) {
+      const parts = rawDate.split("/");
+      if (parts.length === 3) {
+        const d = parts[0].padStart(2, "0");
+        const m = parts[1].padStart(2, "0");
+        const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+        startIso = `${y}${m}${d}T073000`;
+        endIso = `${y}${m}${d}T150000`;
+      }
+    } else if (rawDate.includes("-")) {
+      const parts = rawDate.split("-");
+      if (parts.length === 3) {
+        const y = parts[0];
+        const m = parts[1].padStart(2, "0");
+        const d = parts[2].padStart(2, "0");
+        startIso = `${y}${m}${d}T073000`;
+        endIso = `${y}${m}${d}T150000`;
+      }
+    }
+
+    if (!startIso) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      startIso = `${y}${m}${d}T073000`;
+      endIso = `${y}${m}${d}T150000`;
+    }
+
+    const details = `THÔNG TIN LỊCH GIAO HÀNG (ERP TÂM SEN):\n` +
+      `• Số đơn hàng PO: ${plan["Đơn hàng"]}\n` +
+      `• Khách hàng: ${plan["Khách hàng"]}\n` +
+      `• Mặt hàng sản phẩm: ${plan["Sản phẩm"]}\n` +
+      `• Sản lượng kế hoạch: ${qty}\n` +
+      `• Kế hoạch ID: ${plan["Kế hoạch ID"] || plan.id}\n` +
+      `• Ghi chú điều phối xe: ${plan["Ghi chú"] || "Giao giờ hành chính 07h30 - 15h00, hạ pallet kho nhà máy"}`;
+    const location = plan["Khách hàng"] ? `Kho tiếp nhận nhà máy ${plan["Khách hàng"]}` : "Kho khách hàng chỉ định";
+    
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startIso}/${endIso}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
+  };
+
   const handleSelectPlanningLine = (line: any) => {
     setPlanningPoLine(line);
     const needed = line.qtyNeeded > 0 ? line.qtyNeeded : parseNumber(line["Số lượng"]);
     setPlannedQty(needed > 0 ? needed : 100);
+
+    // Auto smooth scroll to planning form so user does not need to scroll manually
+    setTimeout(() => {
+      const formEl = document.getElementById("delivery-planning-form-card");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, 60);
   };
 
   const handleSaveDeliveryPlan = async () => {
@@ -2576,201 +2665,504 @@ export default function WorkflowView({
           {/* STEP 3: LẬP KẾ HOẠCH GIAO HÀNG (DELIVERY PLANNING) */}
           {/* ================================================== */}
           {activeStep === 3 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Side: PO lines list requiring planning */}
-              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div>
-                  <h3 className="font-bold text-slate-800 text-base">Danh sách dòng PO đang chờ lên lịch</h3>
-                  <p className="text-xs text-slate-500">Chọn một dòng đơn hàng dưới đây để lên lịch điều xe và giao nhận hàng</p>
+            <div className="space-y-6">
+              {/* Step 3 Top Header Bar - Logistics Weekly Operations */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10.5px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
+                      Phòng Kế Hoạch Vật Tư & Vận Tải
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      {activeDeliveryPlans.length} chuyến xe đang điều phối
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+                    <CalendarDays className="text-[#007AFF]" size={22} />
+                    <span>Kế Hoạch Điều Vận & Giao Hàng Theo Tuần</span>
+                  </h3>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase text-slate-500 font-bold">
-                        <th className="px-3 py-2.5">Mã dòng PO</th>
-                        <th className="px-3 py-2.5">Số PO</th>
-                        <th className="px-3 py-2.5">Khách hàng</th>
-                        <th className="px-3 py-2.5">Sản phẩm</th>
-                        <th className="px-3 py-2.5 text-right">Số lượng đặt</th>
-                        <th className="px-3 py-2.5 text-right">Lũy kế lập KH</th>
-                        <th className="px-3 py-2.5 text-center">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
-                      {activePOLinesNeedPlan.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="text-center py-6 text-slate-400 italic">
-                            Không tìm thấy dòng PO nào cần lập kế hoạch!
-                          </td>
-                        </tr>
-                      ) : (
-                        activePOLinesNeedPlan.map((line, idx) => {
-                          const isFullyScheduled = line.plannedQtySum >= parseNumber(line["Số lượng"]);
-                          return (
-                            <tr key={idx} className={`hover:bg-slate-50 ${isFullyScheduled ? "opacity-60 bg-emerald-50/20" : ""}`}>
-                              <td className="px-3 py-3 font-mono text-slate-500">{line["STT"]}</td>
-                              <td className="px-3 py-3 font-medium text-slate-800">{line["Số đơn hàng"]}</td>
-                              <td className="px-3 py-3 text-slate-600 font-medium truncate max-w-[80px]">{line["Khách hàng"]}</td>
-                              <td className="px-3 py-3 font-medium truncate max-w-[150px]" title={line["Tên sản phẩm"]}>{line["Tên sản phẩm"]}</td>
-                              <td className="px-3 py-3 text-right font-bold">{parseNumber(line["Số lượng"]).toLocaleString("vi-VN")}</td>
-                              <td className="px-3 py-3 text-right">
-                                <span className={`font-bold ${isFullyScheduled ? "text-emerald-600" : "text-blue-600"}`}>
-                                  {(line.plannedQtySum || 0).toLocaleString("vi-VN")}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3 text-center">
-                                <button
-                                  onClick={() => handleSelectPlanningLine(line)}
-                                  className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
-                                    isFullyScheduled 
-                                      ? "bg-slate-100 text-slate-500 hover:bg-slate-200" 
-                                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                                  }`}
-                                >
-                                  {isFullyScheduled ? "Lên lịch thêm" : "Lập kế hoạch"}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* View Mode Switcher */}
+                  <div className="bg-[#F5F5F7] p-1 rounded-xl flex items-center border border-slate-200/60 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setStep3ViewMode("weekly")}
+                      className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                        step3ViewMode === "weekly"
+                          ? "bg-white text-[#007AFF] shadow-xs font-bold"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <CalendarRange size={14} />
+                      <span>Lịch Tuần Trực Quan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep3ViewMode("list")}
+                      className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                        step3ViewMode === "list"
+                          ? "bg-white text-[#007AFF] shadow-xs font-bold"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <FileText size={14} />
+                      <span>Danh Sách Đơn Cần Giao</span>
+                    </button>
+                  </div>
+
+                  {/* Week Navigation */}
+                  <div className="flex items-center bg-[#F5F5F7] rounded-xl p-1 border border-slate-200/60 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWeekOffset(prev => prev - 1)}
+                      className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                      title="Tuần trước"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWeekOffset(0)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                        selectedWeekOffset === 0 ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {selectedWeekOffset === 0 ? "Tuần này" : selectedWeekOffset > 0 ? `+${selectedWeekOffset} tuần` : `${selectedWeekOffset} tuần`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWeekOffset(prev => prev + 1)}
+                      className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                      title="Tuần sau"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Right Side: Setup form or existing plan overview */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                {planningPoLine ? (
-                  <div className="space-y-4">
-                    <div className="border-b border-slate-100 pb-2">
-                      <h3 className="font-bold text-slate-800 text-sm">Lên kế hoạch giao nhận</h3>
-                      <p className="text-[11px] text-slate-500">Cấu hình thời gian và sản lượng giao kế hoạch</p>
-                    </div>
+              {/* Main Grid: Content Area + Sticky Planning Panel */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left/Main Column: Weekly Calendar Matrix OR Table List */}
+                <div className="lg:col-span-8 space-y-6">
+                  {step3ViewMode === "weekly" ? (
+                    /* WEEKLY CALENDAR MATRIX VIEW */
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-sm">
+                            Ma Trận Điều Xe Tuần ({currentWeekDays[0].dateSlash} - {currentWeekDays[6].dateSlash})
+                          </h4>
+                          <p className="text-xs text-slate-400 font-normal mt-0.5">
+                            Kế hoạch vận tải đồng bộ tự động với Google Calendar
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                          ⚡ Tự động phân bổ theo xe tải
+                        </span>
+                      </div>
 
-                    <div className="p-3 bg-blue-50/50 rounded-lg text-xs space-y-1.5 border border-blue-100">
-                      <div><strong>Đơn hàng:</strong> {planningPoLine["Số đơn hàng"]}</div>
-                      <div><strong>Sản phẩm:</strong> {planningPoLine["Tên sản phẩm"]}</div>
-                      <div><strong>Tổng đặt:</strong> {parseNumber(planningPoLine["Số lượng"]).toLocaleString("vi-VN")} {planningPoLine["ĐVT"]}</div>
-                      <div><strong>Cần điều phối:</strong> {(planningPoLine.qtyNeeded || 0).toLocaleString("vi-VN")} {planningPoLine["ĐVT"]}</div>
-                    </div>
+                      {/* 7 Days Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+                        {currentWeekDays.map((day, dIdx) => {
+                          const dayPlans = combinedDeliveryPlanData.filter(p => {
+                            if (p.isDeleted) return false;
+                            const pDate = p["Ngày giao kế hoạch"] || "";
+                            return pDate === day.dateSlash || pDate === day.dateIso;
+                          });
 
-                    <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Số lượng giao kế hoạch</label>
-                        <div className="space-y-2">
-                          <input
-                            type="number"
-                            value={plannedQty}
-                            onChange={(e) => setPlannedQty(Math.max(1, parseInt(e.target.value) || 0))}
-                            className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 font-bold text-blue-700"
-                          />
-                          <div className="flex flex-wrap gap-2">
-                            {[400, 800, 1200, 2000].map(val => (
-                              <button 
-                                key={val}
-                                onClick={() => setPlannedQty(val)}
-                                className="px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 text-[10px] font-bold rounded border border-slate-200 transition-colors"
-                              >
-                                {val} (Xe tải)
-                              </button>
-                            ))}
-                            <button 
-                              onClick={() => setPlannedQty(planningPoLine.qtyNeeded)}
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded border border-amber-200 transition-colors"
+                          const dayTotalQty = dayPlans.reduce((sum, p) => sum + parseNumber(p["Số lượng kế hoạch"] || p["Số lượng"]), 0);
+
+                          return (
+                            <div
+                              key={dIdx}
+                              className={`rounded-2xl border transition-all flex flex-col min-h-[300px] ${
+                                day.isToday
+                                  ? "bg-blue-50/30 border-[#007AFF] shadow-[0_0_0_1px_#007AFF]"
+                                  : "bg-[#FBFBFD] border-slate-200/70 hover:border-slate-300"
+                              }`}
                             >
-                              Giao hết ({(planningPoLine.qtyNeeded || 0).toLocaleString("vi-VN")})
-                            </button>
+                              {/* Day Column Header */}
+                              <div className={`p-3 rounded-t-2xl border-b ${
+                                day.isToday
+                                  ? "bg-[#007AFF] text-white border-[#007AFF]"
+                                  : "bg-white text-slate-800 border-slate-100"
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-[11px] font-bold uppercase tracking-wider ${day.isToday ? "text-white" : "text-slate-500"}`}>
+                                    {day.dayName}
+                                  </span>
+                                  {day.isToday && (
+                                    <span className="text-[9px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded">HÔM NAY</span>
+                                  )}
+                                </div>
+                                <div className={`text-sm font-bold mt-0.5 tabular-nums ${day.isToday ? "text-white" : "text-slate-900"}`}>
+                                  {day.dateSlash.slice(0, 5)}
+                                </div>
+                                {dayPlans.length > 0 && (
+                                  <div className={`text-[10px] mt-1 font-medium ${day.isToday ? "text-blue-100" : "text-slate-400"}`}>
+                                    {dayPlans.length} chuyến ({dayTotalQty.toLocaleString("vi-VN")} sp)
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Day Events / Delivery Cards */}
+                              <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[420px]">
+                                {dayPlans.length === 0 ? (
+                                  <div className="h-full flex flex-col items-center justify-center text-center p-3 text-slate-300 text-[11px]">
+                                    <span>Trống lịch</span>
+                                  </div>
+                                ) : (
+                                  dayPlans.map((plan, pIdx) => {
+                                    const qty = parseNumber(plan["Số lượng kế hoạch"] || plan["Số lượng"]);
+                                    const gCalUrl = generateGoogleCalendarUrl(plan);
+
+                                    return (
+                                      <div
+                                        key={pIdx}
+                                        className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-sm transition space-y-1.5 text-xs group"
+                                      >
+                                        <div className="flex items-start justify-between gap-1">
+                                          <span className="font-bold text-slate-900 text-[11px] leading-tight line-clamp-1">
+                                            {plan["Khách hàng"]}
+                                          </span>
+                                          <span className="text-[9.5px] font-mono text-[#007AFF] bg-blue-50 px-1.5 py-0.5 rounded font-semibold shrink-0">
+                                            {plan["Đơn hàng"]}
+                                          </span>
+                                        </div>
+
+                                        <div className="text-[10.5px] text-slate-600 font-medium line-clamp-2 leading-snug" title={plan["Sản phẩm"]}>
+                                          {plan["Sản phẩm"]}
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+                                          <span className="font-bold text-slate-900 tabular-nums">
+                                            {qty.toLocaleString("vi-VN")} <span className="text-[10px] font-normal text-slate-500">{plan["ĐVT"] || "sp"}</span>
+                                          </span>
+                                          <span className="text-[9.5px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                                            {qty <= 400 ? "🚚 1.25T" : qty <= 800 ? "🚚 3.5T" : qty <= 1200 ? "🚛 5T" : "🚛 15T"}
+                                          </span>
+                                        </div>
+
+                                        {/* Action buttons on card */}
+                                        <div className="pt-1.5 flex items-center justify-between border-t border-slate-100 text-[10.5px]">
+                                          <a
+                                            href={gCalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
+                                            title="Thêm vào Google Calendar cá nhân"
+                                          >
+                                            <ExternalLink size={11} />
+                                            <span>Google Cal</span>
+                                          </a>
+
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              await updateDoc(doc(db, "delivery_plans", plan.id || plan["Kế hoạch ID"]), { isDeleted: true });
+                                              toast.success("Đã xóa đợt giao!");
+                                            }}
+                                            className="text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                            title="Xóa đợt này"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* PO Lines List (Always visible in List mode, or below calendar) */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">
+                          Danh Sách Dòng PO Chờ Lên Lịch Giao ({activePOLinesNeedPlan.length} mục)
+                        </h4>
+                        <p className="text-xs text-slate-400 font-normal mt-0.5">
+                          Nhấp "Lập kế hoạch" trên bất kỳ dòng nào để phân bổ xe giao hàng
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">
+                        Cần điều phối: <strong className="text-blue-600 font-bold">{activePOLinesNeedPlan.filter(l => l.qtyNeeded > 0).length} dòng</strong>
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase text-slate-600 font-bold tracking-wider">
+                            <th className="px-3 py-3 text-center w-12">#</th>
+                            <th className="px-3 py-3">Số PO</th>
+                            <th className="px-3 py-3">Khách hàng</th>
+                            <th className="px-4 py-3">Tên Sản Phẩm</th>
+                            <th className="px-3 py-3 text-right">Tổng Đặt</th>
+                            <th className="px-3 py-3 text-right">Đã Lên Lịch</th>
+                            <th className="px-3 py-3 text-right">Còn Thiếu</th>
+                            <th className="px-3 py-3 text-center">Hành Động</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+                          {activePOLinesNeedPlan.length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="text-center py-10 text-slate-400 font-normal">
+                                🎉 Tất cả các đơn hàng đã được lên lịch giao đầy đủ!
+                              </td>
+                            </tr>
+                          ) : (
+                            activePOLinesNeedPlan.map((line, idx) => {
+                              const totalQty = parseNumber(line["Số lượng"]);
+                              const isFullyScheduled = line.plannedQtySum >= totalQty;
+                              const isSelected = planningPoLine && (planningPoLine["STT"] === line["STT"] || planningPoLine.id === line.id);
+
+                              return (
+                                <tr
+                                  key={idx}
+                                  className={`hover:bg-[#FBFBFD] transition-colors ${
+                                    isSelected ? "bg-blue-50/50" : isFullyScheduled ? "opacity-60 bg-emerald-50/10" : ""
+                                  }`}
+                                >
+                                  <td className="px-3 py-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                                  <td className="px-3 py-3 font-mono font-semibold text-slate-900">{line["Số đơn hàng"]}</td>
+                                  <td className="px-3 py-3 text-slate-800 font-medium">{line["Khách hàng"]}</td>
+                                  <td className="px-4 py-3 font-semibold text-slate-900 max-w-[220px] truncate" title={line["Tên sản phẩm"]}>
+                                    {line["Tên sản phẩm"]}
+                                  </td>
+                                  <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums">
+                                    {totalQty.toLocaleString("vi-VN")}
+                                  </td>
+                                  <td className="px-3 py-3 text-right font-bold text-emerald-600 tabular-nums">
+                                    {(line.plannedQtySum || 0).toLocaleString("vi-VN")}
+                                  </td>
+                                  <td className="px-3 py-3 text-right font-bold tabular-nums">
+                                    <span className={line.qtyNeeded > 0 ? "text-amber-600" : "text-slate-400"}>
+                                      {(line.qtyNeeded || 0).toLocaleString("vi-VN")}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectPlanningLine(line)}
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-2xs active:scale-[0.98] ${
+                                        isSelected
+                                          ? "bg-slate-900 text-white"
+                                          : isFullyScheduled
+                                          ? "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                                          : "bg-[#007AFF] hover:bg-[#0066D6] text-white"
+                                      }`}
+                                    >
+                                      {isSelected ? "Đang chọn" : isFullyScheduled ? "Lên lịch thêm" : "Lập kế hoạch"}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Sticky Delivery Planning Form Card (No more scrolling up required!) */}
+                <div className="lg:col-span-4 sticky top-6">
+                  <div
+                    id="delivery-planning-form-card"
+                    className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.06)] p-6 space-y-4"
+                  >
+                    {planningPoLine ? (
+                      <div className="space-y-4">
+                        <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                          <div>
+                            <h3 className="font-bold text-slate-900 text-base">Lên Kế Hoạch Giao Hàng</h3>
+                            <p className="text-xs text-slate-400 font-normal mt-0.5">Phân bổ xe tải theo lịch tuần của khách hàng</p>
+                          </div>
+                          <span className="text-xs font-mono font-bold bg-blue-50 text-[#007AFF] px-2.5 py-1 rounded-lg border border-blue-100">
+                            {planningPoLine["Số đơn hàng"]}
+                          </span>
+                        </div>
+
+                        {/* Order info summary pill */}
+                        <div className="p-3.5 bg-[#FBFBFD] rounded-xl text-xs space-y-1.5 border border-slate-200/70">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Khách nhận:</span>
+                            <span className="font-bold text-slate-900">{planningPoLine["Khách hàng"]}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Sản phẩm:</span>
+                            <span className="font-bold text-slate-900 text-right truncate max-w-[180px]" title={planningPoLine["Tên sản phẩm"]}>
+                              {planningPoLine["Tên sản phẩm"]}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Tổng đơn đặt:</span>
+                            <span className="font-bold text-slate-900 tabular-nums">
+                              {parseNumber(planningPoLine["Số lượng"]).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-1 border-t border-slate-100">
+                            <span className="text-amber-700 font-semibold">Cần điều phối:</span>
+                            <span className="font-bold text-amber-700 tabular-nums">
+                              {(planningPoLine.qtyNeeded || 0).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
+                            </span>
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày giao kế hoạch</label>
-                        <input
-                          type="date"
-                          value={plannedDate}
-                          onChange={(e) => setPlannedDate(e.target.value)}
-                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                        {/* Form Inputs */}
+                        <div className="space-y-4 pt-1">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                              Số lượng giao đợt này
+                            </label>
+                            <input
+                              type="number"
+                              value={plannedQty}
+                              onChange={(e) => setPlannedQty(Math.max(1, parseInt(e.target.value) || 0))}
+                              className="w-full text-sm font-bold text-blue-700 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 bg-[#FBFBFD]"
+                            />
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Ghi chú vận hành / kế hoạch Mrs Thảo</label>
-                        <textarea
-                          placeholder="VD: Theo kế hoạch Mrs Thảo, điều xe tải 5 tấn..."
-                          value={planNotes}
-                          onChange={(e) => setPlanNotes(e.target.value)}
-                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500 h-16 resize-none"
-                        />
-                      </div>
-                    </div>
+                            {/* Vehicle Presets (Tải trọng chuẩn logistics) */}
+                            <div className="mt-2.5 flex flex-wrap gap-1.5">
+                              {[400, 800, 1200, 2000].map(val => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => setPlannedQty(val)}
+                                  className="px-2.5 py-1 bg-[#F5F5F7] hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[10.5px] font-semibold rounded-lg border border-slate-200/80 transition-colors"
+                                >
+                                  {val} (Xe {val === 400 ? "1.25T" : val === 800 ? "3.5T" : val === 1200 ? "5T" : "15T"})
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setPlannedQty(planningPoLine.qtyNeeded || parseNumber(planningPoLine["Số lượng"]))}
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10.5px] font-bold rounded-lg border border-amber-200 transition-colors"
+                              >
+                                Giao hết ({(planningPoLine.qtyNeeded || 0).toLocaleString("vi-VN")})
+                              </button>
+                            </div>
+                          </div>
 
-                    <div className="pt-2 flex gap-2">
-                      <button
-                        onClick={() => setPlanningPoLine(null)}
-                        className="w-1/2 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        onClick={handleSaveDeliveryPlan}
-                        className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded-lg transition shadow-md hover:shadow-lg"
-                      >
-                        Xác nhận lưu đợt này
-                      </button>
-                    </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                              Ngày giao kế hoạch
+                            </label>
+                            <input
+                              type="date"
+                              value={plannedDate}
+                              onChange={(e) => setPlannedDate(e.target.value)}
+                              className="w-full text-xs font-semibold text-slate-800 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 bg-[#FBFBFD]"
+                            />
+                          </div>
 
-                    {/* Show existing plans for this line */}
-                    {deliveryPlanData.filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === planningPoLine["STT"]).length > 0 && (
-                      <div className="mt-6 pt-4 border-t border-slate-100">
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Các đợt đã lên lịch</h4>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {deliveryPlanData
-                            .filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === planningPoLine["STT"])
-                            .sort((a, b) => {
-                               const dateA = a["Ngày giao kế hoạch"]?.split('/').reverse().join('') || '';
-                               const dateB = b["Ngày giao kế hoạch"]?.split('/').reverse().join('') || '';
-                               return dateA.localeCompare(dateB);
-                            })
-                            .map((p, i) => (
-                              <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg group">
-                                <div>
-                                  <div className="text-[11px] font-bold text-slate-700">{p["Số lượng kế hoạch"]?.toLocaleString("vi-VN")} {planningPoLine["ĐVT"]}</div>
-                                  <div className="text-[10px] text-slate-500">{p["Ngày giao kế hoạch"]}</div>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                   <button 
-                                     onClick={async () => {
-                                       if (true) {
-                                          await updateDoc(doc(db, "delivery_plans", p.id || p["Kế hoạch ID"]), { isDeleted: true });
-                                          toast.success("Đã xóa đợt giao!");
-                                       }
-                                     }}
-                                     className="p-1 text-rose-600 hover:bg-rose-50 rounded"
-                                   >
-                                     <AlertCircle size={14} />
-                                   </button>
-                                </div>
-                              </div>
-                            ))}
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                              Ghi chú điều xe / Kế hoạch vật tư
+                            </label>
+                            <textarea
+                              placeholder="VD: Điều xe tải 5 tấn giao ca sáng 8h30..."
+                              value={planNotes}
+                              onChange={(e) => setPlanNotes(e.target.value)}
+                              className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none bg-[#FBFBFD]"
+                            />
+                          </div>
                         </div>
+
+                        {/* Submit Actions */}
+                        <div className="pt-2 flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPlanningPoLine(null)}
+                            className="w-1/3 border border-slate-200 text-slate-600 text-xs font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition"
+                          >
+                            Đóng
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveDeliveryPlan}
+                            className="w-2/3 bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-bold py-2.5 rounded-xl transition shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle size={15} />
+                            <span>Xác Nhận Lưu Đợt Này</span>
+                          </button>
+                        </div>
+
+                        {/* Existing plans for this line */}
+                        {deliveryPlanData.filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === planningPoLine["STT"]).length > 0 && (
+                          <div className="mt-5 pt-4 border-t border-slate-100">
+                            <h4 className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
+                              Các đợt đã lên lịch ({deliveryPlanData.filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === planningPoLine["STT"]).length})
+                            </h4>
+                            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                              {deliveryPlanData
+                                .filter(p => !p.isDeleted && p["Chi tiết đơn hàng"] === planningPoLine["STT"])
+                                .map((p, i) => {
+                                  const gUrl = generateGoogleCalendarUrl(p);
+                                  return (
+                                    <div key={i} className="flex items-center justify-between p-2.5 bg-[#FBFBFD] border border-slate-200/80 rounded-xl text-xs">
+                                      <div>
+                                        <div className="font-bold text-slate-800 tabular-nums">
+                                          {parseNumber(p["Số lượng kế hoạch"] || p["Số lượng"]).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
+                                        </div>
+                                        <div className="text-[10.5px] text-slate-400">{p["Ngày giao kế hoạch"]}</div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <a
+                                          href={gUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-800 p-1.5 bg-blue-50 rounded-lg hover:bg-blue-100 transition flex items-center gap-1 text-[11px] font-semibold"
+                                          title="Đồng bộ vào Google Calendar"
+                                        >
+                                          <Calendar size={13} />
+                                          <span>Google Cal</span>
+                                        </a>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await updateDoc(doc(db, "delivery_plans", p.id || p["Kế hoạch ID"]), { isDeleted: true });
+                                            toast.success("Đã xóa đợt giao!");
+                                          }}
+                                          className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                          title="Xóa đợt này"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-64 flex flex-col items-center justify-center text-center p-4">
+                        <Calendar size={40} className="text-slate-200 mb-2.5" />
+                        <p className="text-sm text-slate-700 font-bold">Chưa chọn dòng đơn hàng</p>
+                        <p className="text-xs text-slate-400 mt-1 max-w-[220px]">
+                          Vui lòng chọn nút <strong>Lập kế hoạch</strong> trên bảng bên trái để cấu hình chuyến xe
+                        </p>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="h-64 flex flex-col items-center justify-center text-center p-4">
-                    <Calendar size={36} className="text-slate-300 mb-2 animate-bounce" />
-                    <p className="text-xs text-slate-500 font-medium">Chưa chọn dòng hàng nào</p>
-                    <p className="text-[10px] text-slate-400 mt-1 max-w-[200px]">Hãy click nút Lập kế hoạch trên dòng đơn bên trái để phân bổ vận tải</p>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* ================================================== */}
           {/* STEP 4: GIAO HÀNG (PXK ENTRY) */}
           {/* ================================================== */}
           {activeStep === 4 && (
