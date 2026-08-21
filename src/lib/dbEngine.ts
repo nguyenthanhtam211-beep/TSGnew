@@ -192,6 +192,49 @@ class TSGDataEngine {
   /**
    * Get all items of a collection
    */
+  /**
+   * Merge remote Firestore snapshot into local memory and cache
+   * Preserves local user-modifications if they haven't been synced yet
+   */
+  public mergeFirestoreSnapshot(colName: CollectionName, remoteDocs: any[]) {
+    try {
+      if (!Array.isArray(remoteDocs) || remoteDocs.length === 0) return;
+
+      const colMap = this.loadCollection(colName);
+      const userMods = this.getUserModifiedMap(colName);
+
+      remoteDocs.forEach(doc => {
+        if (doc && typeof doc === 'object') {
+          const key = getItemKey(doc, colName);
+          if (key) {
+            const sanitizedKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
+            
+            // If the user has a local uncommitted modification, keep user mod; otherwise update from cloud
+            if (!userMods.has(sanitizedKey)) {
+              colMap.set(sanitizedKey, { ...(colMap.get(sanitizedKey) || {}), ...doc });
+            }
+          }
+        }
+      });
+
+      // Update memory cache
+      this.memoryCache.set(colName, colMap);
+
+      // Persist to local storage
+      const dataArray = Array.from(colMap.values());
+      try {
+        localStorage.setItem(this.getStorageKey(colName), JSON.stringify(dataArray));
+      } catch (e) {
+        console.warn(`Error persisting merged cache for ${colName}:`, e);
+      }
+
+      // Notify reactive subscribers
+      this.notifySubscribers(colName);
+    } catch (err) {
+      console.error(`Error merging Firestore snapshot for ${colName}:`, err);
+    }
+  }
+
   public getAll(colName: CollectionName, fallbackData: any[] = []): any[] {
     const colMap = this.loadCollection(colName, fallbackData);
     return Array.from(colMap.values());

@@ -818,6 +818,8 @@ export default function App() {
             supplierData={supplierData}
             productData={productData}
             deliveryPlanData={enrichedDeliveryPlanData}
+            onProductClick={(val) => setSelectedProductDetails(val)}
+            onPoClick={(val) => setSelectedPoDetails(val)}
           />
         )}
         {activeTab === "assistant" && <AssistantView />}

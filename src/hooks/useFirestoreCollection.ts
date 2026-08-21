@@ -114,6 +114,11 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
       const colRef = collection(db, collectionName);
       unsubFirestore = onSnapshot(colRef, (snapshot) => {
         if (!snapshot.empty) {
+          const docs: any[] = [];
+          snapshot.forEach(doc => {
+            docs.push({ id: doc.id, ...doc.data() });
+          });
+          dbEngine.mergeFirestoreSnapshot(collectionName as CollectionName, docs);
           const currentAll = dbEngine.getAll(collectionName as CollectionName, fallbackData);
           if (Array.isArray(currentAll) && currentAll.length > 0) {
             setData(currentAll);

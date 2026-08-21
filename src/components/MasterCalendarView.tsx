@@ -705,9 +705,14 @@ export default function MasterCalendarView({
                     className="bg-[#FBFBFD] hover:bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs hover:shadow-md transition-all space-y-3"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-[#007AFF] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                      <button
+                        type="button"
+                        onClick={() => onPoClick?.(item.poNumber)}
+                        className="font-mono text-xs font-bold text-[#007AFF] bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-100 transition cursor-pointer"
+                        title="Xem hồ sơ đơn hàng PO"
+                      >
                         {item.poNumber}
-                      </span>
+                      </button>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                         isDelivered ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}>
@@ -723,9 +728,14 @@ export default function MasterCalendarView({
 
                     <div>
                       <div className="text-xs font-medium text-slate-400">Mặt hàng:</div>
-                      <div className="text-xs font-semibold text-slate-800 line-clamp-2" title={item.product}>
+                      <button
+                        type="button"
+                        onClick={() => onProductClick?.(item.product)}
+                        className="text-xs font-semibold text-slate-800 hover:text-blue-600 text-left line-clamp-2 transition hover:underline cursor-pointer"
+                        title="Xem chi tiết 360° sản phẩm"
+                      >
                         {item.product}
-                      </div>
+                      </button>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">

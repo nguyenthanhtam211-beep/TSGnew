@@ -25,6 +25,8 @@ interface WorkflowViewProps {
   supplierData: any[];
   productData: any[];
   deliveryPlanData: any[];
+  onProductClick?: (productId: string) => void;
+  onPoClick?: (poNumber: string) => void;
 }
 
 export default function WorkflowView({
@@ -35,7 +37,9 @@ export default function WorkflowView({
   customerData,
   supplierData,
   productData,
-  deliveryPlanData
+  deliveryPlanData,
+  onProductClick,
+  onPoClick
 }: WorkflowViewProps) {
   const [activeStep, setActiveStep] = useState<number>(1);
 
@@ -2958,14 +2962,30 @@ export default function WorkflowView({
                                   <td className="px-3 py-3 text-center font-mono text-slate-400">{idx + 1}</td>
                                   
                                   {/* Số PO */}
-                                  <td className="px-3 py-3 font-mono font-semibold text-slate-900">{line["Số đơn hàng"]}</td>
+                                  <td className="px-3 py-3 font-mono font-semibold text-slate-900">
+                                    <button
+                                      type="button"
+                                      onClick={() => onPoClick?.(line["Số đơn hàng"] || line["Đơn hàng"])}
+                                      className="hover:text-blue-600 hover:underline cursor-pointer font-bold transition"
+                                      title="Xem hồ sơ đơn hàng PO"
+                                    >
+                                      {line["Số đơn hàng"]}
+                                    </button>
+                                  </td>
                                   
                                   {/* Khách hàng */}
                                   <td className="px-3 py-3 text-slate-800 font-medium">{line["Khách hàng"]}</td>
                                   
                                   {/* Tên sản phẩm */}
-                                  <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate" title={line["Tên sản phẩm"]}>
-                                    {line["Tên sản phẩm"]}
+                                  <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate">
+                                    <button
+                                      type="button"
+                                      onClick={() => onProductClick?.(line["Tên sản phẩm"] || line["Mã sản phẩm"])}
+                                      className="hover:text-blue-600 hover:underline cursor-pointer text-left font-semibold transition truncate max-w-[200px] block"
+                                      title="Xem chi tiết 360° sản phẩm"
+                                    >
+                                      {line["Tên sản phẩm"]}
+                                    </button>
                                   </td>
                                   
                                   {/* Tổng đặt */}
