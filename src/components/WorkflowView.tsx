@@ -822,6 +822,7 @@ export default function WorkflowView({
       const poNum = String(line["Số đơn hàng"] || line["Đơn hàng"] || "").trim();
       const prodName = String(line["Tên sản phẩm"] || "").trim();
 
+      // Planned delivery quantities
       const existingPlans = combinedDeliveryPlanData.filter(p => 
         !p.isDeleted && (
           (p["Chi tiết đơn hàng"] && String(p["Chi tiết đơn hàng"]).trim() === lineStt) ||
@@ -829,14 +830,30 @@ export default function WorkflowView({
         )
       );
       const plannedSum = existingPlans.reduce((sum, p) => sum + parseNumber(p["Số lượng kế hoạch"] || p["Số lượng cần giao"] || p["Số lượng"]), 0);
+
+      // Actual delivered quantities from PXK
+      const existingDeliveries = combinedDeliveryData.filter(d =>
+        !d.isDeleted && (
+          (d["Chi tiết đơn hàng"] && String(d["Chi tiết đơn hàng"]).trim() === lineStt) ||
+          (d["Đơn hàng"] && String(d["Đơn hàng"]).trim() === poNum && (d["Tên sản phẩm"] || d["Sản phẩm"]) && String(d["Tên sản phẩm"] || d["Sản phẩm"]).trim() === prodName)
+        )
+      );
+      const deliveredSum = existingDeliveries.reduce((sum, d) => sum + parseNumber(d["Số lượng giao"] || d["Số lượng thực nhận"] || d["Đã giao"] || d["Số lượng"]), 0);
+
       const totalQty = parseNumber(line["Số lượng"]);
+      const remainingToDeliver = Math.max(0, totalQty - deliveredSum);
+      const deliveryProgress = totalQty > 0 ? Math.min(100, Math.round((deliveredSum / totalQty) * 100)) : 0;
+
       return {
         ...line,
         plannedQtySum: plannedSum,
-        qtyNeeded: Math.max(0, totalQty - plannedSum)
+        qtyNeeded: Math.max(0, totalQty - plannedSum),
+        deliveredSum,
+        remainingToDeliver,
+        deliveryProgress
       };
     });
-  }, [combinedPoLinesData, combinedDeliveryPlanData]);
+  }, [combinedPoLinesData, combinedDeliveryPlanData, combinedDeliveryData]);
 
   const currentWeekDays = useMemo(() => {
     const now = new Date();
@@ -2904,26 +2921,29 @@ export default function WorkflowView({
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase text-slate-600 font-bold tracking-wider">
-                            <th className="px-3 py-3 text-center w-12">#</th>
+                            <th className="px-3 py-3 text-center w-10">#</th>
                             <th className="px-3 py-3">Số PO</th>
-                            <th className="px-3 py-3">Khách hàng</th>
+                            <th className="px-3 py-3">Khách Hàng</th>
                             <th className="px-4 py-3">Tên Sản Phẩm</th>
                             <th className="px-3 py-3 text-right">Tổng Đặt</th>
+                            <th className="px-3 py-3 text-right text-emerald-700 bg-emerald-50/40">Đã Giao Thực Tế</th>
+                            <th className="px-3 py-3 text-right text-rose-700 bg-rose-50/40">Còn Lại Phải Giao</th>
                             <th className="px-3 py-3 text-right">Đã Lên Lịch</th>
-                            <th className="px-3 py-3 text-right">Còn Thiếu</th>
+                            <th className="px-3 py-3 text-right">Chưa Lên Lịch</th>
                             <th className="px-3 py-3 text-center">Hành Động</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                           {activePOLinesNeedPlan.length === 0 ? (
                             <tr>
-                              <td colSpan={8} className="text-center py-10 text-slate-400 font-normal">
+                              <td colSpan={10} className="text-center py-10 text-slate-400 font-normal">
                                 🎉 Tất cả các đơn hàng đã được lên lịch giao đầy đủ!
                               </td>
                             </tr>
                           ) : (
                             activePOLinesNeedPlan.map((line, idx) => {
                               const totalQty = parseNumber(line["Số lượng"]);
+                              const isFullyDelivered = line.deliveredSum >= totalQty;
                               const isFullyScheduled = line.plannedQtySum >= totalQty;
                               const isSelected = planningPoLine && (planningPoLine["STT"] === line["STT"] || planningPoLine.id === line.id);
 
@@ -2931,26 +2951,58 @@ export default function WorkflowView({
                                 <tr
                                   key={idx}
                                   className={`hover:bg-[#FBFBFD] transition-colors ${
-                                    isSelected ? "bg-blue-50/50" : isFullyScheduled ? "opacity-60 bg-emerald-50/10" : ""
+                                    isSelected ? "bg-blue-50/50" : isFullyDelivered ? "bg-emerald-50/20" : isFullyScheduled ? "opacity-80" : ""
                                   }`}
                                 >
+                                  {/* # */}
                                   <td className="px-3 py-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                                  
+                                  {/* Số PO */}
                                   <td className="px-3 py-3 font-mono font-semibold text-slate-900">{line["Số đơn hàng"]}</td>
+                                  
+                                  {/* Khách hàng */}
                                   <td className="px-3 py-3 text-slate-800 font-medium">{line["Khách hàng"]}</td>
-                                  <td className="px-4 py-3 font-semibold text-slate-900 max-w-[220px] truncate" title={line["Tên sản phẩm"]}>
+                                  
+                                  {/* Tên sản phẩm */}
+                                  <td className="px-4 py-3 font-semibold text-slate-900 max-w-[200px] truncate" title={line["Tên sản phẩm"]}>
                                     {line["Tên sản phẩm"]}
                                   </td>
+                                  
+                                  {/* Tổng đặt */}
                                   <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums">
                                     {totalQty.toLocaleString("vi-VN")}
                                   </td>
-                                  <td className="px-3 py-3 text-right font-bold text-emerald-600 tabular-nums">
+
+                                  {/* Đã giao thực tế (PXK) */}
+                                  <td className="px-3 py-3 text-right tabular-nums bg-emerald-50/20">
+                                    <div className="font-bold text-emerald-700">
+                                      {(line.deliveredSum || 0).toLocaleString("vi-VN")}
+                                    </div>
+                                    <div className="text-[10px] text-emerald-600 font-medium">
+                                      {line.deliveryProgress || 0}%
+                                    </div>
+                                  </td>
+
+                                  {/* Còn lại phải giao */}
+                                  <td className="px-3 py-3 text-right tabular-nums bg-rose-50/20">
+                                    <span className={`font-bold ${line.remainingToDeliver > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                      {(line.remainingToDeliver || 0).toLocaleString("vi-VN")}
+                                    </span>
+                                  </td>
+                                  
+                                  {/* Đã lên lịch */}
+                                  <td className="px-3 py-3 text-right font-bold text-blue-700 tabular-nums">
                                     {(line.plannedQtySum || 0).toLocaleString("vi-VN")}
                                   </td>
+                                  
+                                  {/* Chưa lên lịch */}
                                   <td className="px-3 py-3 text-right font-bold tabular-nums">
                                     <span className={line.qtyNeeded > 0 ? "text-amber-600" : "text-slate-400"}>
                                       {(line.qtyNeeded || 0).toLocaleString("vi-VN")}
                                     </span>
                                   </td>
+                                  
+                                  {/* Hành động */}
                                   <td className="px-3 py-3 text-center">
                                     <button
                                       type="button"
@@ -2958,12 +3010,14 @@ export default function WorkflowView({
                                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-2xs active:scale-[0.98] ${
                                         isSelected
                                           ? "bg-slate-900 text-white"
+                                          : isFullyDelivered
+                                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                                           : isFullyScheduled
                                           ? "bg-slate-100 hover:bg-slate-200 text-slate-600"
                                           : "bg-[#007AFF] hover:bg-[#0066D6] text-white"
                                       }`}
                                     >
-                                      {isSelected ? "Đang chọn" : isFullyScheduled ? "Lên lịch thêm" : "Lập kế hoạch"}
+                                      {isSelected ? "Đang chọn" : isFullyDelivered ? "Đã giao đủ" : isFullyScheduled ? "Lên lịch thêm" : "Lập kế hoạch"}
                                     </button>
                                   </td>
                                 </tr>
@@ -2994,8 +3048,8 @@ export default function WorkflowView({
                           </span>
                         </div>
 
-                        {/* Order info summary pill */}
-                        <div className="p-3.5 bg-[#FBFBFD] rounded-xl text-xs space-y-1.5 border border-slate-200/70">
+                        {/* Order info summary pill with Delivery Status Progress */}
+                        <div className="p-3.5 bg-[#FBFBFD] rounded-xl text-xs space-y-2 border border-slate-200/70">
                           <div className="flex justify-between">
                             <span className="text-slate-500">Khách nhận:</span>
                             <span className="font-bold text-slate-900">{planningPoLine["Khách hàng"]}</span>
@@ -3012,8 +3066,33 @@ export default function WorkflowView({
                               {parseNumber(planningPoLine["Số lượng"]).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
                             </span>
                           </div>
-                          <div className="flex justify-between pt-1 border-t border-slate-100">
-                            <span className="text-amber-700 font-semibold">Cần điều phối:</span>
+
+                          {/* Real-time Delivery Status */}
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                <span>🚚 Đã giao thực tế:</span>
+                              </span>
+                              <span className="font-bold text-emerald-700 tabular-nums">
+                                {(planningPoLine.deliveredSum || 0).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"} ({planningPoLine.deliveryProgress || 0}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(planningPoLine.deliveryProgress || 0, 100)}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[11px] pt-0.5">
+                              <span className="text-slate-600 font-medium">Còn lại phải giao:</span>
+                              <span className="font-bold text-rose-600 tabular-nums">
+                                {(planningPoLine.remainingToDeliver ?? parseNumber(planningPoLine["Số lượng"])).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between pt-1.5 border-t border-slate-100">
+                            <span className="text-amber-700 font-semibold">Chưa lên lịch xe:</span>
                             <span className="font-bold text-amber-700 tabular-nums">
                               {(planningPoLine.qtyNeeded || 0).toLocaleString("vi-VN")} {planningPoLine["ĐVT"] || "sp"}
                             </span>
