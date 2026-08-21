@@ -1947,26 +1947,26 @@ export default function WorkflowView({
           {/* ================================================== */}
           {activeStep === 2 && (
             <div className="space-y-6">
-              {/* Header */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <ShieldCheck size={24} />
+              {/* Header - Apple HIG Style */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                    <ShieldCheck size={22} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-lg">2. Bàn Làm Việc Thẩm Định & Phê Duyệt Đơn Hàng (BOD Approval)</h3>
-                    <p className="text-xs text-slate-500">Kiểm toán an toàn biên lợi nhuận, đối soát Hợp đồng gốc và phê duyệt phát lệnh sản xuất cho xưởng NCC</p>
+                    <h3 className="font-bold text-slate-900 text-base sm:text-lg tracking-tight">2. Bàn Làm Việc Thẩm Định & Phê Duyệt Đơn Hàng (BOD Approval)</h3>
+                    <p className="text-xs text-slate-400 font-normal">Kiểm toán an toàn biên lợi nhuận, đối soát Hợp đồng gốc và phê duyệt phát lệnh sản xuất cho xưởng NCC</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-slate-500 font-medium">Tổng đơn hàng:</span>
-                  <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-full text-xs border border-blue-200">
-                    {combinedPoHeadersData.length} đơn
+                  <span className="bg-[#F5F5F7] text-slate-700 font-medium px-3 py-1 rounded-full text-xs border border-slate-200/60">
+                    Tổng đơn: <strong className="text-slate-900 font-semibold">{combinedPoHeadersData.length}</strong>
                   </span>
                   {pendingApprovalCount > 0 && (
-                    <span className="bg-amber-500 text-white font-bold px-2.5 py-1 rounded-full text-xs animate-pulse flex items-center gap-1 shadow-xs">
-                      ⚡ {pendingApprovalCount} đơn chờ duyệt
+                    <span className="bg-amber-50 text-amber-700 border border-amber-200/60 font-semibold px-3 py-1 rounded-full text-xs flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      {pendingApprovalCount} đơn chờ duyệt
                     </span>
                   )}
                 </div>
@@ -1974,57 +1974,57 @@ export default function WorkflowView({
 
               {/* Master - Detail Workspace */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Column: PO Headers List with Smart Tabs & Search (3 cols) */}
-                <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3 flex flex-col">
+                {/* Left Column: PO Headers List with Smart Tabs & Search (3 cols) - Apple HIG Sidebar */}
+                <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-4 space-y-3 flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Đơn Hàng Cần Duyệt</h4>
+                    <h4 className="font-bold text-xs text-slate-900 tracking-tight">Đơn Hàng Cần Duyệt</h4>
                     <button
                       onClick={() => setActiveStep(1)}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 hover:underline"
+                      className="text-xs text-[#007AFF] hover:text-[#0066D6] font-semibold flex items-center gap-1 transition"
                     >
                       <Plus size={13} />
                       Tạo thêm
                     </button>
                   </div>
 
-                  {/* Filter Tabs */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold gap-1">
+                  {/* Filter Tabs - Apple Segmented Control */}
+                  <div className="flex bg-[#F5F5F7] p-1 rounded-xl text-xs font-medium gap-1">
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("pending")}
-                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-bold ${
+                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-semibold ${
                         approvalFilter === "pending"
-                          ? "bg-white text-amber-700 shadow-xs border border-amber-200"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
-                      ⚡ Chờ duyệt ({pendingApprovalCount})
+                      Chờ duyệt ({pendingApprovalCount})
                     </button>
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("approved")}
-                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-bold ${
+                      className={`flex-1 py-1.5 px-1.5 rounded-lg transition text-center text-[11px] font-semibold ${
                         approvalFilter === "approved"
-                          ? "bg-white text-emerald-700 shadow-xs border border-emerald-200"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
-                      ✅ Đã duyệt ({approvedCount})
+                      Đã duyệt ({approvedCount})
                     </button>
                     <button
                       type="button"
                       onClick={() => setApprovalFilter("all")}
-                      className={`py-1.5 px-2 rounded-lg transition text-center text-[11px] font-bold ${
+                      className={`py-1.5 px-2.5 rounded-lg transition text-center text-[11px] font-semibold ${
                         approvalFilter === "all"
-                          ? "bg-white text-blue-700 shadow-xs border border-blue-200"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
                       Tất cả
                     </button>
                   </div>
 
-                  {/* Search Box */}
+                  {/* Search Box - Apple Spotlight Style */}
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
@@ -2032,14 +2032,14 @@ export default function WorkflowView({
                       placeholder="Tìm số PO, khách hàng..."
                       value={approvalSearch}
                       onChange={(e) => setApprovalSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200/80 rounded-xl bg-[#F5F5F7] focus:bg-white focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] outline-none transition"
                     />
                   </div>
 
                   {/* PO Cards List */}
-                  <div className="space-y-2.5 max-h-[620px] overflow-y-auto pr-1 flex-1">
+                  <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1 flex-1">
                     {filteredPoHeadersForApproval.length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50 rounded-xl border border-dashed border-slate-200 p-4">
+                      <div className="text-center py-12 text-slate-400 text-xs italic bg-[#FBFBFD] rounded-xl border border-dashed border-slate-200 p-4">
                         Không có đơn hàng nào phù hợp với bộ lọc!
                       </div>
                     ) : (
@@ -2054,33 +2054,32 @@ export default function WorkflowView({
                           <div
                             key={idx}
                             onClick={() => setSelectedPoForApproval(poNum)}
-                            className={`p-3.5 rounded-xl border transition cursor-pointer space-y-2 relative ${
+                            className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-2 relative ${
                               isSelected
-                                ? "bg-blue-50/80 border-blue-400 ring-2 ring-blue-500/20 shadow-sm"
-                                : isApproved
-                                ? "bg-white hover:bg-slate-50 border-slate-200"
-                                : "bg-amber-50/40 hover:bg-amber-50/80 border-amber-200"
+                                ? "bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/15 shadow-sm"
+                                : "bg-white hover:bg-[#FBFBFD] border-slate-200/70 shadow-2xs"
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className="font-mono font-bold text-xs text-slate-900">{poNum}</span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                                 isApproved
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-amber-500 text-white border-amber-600 shadow-xs animate-pulse"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                  : "bg-amber-50 text-amber-700 border-amber-200/60"
                               }`}>
-                                {isApproved ? "✅ Đã duyệt" : "⚡ Chờ duyệt"}
+                                <span className={`w-1.5 h-1.5 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                                {isApproved ? "Đã duyệt" : "Chờ duyệt"}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-800 truncate max-w-[140px]">{header["Khách hàng"]}</span>
+                              <span className="font-medium text-slate-700 truncate max-w-[140px]">{header["Khách hàng"]}</span>
                               <span className="text-[11px] text-slate-400">{header["Ngày đặt hàng"]}</span>
                             </div>
 
-                            <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-xs">
-                              <span className="text-[10px] text-slate-500">Giá trị đơn:</span>
-                              <strong className="text-blue-700 font-extrabold">{formatCurrency(header["Tổng giá trị đơn hàng"])}</strong>
+                            <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                              <span className="text-[10.5px] text-slate-400">Giá trị đơn:</span>
+                              <strong className="text-slate-900 font-mono font-bold">{formatCurrency(header["Tổng giá trị đơn hàng"])}</strong>
                             </div>
                           </div>
                         );
@@ -2110,110 +2109,101 @@ export default function WorkflowView({
                         const isApproved = currentPoForApproval["Trạng Thái"]?.includes("Đã phê duyệt") || currentPoForApproval["Trạng Thái"]?.includes("Đang sản xuất");
 
                         return (
-                          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
-                            {/* Header Row */}
+                          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-6 space-y-6">
+                            {/* Header Row - Apple Clean Header */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
-                                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">Hồ sơ kiểm toán & thẩm định đơn hàng</span>
-                                </div>
-                                <h4 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                                  <span className="font-mono text-blue-900 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-200 font-extrabold shadow-2xs">
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest block mb-1">
+                                  Hồ sơ kiểm toán & thẩm định đơn hàng
+                                </span>
+                                <h4 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                                  <span className="font-mono text-blue-600 bg-blue-50/80 px-3 py-1 rounded-xl border border-blue-100 font-semibold text-base">
                                     {currentPoForApproval["Đơn hàng"]}
                                   </span>
-                                  <span className="text-slate-300 font-light text-2xl">|</span>
-                                  <span className="text-slate-800 tracking-tight">{currentPoForApproval["Khách hàng"]}</span>
+                                  <span className="text-slate-300 font-light text-xl">/</span>
+                                  <span className="text-slate-900 tracking-tight font-semibold">{currentPoForApproval["Khách hàng"]}</span>
                                 </h4>
                               </div>
 
                               <div className="flex items-center gap-2.5 flex-wrap">
-                                <span className={`px-3.5 py-1.5 rounded-full text-xs font-black border flex items-center gap-1.5 shadow-2xs ${
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 transition-all ${
                                   isSafe
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                    : "bg-amber-50 text-amber-700 border-amber-200/60"
                                 }`}>
-                                  {isSafe ? <CheckCircle size={15} className="text-emerald-600" /> : <AlertTriangle size={15} className="text-amber-600" />}
-                                  {isSafe ? "Biên Độ An Toàn Cao (Pass)" : "Cảnh Báo Lãi Thấp"}
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isSafe ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                                  {isSafe ? "Biên độ an toàn (Pass)" : "Cảnh báo lãi thấp"}
                                 </span>
-                                <span className={`px-3.5 py-1.5 rounded-full text-xs font-black border shadow-2xs ${
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
                                   isApproved
-                                    ? "bg-emerald-600 text-white border-emerald-600"
-                                    : "bg-amber-100 text-amber-900 border-amber-300"
+                                    ? "bg-slate-900 text-white border-slate-900"
+                                    : "bg-slate-100 text-slate-700 border-slate-200/80"
                                 }`}>
-                                  {isApproved ? "Đã Phê Duyệt / Lệnh SX Kích Hoạt" : "Chờ Ký Duyệt BOD"}
+                                  {isApproved ? "Đã Phê Duyệt" : "Chờ Ký Duyệt BOD"}
                                 </span>
                               </div>
                             </div>
 
-                            {/* 4 Financial KPIs Cards - Modern Glassmorphism Accent */}
+                            {/* 4 Financial KPIs Cards - Apple HIG Clean Bento Grid */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                               {/* 1. Doanh thu bán */}
-                              <div className="relative overflow-hidden bg-gradient-to-br from-blue-50/90 via-white to-blue-50/40 p-4 rounded-2xl border border-blue-200/80 shadow-2xs hover:shadow-md transition-all group">
-                                <div className="flex items-center justify-between text-[11px] font-black text-blue-700 uppercase tracking-wider mb-2">
-                                  <span>1. Doanh thu (SO)</span>
-                                  <span className="p-1 rounded-lg bg-blue-100 text-blue-700"><ShoppingCart size={13} /></span>
-                                </div>
-                                <div className="text-lg sm:text-xl font-black text-blue-950 font-mono tracking-tight group-hover:scale-[1.02] transition-transform origin-left">
+                              <div className="bg-[#FBFBFD] hover:bg-[#F5F5F7] p-5 rounded-2xl border border-slate-200/70 transition-all">
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                  Doanh Thu (SO)
+                                </span>
+                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tracking-tight mt-2">
                                   {formatCurrency(totalRev)}
                                 </div>
-                                <div className="mt-1 text-[10.5px] text-blue-600/80 font-medium">Theo đơn giá bán khách hàng</div>
+                                <div className="mt-1 text-xs text-slate-500">Đơn giá bán khách hàng</div>
                               </div>
 
                               {/* 2. Giá vốn xưởng */}
-                              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50/90 via-white to-purple-50/40 p-4 rounded-2xl border border-purple-200/80 shadow-2xs hover:shadow-md transition-all group">
-                                <div className="flex items-center justify-between text-[11px] font-black text-purple-700 uppercase tracking-wider mb-2">
-                                  <span>2. Giá vốn (PO)</span>
-                                  <span className="p-1 rounded-lg bg-purple-100 text-purple-700"><Package size={13} /></span>
-                                </div>
-                                <div className="text-lg sm:text-xl font-black text-purple-950 font-mono tracking-tight group-hover:scale-[1.02] transition-transform origin-left">
+                              <div className="bg-[#FBFBFD] hover:bg-[#F5F5F7] p-5 rounded-2xl border border-slate-200/70 transition-all">
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                  Giá Vốn (PO)
+                                </span>
+                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tracking-tight mt-2">
                                   {formatCurrency(totalCost)}
                                 </div>
-                                <div className="mt-1 text-[10.5px] text-purple-600/80 font-medium">Giá vốn mua xưởng sản xuất</div>
+                                <div className="mt-1 text-xs text-slate-500">Giá mua xưởng sản xuất</div>
                               </div>
 
                               {/* 3. Lợi nhuận gộp */}
-                              <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/90 via-white to-emerald-50/40 p-4 rounded-2xl border border-emerald-200/80 shadow-2xs hover:shadow-md transition-all group">
-                                <div className="flex items-center justify-between text-[11px] font-black text-emerald-700 uppercase tracking-wider mb-2">
-                                  <span>3. Lợi nhuận gộp</span>
-                                  <span className="p-1 rounded-lg bg-emerald-100 text-emerald-700"><DollarSign size={13} /></span>
-                                </div>
-                                <div className="text-lg sm:text-xl font-black text-emerald-700 font-mono tracking-tight group-hover:scale-[1.02] transition-transform origin-left">
+                              <div className="bg-[#FBFBFD] hover:bg-[#F5F5F7] p-5 rounded-2xl border border-slate-200/70 transition-all">
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                  Lợi Nhuận Gộp
+                                </span>
+                                <div className="text-xl sm:text-2xl font-bold text-emerald-600 font-mono tracking-tight mt-2">
                                   {formatCurrency(profit)}
                                 </div>
-                                <div className="mt-1 text-[10.5px] text-emerald-600/80 font-medium">Chênh lệch bán - mua thực thu</div>
+                                <div className="mt-1 text-xs text-slate-500">Chênh lệch thực thu</div>
                               </div>
 
                               {/* 4. Tỷ suất Margin */}
-                              <div className={`relative overflow-hidden p-4 rounded-2xl border shadow-2xs hover:shadow-md transition-all group ${
-                                isSafe ? "bg-gradient-to-br from-emerald-50 via-white to-teal-50 border-emerald-300" : "bg-gradient-to-br from-amber-50 via-white to-orange-50 border-amber-300"
+                              <div className={`p-5 rounded-2xl border transition-all ${
+                                isSafe ? "bg-emerald-50/40 border-emerald-200/80" : "bg-amber-50/40 border-amber-200/80"
                               }`}>
-                                <div className={`flex items-center justify-between text-[11px] font-black uppercase tracking-wider mb-2 ${isSafe ? "text-emerald-800" : "text-amber-800"}`}>
-                                  <span>4. Tỷ suất Margin</span>
-                                  <span className={`p-1 rounded-lg ${isSafe ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                    <TrendingUp size={13} />
-                                  </span>
-                                </div>
-                                <div className={`text-xl sm:text-2xl font-black font-mono tracking-tight group-hover:scale-[1.02] transition-transform origin-left ${isSafe ? "text-emerald-700" : "text-amber-700"}`}>
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                  Tỷ Suất Margin
+                                </span>
+                                <div className={`text-xl sm:text-2xl font-bold font-mono tracking-tight mt-2 ${
+                                  isSafe ? "text-emerald-600" : "text-amber-600"
+                                }`}>
                                   {margin.toFixed(1)}%
                                 </div>
-                                <div className={`mt-1 text-[10.5px] font-bold ${isSafe ? "text-emerald-600" : "text-amber-600"}`}>
-                                  {isSafe ? "✓ Đạt mục tiêu BOD (≥ 20%)" : "⚠ Thấp hơn định mức (20%)"}
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {isSafe ? "Mục tiêu BOD ≥ 20%" : "Thấp hơn định mức"}
                                 </div>
                               </div>
                             </div>
 
-                            {/* Margin Guard AI Notice */}
-                            <div className={`p-4 rounded-2xl border flex items-start gap-3 text-xs shadow-2xs ${
-                              isSafe
-                                ? "bg-emerald-50/70 border-emerald-200 text-emerald-900"
-                                : "bg-amber-50/70 border-amber-200 text-amber-900"
-                            }`}>
-                              <span className="text-lg leading-none mt-0.5">✨</span>
+                            {/* Margin Guard AI Notice - Apple Intelligence Clean Card */}
+                            <div className="p-4 rounded-xl bg-[#F5F5F7] border border-slate-200/60 flex items-start gap-3 text-xs text-slate-600">
+                              <span className="text-sm mt-0.5">✨</span>
                               <div className="leading-relaxed">
-                                <strong className="font-extrabold">Đánh giá kiểm toán tự động: </strong>
+                                <strong className="font-semibold text-slate-900">Đánh giá kiểm toán tự động: </strong>
                                 {isSafe ? (
-                                  <span>Đơn hàng đạt biên lợi nhuận kỳ vọng ({margin.toFixed(1)}% ≥ 20%). Giá bán SO và giá mua PO hoàn toàn khớp với khung hợp đồng gốc. Đủ điều kiện phê duyệt phát lệnh sản xuất cho xưởng.</span>
+                                  <span>Đơn hàng đạt biên lợi nhuận kỳ vọng ({margin.toFixed(1)}% ≥ 20%). Giá bán SO và giá mua PO khớp khung hợp đồng gốc. Đủ điều kiện phê duyệt đơn hàng.</span>
                                 ) : (
                                   <span>Đơn hàng có tỷ suất lợi nhuận gộp ({margin.toFixed(1)}% &lt; 20%). Ban điều hành cần lưu ý kiểm tra lại bảng giá mua từ nhà cung cấp trước khi khóa đơn.</span>
                                 )}
@@ -2223,61 +2213,58 @@ export default function WorkflowView({
                         );
                       })()}
 
-                      {/* Detail Products Table Box - Ultra Modern Design */}
-                      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+                      {/* Detail Products Table Box - Apple HIG Clean Minimalist Table */}
+                      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-6 space-y-5">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                          <div className="flex items-center gap-2.5">
-                            <span className="p-2 bg-slate-900 text-white rounded-xl shadow-2xs"><Layers size={16} /></span>
-                            <div>
-                              <h4 className="font-black text-slate-900 text-sm uppercase tracking-wider">
-                                Chi Tiết Sản Phẩm & Định Mức Giá ({currentPoLinesForApproval.length} mặt hàng)
-                              </h4>
-                              <p className="text-[11px] text-slate-400 font-medium">Bảng đối soát dòng tiền và thông số kỹ thuật sản xuất</p>
-                            </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">
+                              Chi Tiết Sản Phẩm & Định Mức Giá ({currentPoLinesForApproval.length} mặt hàng)
+                            </h4>
+                            <p className="text-xs text-slate-400 font-normal mt-0.5">Bảng đối soát dòng tiền và thông số kỹ thuật sản xuất</p>
                           </div>
-                          <span className="text-xs text-slate-500 font-medium bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                            Khách hàng: <strong className="text-blue-700 font-bold">{currentPoForApproval["Khách hàng"]}</strong>
+                          <span className="text-xs font-medium text-slate-500 bg-[#F5F5F7] px-3 py-1.5 rounded-full border border-slate-200/60">
+                            Khách hàng: <strong className="text-slate-800 font-semibold">{currentPoForApproval["Khách hàng"]}</strong>
                           </span>
                         </div>
 
-                        {/* High-Tech Multi-Tier Table */}
-                        <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+                        {/* Apple HIG Clean Table */}
+                        <div className="overflow-x-auto rounded-xl border border-slate-200/70">
                           <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                              {/* Tier 1 Header: Modern Bold Category Badges */}
-                              <tr className="bg-slate-900 text-white text-[11px] font-black border-b border-slate-800">
-                                <th className="px-3.5 py-3 text-center w-12 border-r border-slate-800" rowSpan={2}>#</th>
-                                <th className="px-4 py-3 border-r border-slate-800 tracking-wider" colSpan={3}>
-                                  📦 THÔNG TIN MẶT HÀNG & HỢP ĐỒNG GỐC
+                              {/* Tier 1 Header - Apple Clean Functional Sections */}
+                              <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[11px] font-semibold text-slate-600">
+                                <th className="px-3.5 py-3 text-center w-12 border-r border-slate-200/60 text-slate-400 font-medium" rowSpan={2}>#</th>
+                                <th className="px-4 py-3 border-r border-slate-200/60 tracking-wider text-slate-700" colSpan={3}>
+                                  MẶT HÀNG & HỢP ĐỒNG GỐC
                                 </th>
-                                <th className="px-4 py-3 text-center bg-blue-600 text-white border-r border-blue-500 font-black tracking-wider" colSpan={2}>
-                                  🛒 ĐƠN BÁN KHÁCH HÀNG (SO)
+                                <th className="px-4 py-3 text-center text-blue-700 bg-blue-50/40 border-r border-slate-200/60 font-semibold tracking-wider" colSpan={2}>
+                                  ĐƠN BÁN KHÁCH HÀNG (SO)
                                 </th>
-                                <th className="px-4 py-3 text-center bg-purple-700 text-white border-r border-purple-600 font-black tracking-wider" colSpan={2}>
-                                  🏭 ĐƠN MUA XƯỞNG SẢN XUẤT (PO)
+                                <th className="px-4 py-3 text-center text-purple-700 bg-purple-50/40 border-r border-slate-200/60 font-semibold tracking-wider" colSpan={2}>
+                                  ĐƠN MUA XƯỞNG (PO)
                                 </th>
-                                <th className="px-4 py-3 text-center bg-emerald-700 text-white font-black tracking-wider" colSpan={2}>
-                                  📈 HIỆU QUẢ TÀI CHÍNH
+                                <th className="px-4 py-3 text-center text-emerald-700 bg-emerald-50/40 font-semibold tracking-wider" colSpan={2}>
+                                  HIỆU QUẢ TÀI CHÍNH
                                 </th>
                               </tr>
-                              {/* Tier 2 Header: Detail Columns with Subtle Tint */}
-                              <tr className="bg-slate-100 border-b border-slate-200 text-[10px] uppercase font-extrabold text-slate-600">
-                                <th className="px-4 py-2.5 border-r border-slate-200">Tên Mặt Hàng & Quy Cách Chi Tiết</th>
-                                <th className="px-3.5 py-2.5 border-r border-slate-200 w-28">HĐ Gốc / Mã Giá</th>
-                                <th className="px-3.5 py-2.5 text-center border-r border-slate-200 w-28">Số Lượng Đặt</th>
-                                <th className="px-3.5 py-2.5 text-right bg-blue-50 text-blue-900 border-r border-blue-100 w-28 font-bold">Đơn Giá Bán</th>
-                                <th className="px-4 py-2.5 text-right bg-blue-100/70 text-blue-950 font-black border-r border-blue-200 w-36">Doanh Thu (SO)</th>
-                                <th className="px-3.5 py-2.5 text-right bg-purple-50 text-purple-900 border-r border-purple-100 w-32 font-bold">NCC / Giá Mua</th>
-                                <th className="px-4 py-2.5 text-right bg-purple-100/70 text-purple-950 font-black border-r border-purple-200 w-36">Giá Vốn (PO)</th>
-                                <th className="px-4 py-2.5 text-right bg-emerald-50 text-emerald-950 font-black border-r border-emerald-100 w-36">Lãi Gộp</th>
-                                <th className="px-3 py-2.5 text-center bg-emerald-100/70 text-emerald-950 font-black w-24">Biên LN (%)</th>
+                              {/* Tier 2 Header - Clean Sub-columns */}
+                              <tr className="bg-[#FAFAFC] border-b border-slate-200/80 text-[10px] uppercase font-semibold text-slate-400">
+                                <th className="px-4 py-2.5 border-r border-slate-200/60">Tên Mặt Hàng & Quy Cách</th>
+                                <th className="px-3.5 py-2.5 border-r border-slate-200/60 w-28">HĐ Gốc / Mã Giá</th>
+                                <th className="px-3.5 py-2.5 text-center border-r border-slate-200/60 w-28">Số Lượng</th>
+                                <th className="px-3.5 py-2.5 text-right border-r border-slate-200/60 w-28">Đơn Giá Bán</th>
+                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-slate-700">Doanh Thu (SO)</th>
+                                <th className="px-3.5 py-2.5 text-right border-r border-slate-200/60 w-32">NCC / Giá Mua</th>
+                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-slate-700">Giá Vốn (PO)</th>
+                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-emerald-700">Lãi Gộp</th>
+                                <th className="px-3 py-2.5 text-center w-24">Biên LN</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
                               {currentPoLinesForApproval.length === 0 ? (
                                 <tr>
-                                  <td colSpan={10} className="text-center py-12 text-slate-400 italic">
-                                    Không có dữ liệu dòng sản phẩm của đơn hàng này!
+                                  <td colSpan={10} className="text-center py-12 text-slate-400 font-normal">
+                                    Không có dữ liệu dòng sản phẩm của đơn hàng này
                                   </td>
                                 </tr>
                               ) : (
@@ -2299,75 +2286,75 @@ export default function WorkflowView({
                                   const specs = line.specs || line["Quy cách"] || getDefaultSpecs(prodName, prodCode, unit);
 
                                   return (
-                                    <tr key={lIdx} className="hover:bg-slate-50/90 transition-colors group">
-                                      <td className="px-3.5 py-4 text-center font-mono text-slate-400 font-bold border-r border-slate-100">{lIdx + 1}</td>
+                                    <tr key={lIdx} className="hover:bg-[#FBFBFD] transition-colors">
+                                      <td className="px-3.5 py-4 text-center font-mono text-slate-400 font-medium border-r border-slate-100">{lIdx + 1}</td>
                                       
                                       {/* Product Name & Specs */}
                                       <td className="px-4 py-4 border-r border-slate-100">
-                                        <div className="font-bold text-slate-900 text-xs sm:text-[13px] group-hover:text-blue-700 transition-colors">
+                                        <div className="font-semibold text-slate-900 text-sm">
                                           {prodName}
                                         </div>
-                                        <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 mt-1">
-                                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-bold text-[10px] border border-slate-200/60">
+                                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-1">
+                                          <span className="bg-[#F5F5F7] text-slate-600 px-2 py-0.5 rounded-full font-mono text-[10px] font-medium border border-slate-200/50">
                                             {prodCode}
                                           </span>
                                           <span className="text-slate-300">•</span>
-                                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-bold text-[10px] border border-blue-200/60">
-                                            ĐVT: {unit}
+                                          <span className="text-slate-500 font-medium">
+                                            ĐVT: <strong className="text-slate-700 font-semibold">{unit}</strong>
                                           </span>
                                         </div>
-                                        <div className="mt-2 p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-[10.5px] text-slate-600 leading-relaxed font-sans" title={specs}>
-                                          <span className="font-bold text-slate-700">⚙️ Quy cách:</span> {specs}
+                                        <div className="mt-2 p-2.5 rounded-xl bg-[#F5F5F7]/80 text-xs text-slate-600 leading-relaxed font-sans" title={specs}>
+                                          <span className="font-medium text-slate-500">Quy cách:</span> {specs}
                                         </div>
                                       </td>
 
                                       {/* Contract & Price Code */}
                                       <td className="px-3.5 py-4 border-r border-slate-100">
-                                        <div className="font-bold text-blue-700 font-mono text-xs">{contractNo}</div>
+                                        <div className="font-semibold text-blue-600 font-mono text-xs">{contractNo}</div>
                                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">{priceCode}</div>
                                       </td>
 
                                       {/* Quantity */}
-                                      <td className="px-3.5 py-4 text-center font-black text-slate-900 font-mono border-r border-slate-100 bg-slate-50/40 text-sm">
+                                      <td className="px-3.5 py-4 text-center font-semibold text-slate-900 font-mono border-r border-slate-100 text-sm">
                                         {qty.toLocaleString("vi-VN")}
                                       </td>
 
                                       {/* SO Price */}
-                                      <td className="px-3.5 py-4 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
+                                      <td className="px-3.5 py-4 text-right font-mono font-medium text-slate-700 border-r border-slate-100">
                                         {formatCurrency(sell)}
                                       </td>
 
                                       {/* SO Revenue */}
-                                      <td className="px-4 py-4 text-right font-mono font-black text-blue-950 bg-blue-50/40 border-r border-blue-100 text-sm">
+                                      <td className="px-4 py-4 text-right font-mono font-bold text-slate-900 border-r border-slate-100 text-sm">
                                         {formatCurrency(lineRev)}
                                       </td>
 
                                       {/* PO Supplier & Buy Price */}
                                       <td className="px-3.5 py-4 text-right border-r border-slate-100">
-                                        <span className="inline-block px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md font-extrabold text-[10px] mb-0.5">
+                                        <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-md font-semibold text-[10px] mb-0.5">
                                           {suppShort}
                                         </span>
                                         <div className="font-mono text-slate-500 text-[11px] mt-0.5">{formatCurrency(buy)}</div>
                                       </td>
 
                                       {/* PO Cost */}
-                                      <td className="px-4 py-4 text-right font-mono font-bold text-purple-950 bg-purple-50/40 border-r border-purple-100 text-sm">
+                                      <td className="px-4 py-4 text-right font-mono font-medium text-slate-900 border-r border-slate-100 text-sm">
                                         {formatCurrency(lineCost)}
                                       </td>
 
                                       {/* Gross Profit */}
-                                      <td className="px-4 py-4 text-right font-mono font-black text-emerald-700 bg-emerald-50/40 border-r border-slate-100 text-sm">
+                                      <td className="px-4 py-4 text-right font-mono font-bold text-emerald-600 border-r border-slate-100 text-sm">
                                         {formatCurrency(prof)}
                                       </td>
 
-                                      {/* Margin % */}
+                                      {/* Margin % - Apple Pill */}
                                       <td className="px-3 py-4 text-center">
-                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-black inline-flex items-center gap-1 shadow-2xs ${
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
                                           lineMargin >= 20 
-                                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300" 
-                                            : "bg-amber-100 text-amber-800 border border-amber-300"
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" 
+                                            : "bg-amber-50 text-amber-700 border border-amber-200/60"
                                         }`}>
-                                          <span className={`h-1.5 w-1.5 rounded-full ${lineMargin >= 20 ? "bg-emerald-600" : "bg-amber-600"}`}></span>
+                                          <span className={`h-1.5 w-1.5 rounded-full ${lineMargin >= 20 ? "bg-emerald-500" : "bg-amber-500"}`}></span>
                                           {lineMargin.toFixed(1)}%
                                         </span>
                                       </td>
@@ -2376,7 +2363,7 @@ export default function WorkflowView({
                                 })
                               )}
                             </tbody>
-                            {/* Summary Total Row for Step 2 */}
+                            {/* Summary Total Row - Apple Clean Neutral Footer */}
                             {currentPoLinesForApproval.length > 0 && (() => {
                               let totalQty = 0;
                               let totalRev = 0;
@@ -2394,27 +2381,27 @@ export default function WorkflowView({
 
                               return (
                                 <tfoot>
-                                  <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-800 text-xs">
-                                    <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[11px] text-slate-300 border-r border-slate-800 font-extrabold">
-                                      TỔNG CỘNG ({currentPoLinesForApproval.length} MẶT HÀNG):
+                                  <tr className="bg-[#F5F5F7] text-slate-800 font-semibold border-t-2 border-slate-200/80 text-xs">
+                                    <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[11px] text-slate-500 border-r border-slate-200/60">
+                                      Tổng Cộng ({currentPoLinesForApproval.length} mặt hàng):
                                     </td>
-                                    <td className="px-3.5 py-4 text-center font-mono font-black text-white border-r border-slate-800 text-sm">
+                                    <td className="px-3.5 py-4 text-center font-mono font-bold text-slate-900 border-r border-slate-200/60 text-sm">
                                       {totalQty.toLocaleString("vi-VN")}
                                     </td>
-                                    <td className="px-3.5 py-4 border-r border-slate-800"></td>
-                                    <td className="px-4 py-4 text-right font-mono font-black text-sky-300 bg-slate-800/80 border-r border-slate-800 text-base">
+                                    <td className="px-3.5 py-4 border-r border-slate-200/60"></td>
+                                    <td className="px-4 py-4 text-right font-mono font-bold text-blue-700 border-r border-slate-200/60 text-sm">
                                       {formatCurrency(totalRev)}
                                     </td>
-                                    <td className="px-3.5 py-4 border-r border-slate-800"></td>
-                                    <td className="px-4 py-4 text-right font-mono font-bold text-purple-300 bg-slate-800/80 border-r border-slate-800 text-base">
+                                    <td className="px-3.5 py-4 border-r border-slate-200/60"></td>
+                                    <td className="px-4 py-4 text-right font-mono font-bold text-purple-700 border-r border-slate-200/60 text-sm">
                                       {formatCurrency(totalCost)}
                                     </td>
-                                    <td className="px-4 py-4 text-right font-mono font-black text-emerald-400 bg-slate-800/80 border-r border-slate-800 text-base">
+                                    <td className="px-4 py-4 text-right font-mono font-bold text-emerald-600 border-r border-slate-200/60 text-sm">
                                       {formatCurrency(totalProfit)}
                                     </td>
                                     <td className="px-3 py-4 text-center">
-                                      <span className={`px-3 py-1 rounded-full text-xs font-black shadow-sm ${
-                                        avgMargin >= 20 ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                        avgMargin >= 20 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                                       }`}>
                                         {avgMargin.toFixed(1)}%
                                       </span>
@@ -2426,18 +2413,18 @@ export default function WorkflowView({
                           </table>
                         </div>
 
-                        {/* Executive Action Buttons - Modern High Contrast */}
-                        <div className="pt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100">
+                        {/* Apple HIG Control Bar */}
+                        <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100">
                           <button
                             type="button"
                             onClick={() => setShowDualPOModal(true)}
-                            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold px-5 py-3 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition shadow-md shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                            className="bg-[#007AFF] hover:bg-[#0066D6] text-white font-medium px-5 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-sm active:scale-[0.98]"
                           >
-                            <Layers size={18} />
-                            <span>📄 Xem & In Cặp Văn Bản PO (Khách & NCC)</span>
+                            <Layers size={16} />
+                            <span>Xem & In Cặp Văn Bản PO</span>
                           </button>
 
-                          <div className="flex gap-3">
+                          <div className="flex items-center gap-3">
                             <button
                               type="button"
                               onClick={() => {
@@ -2446,18 +2433,18 @@ export default function WorkflowView({
                                 setPoLines(currentPoLinesForApproval);
                                 setActiveStep(1);
                               }}
-                              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-5 py-3 rounded-2xl text-xs sm:text-sm transition shadow-2xs"
+                              className="bg-white hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-xl text-xs sm:text-sm border border-slate-200 transition"
                             >
-                              ✏️ Sửa Đơn Ở Bước 1
+                              Sửa Đơn Ở Bước 1
                             </button>
 
                             <button
                               type="button"
                               onClick={() => handleApprovePOFromStep2(currentPoForApproval)}
-                              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black px-6 py-3 rounded-2xl text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-emerald-600/25 hover:scale-[1.02] active:scale-[0.98]"
+                              className="bg-[#34C759] hover:bg-[#2FB34F] text-white font-semibold px-6 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2 transition shadow-sm active:scale-[0.98]"
                             >
-                              <CheckCircle size={18} />
-                              <span>Phê Duyệt & Khóa Đơn Sản Xuất ➔</span>
+                              <CheckCircle size={16} />
+                              <span>Phê Duyệt & Khóa Đơn Sản Xuất</span>
                             </button>
                           </div>
                         </div>
