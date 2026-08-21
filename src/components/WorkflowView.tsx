@@ -2213,10 +2213,10 @@ export default function WorkflowView({
                                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                                   Doanh Thu (SO)
                                 </span>
-                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tracking-tight mt-2">
+                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-sans tabular-nums tracking-tight mt-2">
                                   {formatCurrency(totalRev)}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">Đơn giá bán khách hàng</div>
+                                <div className="mt-1 text-xs text-slate-400 font-normal">Đơn giá bán khách hàng</div>
                               </div>
 
                               {/* 2. Giá vốn xưởng */}
@@ -2224,10 +2224,10 @@ export default function WorkflowView({
                                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                                   Giá Vốn (PO)
                                 </span>
-                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tracking-tight mt-2">
+                                <div className="text-xl sm:text-2xl font-bold text-slate-900 font-sans tabular-nums tracking-tight mt-2">
                                   {formatCurrency(totalCost)}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">Giá mua xưởng sản xuất</div>
+                                <div className="mt-1 text-xs text-slate-400 font-normal">Giá mua xưởng sản xuất</div>
                               </div>
 
                               {/* 3. Lợi nhuận gộp */}
@@ -2235,10 +2235,10 @@ export default function WorkflowView({
                                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                                   Lợi Nhuận Gộp
                                 </span>
-                                <div className="text-xl sm:text-2xl font-bold text-emerald-600 font-mono tracking-tight mt-2">
+                                <div className="text-xl sm:text-2xl font-bold text-emerald-600 font-sans tabular-nums tracking-tight mt-2">
                                   {formatCurrency(profit)}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">Chênh lệch thực thu</div>
+                                <div className="mt-1 text-xs text-slate-400 font-normal">Chênh lệch thực thu</div>
                               </div>
 
                               {/* 4. Tỷ suất Margin */}
@@ -2248,12 +2248,12 @@ export default function WorkflowView({
                                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                                   Tỷ Suất Margin
                                 </span>
-                                <div className={`text-xl sm:text-2xl font-bold font-mono tracking-tight mt-2 ${
+                                <div className={`text-xl sm:text-2xl font-bold font-sans tabular-nums tracking-tight mt-2 ${
                                   isSafe ? "text-emerald-600" : "text-amber-600"
                                 }`}>
                                   {margin.toFixed(1)}%
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">
+                                <div className="mt-1 text-xs text-slate-400 font-normal">
                                   {isSafe ? "Mục tiêu BOD ≥ 20%" : "Thấp hơn định mức"}
                                 </div>
                               </div>
@@ -2289,39 +2289,43 @@ export default function WorkflowView({
                           </span>
                         </div>
 
-                        {/* Apple HIG Clean Table */}
-                        <div className="overflow-x-auto rounded-xl border border-slate-200/70">
-                          <table className="w-full text-left text-xs border-collapse">
+                        {/* Apple HIG Clean Balanced Table with Fixed Proportions */}
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[1050px]">
                             <thead>
-                              {/* Tier 1 Header - Apple Clean Functional Sections */}
-                              <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[11px] font-semibold text-slate-600">
-                                <th className="px-3.5 py-3 text-center w-12 border-r border-slate-200/60 text-slate-400 font-medium" rowSpan={2}>#</th>
-                                <th className="px-4 py-3 border-r border-slate-200/60 tracking-wider text-slate-700" colSpan={3}>
+                              {/* Tier 1 Header - Exact Functional Sections */}
+                              <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[11px] font-bold text-slate-700">
+                                <th className="py-3 px-2 text-center w-[4%] border-r border-slate-200/60 text-slate-400 font-semibold align-middle" rowSpan={2}>
+                                  #
+                                </th>
+                                <th className="py-3 px-4 border-r border-slate-200/60 text-slate-700 tracking-wide text-left align-middle" colSpan={2}>
                                   MẶT HÀNG & HỢP ĐỒNG GỐC
                                 </th>
-                                <th className="px-4 py-3 text-center text-blue-700 bg-blue-50/40 border-r border-slate-200/60 font-semibold tracking-wider" colSpan={2}>
+                                <th className="py-3 px-4 text-center text-[#007AFF] bg-blue-50/50 border-r border-slate-200/60 tracking-wide align-middle" colSpan={3}>
                                   ĐƠN BÁN KHÁCH HÀNG (SO)
                                 </th>
-                                <th className="px-4 py-3 text-center text-purple-700 bg-purple-50/40 border-r border-slate-200/60 font-semibold tracking-wider" colSpan={2}>
+                                <th className="py-3 px-4 text-center text-purple-700 bg-purple-50/50 border-r border-slate-200/60 tracking-wide align-middle" colSpan={2}>
                                   ĐƠN MUA XƯỞNG (PO)
                                 </th>
-                                <th className="px-4 py-3 text-center text-emerald-700 bg-emerald-50/40 font-semibold tracking-wider" colSpan={2}>
+                                <th className="py-3 px-4 text-center text-emerald-700 bg-emerald-50/50 tracking-wide align-middle" colSpan={2}>
                                   HIỆU QUẢ TÀI CHÍNH
                                 </th>
                               </tr>
-                              {/* Tier 2 Header - Clean Sub-columns */}
-                              <tr className="bg-[#FAFAFC] border-b border-slate-200/80 text-[10px] uppercase font-semibold text-slate-400">
-                                <th className="px-4 py-2.5 border-r border-slate-200/60">Tên Mặt Hàng & Quy Cách</th>
-                                <th className="px-3.5 py-2.5 border-r border-slate-200/60 w-28">HĐ Gốc / Mã Giá</th>
-                                <th className="px-3.5 py-2.5 text-center border-r border-slate-200/60 w-28">Số Lượng</th>
-                                <th className="px-3.5 py-2.5 text-right border-r border-slate-200/60 w-28">Đơn Giá Bán</th>
-                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-slate-700">Doanh Thu (SO)</th>
-                                <th className="px-3.5 py-2.5 text-right border-r border-slate-200/60 w-32">NCC / Giá Mua</th>
-                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-slate-700">Giá Vốn (PO)</th>
-                                <th className="px-4 py-2.5 text-right border-r border-slate-200/60 w-36 font-bold text-emerald-700">Lãi Gộp</th>
-                                <th className="px-3 py-2.5 text-center w-24">Biên LN</th>
+
+                              {/* Tier 2 Header - Balanced Sub-columns */}
+                              <tr className="bg-[#FAFAFC] border-b border-slate-200/80 text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
+                                <th className="py-2.5 px-4 text-left border-r border-slate-200/60 w-[27%]">Tên Mặt Hàng & Quy Cách</th>
+                                <th className="py-2.5 px-3 text-center border-r border-slate-200/60 w-[10%]">HĐ Gốc / Mã Giá</th>
+                                <th className="py-2.5 px-3 text-right border-r border-slate-200/60 w-[9%]">Số Lượng</th>
+                                <th className="py-2.5 px-3 text-right border-r border-slate-200/60 w-[9%]">Đơn Giá Bán</th>
+                                <th className="py-2.5 px-4 text-right border-r border-slate-200/60 w-[12%] text-blue-900 font-bold">Doanh Thu (SO)</th>
+                                <th className="py-2.5 px-3 text-right border-r border-slate-200/60 w-[10%]">NCC / Giá Mua</th>
+                                <th className="py-2.5 px-4 text-right border-r border-slate-200/60 w-[12%] text-purple-900 font-bold">Giá Vốn (PO)</th>
+                                <th className="py-2.5 px-4 text-right border-r border-slate-200/60 w-[11%] text-emerald-800 font-bold">Lãi Gộp</th>
+                                <th className="py-2.5 px-2 text-center w-[8%]">Biên LN</th>
                               </tr>
                             </thead>
+
                             <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
                               {currentPoLinesForApproval.length === 0 ? (
                                 <tr>
@@ -2349,69 +2353,71 @@ export default function WorkflowView({
 
                                   return (
                                     <tr key={lIdx} className="hover:bg-[#FBFBFD] transition-colors">
-                                      <td className="px-3.5 py-4 text-center font-mono text-slate-400 font-medium border-r border-slate-100">{lIdx + 1}</td>
+                                      {/* STT */}
+                                      <td className="px-2 py-3.5 text-center font-medium text-slate-400 border-r border-slate-100 align-middle">
+                                        {lIdx + 1}
+                                      </td>
                                       
                                       {/* Product Name & Specs */}
-                                      <td className="px-4 py-4 border-r border-slate-100">
-                                        <div className="font-semibold text-slate-900 text-sm">
-                                          {prodName}
-                                        </div>
-                                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-1">
-                                          <span className="bg-[#F5F5F7] text-slate-600 px-2 py-0.5 rounded-full font-mono text-[10px] font-medium border border-slate-200/50">
+                                      <td className="px-4 py-3.5 border-r border-slate-100 align-middle">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-bold text-slate-900 text-sm">
+                                            {prodName}
+                                          </span>
+                                          <span className="bg-[#F5F5F7] text-slate-600 px-2 py-0.5 rounded-md font-mono text-[10px] font-medium border border-slate-200/60">
                                             {prodCode}
                                           </span>
-                                          <span className="text-slate-300">•</span>
-                                          <span className="text-slate-500 font-medium">
-                                            ĐVT: <strong className="text-slate-700 font-semibold">{unit}</strong>
+                                          <span className="text-[11px] text-slate-500 font-medium">
+                                            • ĐVT: <strong className="text-slate-700 font-semibold">{unit}</strong>
                                           </span>
                                         </div>
-                                        <div className="mt-2 p-2.5 rounded-xl bg-[#F5F5F7]/80 text-xs text-slate-600 leading-relaxed font-sans" title={specs}>
-                                          <span className="font-medium text-slate-500">Quy cách:</span> {specs}
+                                        <div className="mt-1.5 p-2 rounded-xl bg-[#F5F5F7]/80 text-[11px] text-slate-600 leading-snug font-normal" title={specs}>
+                                          <span className="font-semibold text-slate-500">Quy cách:</span> {specs}
                                         </div>
                                       </td>
 
                                       {/* Contract & Price Code */}
-                                      <td className="px-3.5 py-4 border-r border-slate-100">
-                                        <div className="font-semibold text-blue-600 font-mono text-xs">{contractNo}</div>
+                                      <td className="px-3 py-3.5 text-center border-r border-slate-100 align-middle">
+                                        <div className="font-semibold text-[#007AFF] font-mono text-xs">{contractNo}</div>
                                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">{priceCode}</div>
                                       </td>
 
                                       {/* Quantity */}
-                                      <td className="px-3.5 py-4 text-center font-semibold text-slate-900 font-mono border-r border-slate-100 text-sm">
+                                      <td className="px-3 py-3.5 text-right font-bold text-slate-900 tabular-nums border-r border-slate-100 text-xs sm:text-sm align-middle">
                                         {qty.toLocaleString("vi-VN")}
                                       </td>
 
-                                      {/* SO Price */}
-                                      <td className="px-3.5 py-4 text-right font-mono font-medium text-slate-700 border-r border-slate-100">
+                                      {/* SO Unit Price */}
+                                      <td className="px-3 py-3.5 text-right font-medium text-slate-700 tabular-nums border-r border-slate-100 text-xs align-middle">
                                         {formatCurrency(sell)}
                                       </td>
 
                                       {/* SO Revenue */}
-                                      <td className="px-4 py-4 text-right font-mono font-bold text-slate-900 border-r border-slate-100 text-sm">
+                                      <td className="px-4 py-3.5 text-right font-bold text-slate-900 tabular-nums border-r border-slate-100 text-xs sm:text-sm align-middle">
                                         {formatCurrency(lineRev)}
                                       </td>
 
                                       {/* PO Supplier & Buy Price */}
-                                      <td className="px-3.5 py-4 text-right border-r border-slate-100">
-                                        <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-md font-semibold text-[10px] mb-0.5">
+                                      <td className="px-3 py-3.5 text-right border-r border-slate-100 align-middle">
+                                        <span className="inline-block px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200/60 rounded-md font-bold text-[10px]">
                                           {suppShort}
                                         </span>
-                                        <div className="font-mono text-slate-500 text-[11px] mt-0.5">{formatCurrency(buy)}</div>
+                                        <div className="text-slate-600 tabular-nums text-[11px] mt-0.5 font-medium">{formatCurrency(buy)}</div>
                                       </td>
 
                                       {/* PO Cost */}
-                                      <td className="px-4 py-4 text-right font-mono font-medium text-slate-900 border-r border-slate-100 text-sm">
+                                      <td className="px-4 py-3.5 text-right font-medium text-slate-900 tabular-nums border-r border-slate-100 text-xs sm:text-sm align-middle">
                                         {formatCurrency(lineCost)}
                                       </td>
 
                                       {/* Gross Profit */}
-                                      <td className="px-4 py-4 text-right font-mono font-bold text-emerald-600 border-r border-slate-100 text-sm">
+                                      <td className="px-4 py-3.5 text-right font-bold text-emerald-600 tabular-nums border-r border-slate-100 text-xs sm:text-sm align-middle">
                                         {formatCurrency(prof)}
                                       </td>
 
                                       {/* Margin % - Apple Pill */}
-                                      <td className="px-3 py-4 text-center">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
+                                      <td className="px-2 py-3.5 text-center align-middle">
+                                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 tabular-nums ${
                                           lineMargin >= 20 
                                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" 
                                             : "bg-amber-50 text-amber-700 border border-amber-200/60"
@@ -2425,6 +2431,7 @@ export default function WorkflowView({
                                 })
                               )}
                             </tbody>
+
                             {/* Summary Total Row - Apple Clean Neutral Footer */}
                             {currentPoLinesForApproval.length > 0 && (() => {
                               let totalQty = 0;
@@ -2443,26 +2450,26 @@ export default function WorkflowView({
 
                               return (
                                 <tfoot>
-                                  <tr className="bg-[#F5F5F7] text-slate-800 font-semibold border-t-2 border-slate-200/80 text-xs">
-                                    <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[11px] text-slate-500 border-r border-slate-200/60">
+                                  <tr className="bg-[#F5F5F7] text-slate-900 font-bold border-t-2 border-slate-200/80 text-xs">
+                                    <td colSpan={3} className="px-4 py-3.5 text-right uppercase tracking-wider text-[11px] text-slate-500 border-r border-slate-200/60 align-middle">
                                       Tổng Cộng ({currentPoLinesForApproval.length} mặt hàng):
                                     </td>
-                                    <td className="px-3.5 py-4 text-center font-mono font-bold text-slate-900 border-r border-slate-200/60 text-sm">
+                                    <td className="px-3 py-3.5 text-right font-bold text-slate-900 tabular-nums border-r border-slate-200/60 text-xs sm:text-sm align-middle">
                                       {totalQty.toLocaleString("vi-VN")}
                                     </td>
-                                    <td className="px-3.5 py-4 border-r border-slate-200/60"></td>
-                                    <td className="px-4 py-4 text-right font-mono font-bold text-blue-700 border-r border-slate-200/60 text-sm">
+                                    <td className="px-3 py-3.5 border-r border-slate-200/60 align-middle"></td>
+                                    <td className="px-4 py-3.5 text-right font-bold text-blue-700 tabular-nums border-r border-slate-200/60 text-xs sm:text-sm align-middle">
                                       {formatCurrency(totalRev)}
                                     </td>
-                                    <td className="px-3.5 py-4 border-r border-slate-200/60"></td>
-                                    <td className="px-4 py-4 text-right font-mono font-bold text-purple-700 border-r border-slate-200/60 text-sm">
+                                    <td className="px-3 py-3.5 border-r border-slate-200/60 align-middle"></td>
+                                    <td className="px-4 py-3.5 text-right font-bold text-purple-700 tabular-nums border-r border-slate-200/60 text-xs sm:text-sm align-middle">
                                       {formatCurrency(totalCost)}
                                     </td>
-                                    <td className="px-4 py-4 text-right font-mono font-bold text-emerald-600 border-r border-slate-200/60 text-sm">
+                                    <td className="px-4 py-3.5 text-right font-bold text-emerald-600 tabular-nums border-r border-slate-200/60 text-xs sm:text-sm align-middle">
                                       {formatCurrency(totalProfit)}
                                     </td>
-                                    <td className="px-3 py-4 text-center">
-                                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                    <td className="px-2 py-3.5 text-center align-middle">
+                                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${
                                         avgMargin >= 20 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                                       }`}>
                                         {avgMargin.toFixed(1)}%
