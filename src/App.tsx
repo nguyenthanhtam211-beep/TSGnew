@@ -526,38 +526,29 @@ export default function App() {
     {
       id: "executive",
       title: "Tổng Quan & Điều Hành",
-      badge: "3",
+      badge: "2",
       items: [
-        { id: "dashboard", label: "Bàn Làm Việc", icon: <LayoutDashboard size={15} />, iconBg: "bg-blue-500" },
-        { id: "workflow", label: "Quy Trình 5 Bước", icon: <TrendingUp size={15} />, iconBg: "bg-indigo-500" },
-        { id: "profit_report", label: "Báo Cáo Lợi Nhuận", icon: <DollarSign size={15} />, iconBg: "bg-rose-500" },
+        { id: "dashboard", label: "Bàn Làm Việc & Báo Cáo", icon: <LayoutDashboard size={15} />, iconBg: "bg-blue-500" },
+        { id: "workflow", label: "Quy Trình Nghiệp Vụ 5 Bước", icon: <TrendingUp size={15} />, iconBg: "bg-indigo-500" },
       ]
     },
     {
       id: "logistics",
-      title: "Đơn Hàng & Giao Nhận",
-      badge: "5",
+      title: "Kinh Doanh & Logistics",
+      badge: "2",
       items: [
-        { id: "po", label: "Đơn Hàng (PO)", icon: <FileText size={15} />, iconBg: "bg-teal-500", badge: poHeaderData.length },
-        { id: "polines", label: "Chi Tiết Đơn Hàng", icon: <FileText size={15} />, iconBg: "bg-teal-600", badge: poLinesData.length },
-        { id: "delivery_plan", label: "Kế Hoạch Giao", icon: <CheckCircle size={15} />, iconBg: "bg-amber-500" },
-        { id: "calendar", label: "Lịch Giao Nhận (4 Tầng)", icon: <CalendarDays size={15} />, iconBg: "bg-blue-600" },
-        { id: "delivery", label: "Giao Hàng (PXK)", icon: <Truck size={15} />, iconBg: "bg-orange-500", badge: deliveryData.length },
+        { id: "po", label: "Quản Lý Đơn Hàng PO", icon: <FileText size={15} />, iconBg: "bg-teal-500", badge: poHeaderData.length },
+        { id: "logistics", label: "Kế Hoạch & Giao Hàng 360°", icon: <Truck size={15} />, iconBg: "bg-orange-500", badge: deliveryData.length },
       ]
     },
     {
       id: "commercial",
       title: "Thương Mại & Danh Mục",
-      badge: "8",
+      badge: "3",
       items: [
-        { id: "customers", label: "Khách Hàng", icon: <Users size={15} />, iconBg: "bg-sky-500", badge: customerData.length },
-        { id: "suppliers", label: "Nhà Cung Cấp", icon: <BookUser size={15} />, iconBg: "bg-amber-600", badge: supplierData.length },
-        { id: "contacts", label: "Danh Bạ Liên Hệ", icon: <Users size={15} />, iconBg: "bg-red-500", badge: contactData.length },
-        { id: "pricing", label: "Bảng Giá 2026", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
-        { id: "contracts", label: "Hợp Đồng & Phụ Lục", icon: <Scale size={15} />, iconBg: "bg-blue-600", badge: contractsData.length },
-        { id: "commissions", label: "Hoa Hồng & Chiết Khấu", icon: <Percent size={15} />, iconBg: "bg-purple-600" },
-        { id: "products", label: "Sản Phẩm & Quy Cách", icon: <Package size={15} />, iconBg: "bg-purple-500", badge: productData.length },
-        { id: "specs", label: "Tiêu Chuẩn Specs", icon: <ShieldCheck size={15} />, iconBg: "bg-blue-600", badge: specsData.length },
+        { id: "customers", label: "Khách Hàng & Đối Tác", icon: <Users size={15} />, iconBg: "bg-sky-500", badge: customerData.length },
+        { id: "pricing", label: "Bảng Giá, Hợp Đồng & Hoa Hồng", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
+        { id: "products", label: "Sản Phẩm & Tiêu Chuẩn Specs", icon: <Package size={15} />, iconBg: "bg-purple-500", badge: productData.length },
       ]
     },
     {
@@ -578,7 +569,7 @@ export default function App() {
         { id: "settings", label: "Cài Đặt Hệ Thống", icon: <Settings size={15} />, iconBg: "bg-slate-600" }
       ]
     }
-  ], [poHeaderData.length, poLinesData.length, deliveryData.length, customerData.length, supplierData.length, contactData.length, pricingData.length, contractsData.length, productData.length, specsData.length, fileStorageData.length]);
+  ], [poHeaderData.length, deliveryData.length, customerData.length, pricingData.length, productData.length, fileStorageData.length]);
 
   const TAB_TITLES: Record<string, string> = {
     dashboard: "Bảng Điều Hành",
