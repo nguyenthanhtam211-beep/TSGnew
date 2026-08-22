@@ -23,7 +23,7 @@ import { sendGeminiPrompt } from "./lib/gemini";
 import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
-  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, MemoryStorageModal, 
+  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, LogisticsHubView, MemoryStorageModal, 
   StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
@@ -1031,45 +1031,30 @@ export default function App() {
             customers={customerData}
           />
         )}
-        {activeTab === "delivery" && (
-          <DeliveryView 
-            deliveryData={enrichedDeliveryData} 
-            poLinesData={enrichedPoLinesData}
-            customerData={customerData}
-            supplierData={supplierData}
-            productData={productData}
-            onAdd={(row) => handleAddToFirestore("deliveries", row)} 
-            onEdit={(row) => handleUpdateToFirestore("deliveries", row)} 
-            onDelete={(row) => handleDeleteFromFirestore("deliveries", row)} 
-            onProductClick={(val) => setSelectedProductDetails(val)} 
-            onPoClick={(val) => setSelectedPoDetails(val)} 
-            onCreateCalendarEvent={handleCreateCalendarEvent}
-          />
-        )}
-        {activeTab === "delivery_plan" && (
-          <DeliveryPlanView 
+        {(activeTab === "logistics" || activeTab === "calendar" || activeTab === "delivery_plan" || activeTab === "delivery" || activeTab === "reconcile") && (
+          <LogisticsHubView 
+            initialSubTab={
+              activeTab === "delivery_plan" ? "plan" :
+              activeTab === "delivery" ? "delivery" :
+              activeTab === "reconcile" ? "reconcile" : "calendar"
+            }
             deliveryPlans={enrichedDeliveryPlanData}
             poLines={enrichedPoLinesData}
             poHeaders={poHeaderData}
             deliveries={enrichedDeliveryData}
             products={productData}
-            onAddPlan={(row) => handleAddToFirestore("delivery_plans", row)}
-            onUpdatePlan={(row) => handleUpdateToFirestore("delivery_plans", row)}
-            onDeletePlan={(row) => handleDeleteFromFirestore("delivery_plans", row)}
-            onPoClick={(val) => setSelectedPoDetails(val)}
-            onProductClick={(val) => setSelectedProductDetails(val)}
-          />
-        )}
-        {activeTab === "calendar" && (
-          <MasterCalendarView
-            deliveryPlans={enrichedDeliveryPlanData}
-            deliveries={enrichedDeliveryData}
-            poLines={enrichedPoLinesData}
-            poHeaders={poHeaderData}
             customers={customerData}
-            products={productData}
+            suppliers={supplierData}
+            pricingData={pricingData}
+            onAddPlan={async (row) => await handleAddToFirestore("delivery_plans", row)}
+            onUpdatePlan={async (row) => await handleUpdateToFirestore("delivery_plans", row)}
+            onDeletePlan={async (row) => await handleDeleteFromFirestore("delivery_plans", row)}
+            onAddDelivery={async (row) => await handleAddToFirestore("deliveries", row)}
+            onEditDelivery={async (row) => await handleUpdateToFirestore("deliveries", row)}
+            onDeleteDelivery={async (row) => await handleDeleteFromFirestore("deliveries", row)}
             onPoClick={(val) => setSelectedPoDetails(val)}
             onProductClick={(val) => setSelectedProductDetails(val)}
+            onCreateCalendarEvent={handleCreateCalendarEvent}
           />
         )}
         {activeTab === "products" && (
