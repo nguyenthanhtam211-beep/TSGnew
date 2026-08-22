@@ -822,3 +822,165 @@ export async function exportMasterDataToExcelDirectly(): Promise<void> {
     toast.error(`Lỗi xuất Excel: ${err.message || err}`, { id: toastId });
   }
 }
+
+/**
+ * TẢI TỆP TRỰC TIẾP LÊN GOOGLE DRIVE TỪ TRÌNH DUYỆT (Client-Side Direct REST API)
+ * Tự động tạo cây thư mục chuẩn hóa: TSG_Business_Documents / Năm / Loại Chứng Từ / Tháng
+ * Hoạt động độc lập 100% không phụ thuộc máy chủ Node.js backend.
+ */
+export async function getOrCreateDriveFolderClient(
+  folderName: string, 
+  parentFolderId?: string, 
+  token?: string
+): Promise<string> {
+  const currentToken = token || getStoredGoogleToken() || localStorage.getItem("google_access_token") || "";
+  if (!currentToken) throw new Error("Chưa đăng nhập Google");
+
+  const safeName = folderName.replace(/'/g, "\'");
+  let q = "name = '" + safeName + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+  if (parentFolderId) {
+    q += " and '" + parentFolderId + "' in parents";
+  }
+
+  const listUrl = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) + "&fields=files(id,name)";
+  const listRes = await callGoogleApi(listUrl, { method: "GET" }, currentToken);
+  
+  if (listRes.ok) {
+    const listData = await listRes.json();
+    if (listData.files && listData.files.length > 0) {
+      return listData.files[0].id;
+    }
+  }
+
+  // Create folder if not existing
+  const createUrl = "https://www.googleapis.com/drive/v3/files?fields=id,name";
+  const folderMetadata: any = {
+    name: folderName,
+    mimeType: "application/vnd.google-apps.folder",
+  };
+  if (parentFolderId) {
+    folderMetadata.parents = [parentFolderId];
+  }
+
+  const createRes = await callGoogleApi(createUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(folderMetadata),
+  }, currentToken);
+
+  if (!createRes.ok) {
+    const err = await createRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || ("Không thể tạo thư mục " + folderName + " trên Drive"));
+  }
+
+  const createdData = await createRes.json();
+  return createdData.id;
+}
+
+export async function uploadFileDirectToGoogleDrive(params: {
+  file: File | Blob;
+  fileName?: string;
+  documentType?: string;
+  documentNumber?: string;
+  year?: string;
+  month?: string;
+  token?: string;
+}): Promise<{
+  driveFileId: string;
+  driveLink: string;
+  downloadLink?: string;
+  fileName: string;
+}> {
+  let currentToken = params.token || getStoredGoogleToken() || localStorage.getItem("google_access_token");
+  if (!currentToken) {
+    currentToken = await ensureGoogleToken();
+  }
+  if (!currentToken) {
+    throw new Error("Chưa đăng nhập Google hoặc phiên đã hết hạn. Vui lòng bấm Đăng nhập Google.");
+  }
+
+  const now = new Date();
+  const yearStr = params.year || String(now.getFullYear());
+  const monthNum = params.month || String(now.getMonth() + 1).padStart(2, "0");
+  const docType = params.documentType || "Chung";
+  const nameToSave = params.fileName || (params.file instanceof File ? params.file.name : ("document_" + Date.now() + ".pdf"));
+
+  let targetFolderId: string | undefined = undefined;
+
+  try {
+    // 1. Root folder
+    const rootId = await getOrCreateDriveFolderClient("TSG_Business_Documents", undefined, currentToken);
+    // 2. Year folder
+    const yearId = await getOrCreateDriveFolderClient(yearStr, rootId, currentToken);
+    // 3. Document type folder
+    const typeFolderClean = docType.replace(/[/\#?%[\]\s.]+/g, "_");
+    const typeId = await getOrCreateDriveFolderClient(typeFolderClean, yearId, currentToken);
+    // 4. Month folder
+    const monthId = await getOrCreateDriveFolderClient("Thang_" + monthNum, typeId, currentToken);
+    targetFolderId = monthId;
+  } catch (folderErr) {
+    console.warn("Could not create structured folder hierarchy, fallback to root folder:", folderErr);
+  }
+
+  // Multipart upload payload
+  const metadata = {
+    name: nameToSave,
+    mimeType: params.file.type || "application/octet-stream",
+    parents: targetFolderId ? [targetFolderId] : undefined,
+  };
+
+  const boundary = "-------TSG_DRIVE_BOUNDARY_" + Date.now();
+  const CRLF = "\r\n";
+  const delimiter = CRLF + "--" + boundary + CRLF;
+  const closeDelimiter = CRLF + "--" + boundary + "--";
+
+  const metadataPart = delimiter +
+    "Content-Type: application/json; charset=UTF-8" + CRLF + CRLF +
+    JSON.stringify(metadata);
+
+  const fileType = params.file.type || "application/octet-stream";
+  const fileHeader = delimiter +
+    "Content-Type: " + fileType + CRLF + CRLF;
+
+  // Read file as ArrayBuffer
+  const fileBuffer = await params.file.arrayBuffer();
+
+  // Construct multipart body using Blob
+  const multipartBlob = new Blob([
+    metadataPart,
+    fileHeader,
+    fileBuffer,
+    closeDelimiter
+  ], { type: "multipart/related; boundary=" + boundary });
+
+  const uploadUrl = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink";
+
+  const response = await callGoogleApi(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "multipart/related; boundary=" + boundary,
+    },
+    body: multipartBlob,
+  }, currentToken);
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => ({}));
+    if (response.status === 401 || response.status === 403) {
+      clearStoredGoogleToken();
+      throw new Error("Xác thực Google bị từ chối hoặc hết hạn. Vui lòng đăng nhập lại Google.");
+    }
+    throw new Error(errorJson.error?.message || ("Lỗi tải tệp lên Google Drive (HTTP " + response.status + ")"));
+  }
+
+  const resultData = await response.json();
+  const driveFileId = resultData.id;
+  const driveLink = resultData.webViewLink || ("https://drive.google.com/file/d/" + driveFileId + "/view");
+  const downloadLink = resultData.webContentLink;
+
+  return {
+    driveFileId,
+    driveLink,
+    downloadLink,
+    fileName: nameToSave,
+  };
+}

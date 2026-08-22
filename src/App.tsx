@@ -28,6 +28,7 @@ import {
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
+import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
 
 const FULL_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
 
@@ -433,80 +434,72 @@ export default function App() {
       }
 
       if (!token) {
-        throw new Error("Chưa có quyền truy cập Google Drive. Vui lòng Bấm Đăng nhập Google hoặc Mở ứng dụng trong Tab mới.");
+        throw new Error("Chưa có quyền truy cập Google Drive. Vui lòng bấm Đăng nhập Google.");
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', metadata.fileName || file.name);
-      formData.append('documentType', metadata.documentType);
-      formData.append('documentNumber', metadata.documentNumber);
-      
       const now = new Date();
-      formData.append('year', now.getFullYear().toString());
-      formData.append('month', (now.getMonth() + 1).toString().padStart(2, '0'));
+      const year = now.getFullYear().toString();
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
 
-      let response: Response;
+      // 1. Tải trực tiếp từ Trình duyệt lên Google Drive REST API (Client-Side Direct Upload - 100% Tin cậy)
+      let driveData: { driveFileId: string; driveLink: string; downloadLink?: string; fileName: string };
+
       try {
-        response = await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData,
+        driveData = await uploadFileDirectToGoogleDrive({
+          file,
+          fileName: metadata.fileName || file.name,
+          documentType: metadata.documentType,
+          documentNumber: metadata.documentNumber,
+          year,
+          month,
+          token
         });
-      } catch (fetchErr: any) {
-        console.error("Fetch /api/drive/upload error:", fetchErr);
-        throw new Error("Lỗi kết nối máy chủ khi tải tệp lên Drive.");
-      }
+      } catch (directErr: any) {
+        console.warn("Direct upload exception, trying server proxy fallback:", directErr);
+        // Fallback to server endpoint if local server is available
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('fileName', metadata.fileName || file.name);
+        formData.append('documentType', metadata.documentType);
+        formData.append('documentNumber', metadata.documentNumber);
+        formData.append('year', year);
+        formData.append('month', month);
 
-      if (!response.ok && response.status === 401) {
-        localStorage.removeItem('google_access_token');
-        setGoogleToken(null);
-        token = await handleSignInGoogle();
-        if (token) {
-          try {
-            response = await fetch('/api/drive/upload', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              },
-              body: formData,
-            });
-          } catch (fetchErr2: any) {
-            throw new Error("Lỗi kết nối máy chủ sau khi thử lại đăng nhập Google.");
-          }
-        } else {
-          throw new Error("Xác thực Google bị hết hạn. Vui lòng đăng nhập lại Google.");
+        let response: Response;
+        try {
+          response = await fetch('/api/drive/upload', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData,
+          });
+        } catch (fetchErr: any) {
+          throw new Error(directErr.message || "Lỗi tải tệp lên Google Drive.");
         }
-      }
 
-      const resText = await response.text();
-      let driveData: any = null;
-      try {
-        driveData = JSON.parse(resText);
-      } catch (e) {
-        // Not JSON
-      }
-
-      if (!response.ok) {
-        if (resText.includes('<!doctype') || resText.includes('<html')) {
-          throw new Error('Đường truyền Google bị chặn hoặc chuyển hướng trong iframe. Vui lòng Bấm "Mở ứng dụng trong Tab mới" ở góc trên bên phải.');
+        if (!response.ok) {
+          throw new Error(directErr.message || `Tải tệp lên Google Drive thất bại (${response.status})`);
         }
-        throw new Error(driveData?.error || `Tải tệp lên Google Drive thất bại (${response.status})`);
+
+        const json = await response.json();
+        driveData = {
+          driveFileId: json.driveFileId,
+          driveLink: json.driveLink,
+          downloadLink: json.downloadLink,
+          fileName: metadata.fileName || file.name
+        };
       }
 
       if (!driveData || !driveData.driveFileId) {
-        throw new Error("Phản hồi từ máy chủ không chứa mã tập tin Drive hợp lệ.");
+        throw new Error("Không thể xác thực mã tệp tải lên Google Drive.");
       }
       
-      // Save metadata to Firestore
+      // 2. Lưu thông tin metadata tệp vào database (Local Cache + Firestore)
       const fileId = `file_${Date.now()}`;
       await handleAddToFirestore('file_storage', {
         id: fileId,
         fileId,
         driveFileId: driveData.driveFileId,
-        fileName: metadata.fileName || file.name,
+        fileName: driveData.fileName || metadata.fileName || file.name,
         mimeType: file.type,
         documentType: metadata.documentType,
         documentNumber: metadata.documentNumber,
@@ -514,15 +507,15 @@ export default function App() {
         year: now.getFullYear(),
         month: now.getMonth() + 1,
         driveLink: driveData.driveLink,
+        downloadLink: driveData.downloadLink
       });
 
-      toast.success('Đã lưu trữ tài liệu vào Google Drive thành công!');
+      toast.success('🎉 Đã lưu trữ bản scan chứng từ vào Google Drive thành công!');
     } catch (error: any) {
       console.error('Upload to Drive error:', error);
       toast.error(`Lỗi lưu trữ: ${error.message || error}`);
     }
   };
-
 
   const TAB_TITLES: Record<string, string> = {
     dashboard: "Bảng Điều Hành",
