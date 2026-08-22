@@ -31,16 +31,8 @@ export const initAuth = (
 export const getStoredGoogleToken = (): string | null => {
   try {
     const token = cachedAccessToken || localStorage.getItem('google_access_token');
-    const expiryStr = localStorage.getItem('google_token_expiry');
-    if (token) {
-      if (expiryStr) {
-        const expiry = parseInt(expiryStr, 10);
-        // If expired (with 2 min buffer), invalidate
-        if (Date.now() > expiry - 120000) {
-          return null;
-        }
-      }
-      return token;
+    if (token && token.trim()) {
+      return token.trim();
     }
   } catch (e) {}
   return null;

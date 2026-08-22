@@ -150,20 +150,25 @@ export default function App() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  const handleSignInGoogle = async () => {
+  const handleSignInGoogle = async (force: boolean = false) => {
     try {
       const token = await ensureGoogleToken([
         'https://www.googleapis.com/auth/calendar.events',
         'https://www.googleapis.com/auth/drive.file',
         'https://www.googleapis.com/auth/spreadsheets'
-      ], true);
+      ], force);
       if (token) {
         setGoogleToken(token);
-        toast.success('Đã kết nối với Google!');
+        if (force) {
+          toast.success('Đã kết nối tài khoản Google thành công!');
+        }
         return token;
       }
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
+      if (force) {
+        toast.error('Không thể kết nối Google: ' + (error.message || error));
+      }
     }
     return null;
   };
@@ -428,92 +433,60 @@ export default function App() {
 
   const handleUploadToDrive = async (file: File, metadata: { documentType: string, documentNumber: string, fileName?: string }) => {
     try {
-      let token = googleToken || localStorage.getItem('google_access_token');
-      if (!token) {
-        token = await handleSignInGoogle();
-      }
-
-      if (!token) {
-        throw new Error("Chưa có quyền truy cập Google Drive. Vui lòng bấm Đăng nhập Google.");
-      }
-
       const now = new Date();
       const year = now.getFullYear().toString();
       const month = (now.getMonth() + 1).toString().padStart(2, '0');
-
-      // 1. Tải trực tiếp từ Trình duyệt lên Google Drive REST API (Client-Side Direct Upload - 100% Tin cậy)
-      let driveData: { driveFileId: string; driveLink: string; downloadLink?: string; fileName: string };
-
-      try {
-        driveData = await uploadFileDirectToGoogleDrive({
-          file,
-          fileName: metadata.fileName || file.name,
-          documentType: metadata.documentType,
-          documentNumber: metadata.documentNumber,
-          year,
-          month,
-          token
-        });
-      } catch (directErr: any) {
-        console.warn("Direct upload exception, trying server proxy fallback:", directErr);
-        // Fallback to server endpoint if local server is available
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('fileName', metadata.fileName || file.name);
-        formData.append('documentType', metadata.documentType);
-        formData.append('documentNumber', metadata.documentNumber);
-        formData.append('year', year);
-        formData.append('month', month);
-
-        let response: Response;
-        try {
-          response = await fetch('/api/drive/upload', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData,
-          });
-        } catch (fetchErr: any) {
-          throw new Error(directErr.message || "Lỗi tải tệp lên Google Drive.");
-        }
-
-        if (!response.ok) {
-          throw new Error(directErr.message || `Tải tệp lên Google Drive thất bại (${response.status})`);
-        }
-
-        const json = await response.json();
-        driveData = {
-          driveFileId: json.driveFileId,
-          driveLink: json.driveLink,
-          downloadLink: json.downloadLink,
-          fileName: metadata.fileName || file.name
-        };
-      }
-
-      if (!driveData || !driveData.driveFileId) {
-        throw new Error("Không thể xác thực mã tệp tải lên Google Drive.");
-      }
-      
-      // 2. Lưu thông tin metadata tệp vào database (Local Cache + Firestore)
       const fileId = `file_${Date.now()}`;
+      const fileNameToSave = metadata.fileName || file.name;
+
+      // 1. Kiểm tra mã token Google hiện tại mà KHÔNG ép mở popup
+      let token = googleToken || localStorage.getItem('google_access_token');
+
+      let driveData: { driveFileId?: string; driveLink?: string; downloadLink?: string } = {};
+
+      if (token) {
+        try {
+          // Tải trực tiếp lên Google Drive nếu đã có token
+          const uploadRes = await uploadFileDirectToGoogleDrive({
+            file,
+            fileName: fileNameToSave,
+            documentType: metadata.documentType,
+            documentNumber: metadata.documentNumber,
+            year,
+            month,
+            token
+          });
+          driveData = uploadRes;
+          toast.success('🎉 Đã lưu trữ bản scan vào Google Drive!');
+        } catch (driveErr: any) {
+          console.warn('Google Drive background upload skipped:', driveErr?.message || driveErr);
+          // Nếu token hết hạn thực sự, xóa để không gọi lại
+          if (driveErr?.message?.includes('hết hạn') || driveErr?.message?.includes('401') || driveErr?.message?.includes('403')) {
+            localStorage.removeItem('google_access_token');
+            setGoogleToken(null);
+          }
+        }
+      }
+
+      // 2. Luôn lưu thông tin tài liệu vào cơ sở dữ liệu hệ thống (Local Cache + Firestore)
       await handleAddToFirestore('file_storage', {
         id: fileId,
         fileId,
-        driveFileId: driveData.driveFileId,
-        fileName: driveData.fileName || metadata.fileName || file.name,
+        driveFileId: driveData.driveFileId || `local_${fileId}`,
+        fileName: fileNameToSave,
         mimeType: file.type,
         documentType: metadata.documentType,
         documentNumber: metadata.documentNumber,
         uploadDate: now.toISOString(),
         year: now.getFullYear(),
         month: now.getMonth() + 1,
-        driveLink: driveData.driveLink,
-        downloadLink: driveData.downloadLink
+        driveLink: driveData.driveLink || '',
+        downloadLink: driveData.downloadLink || '',
+        syncedToDrive: Boolean(driveData.driveFileId)
       });
 
-      toast.success('🎉 Đã lưu trữ bản scan chứng từ vào Google Drive thành công!');
     } catch (error: any) {
-      console.error('Upload to Drive error:', error);
-      toast.error(`Lỗi lưu trữ: ${error.message || error}`);
+      console.warn('Background handleUploadToDrive error:', error);
     }
   };
 
