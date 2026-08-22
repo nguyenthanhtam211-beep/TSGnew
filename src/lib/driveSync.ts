@@ -889,6 +889,9 @@ export async function uploadFileDirectToGoogleDrive(params: {
   driveFileId: string;
   driveLink: string;
   downloadLink?: string;
+  folderId?: string;
+  folderLink?: string;
+  folderPath?: string;
   fileName: string;
 }> {
   let currentToken = params.token || getStoredGoogleToken() || localStorage.getItem("google_access_token");
@@ -903,6 +906,7 @@ export async function uploadFileDirectToGoogleDrive(params: {
   const yearStr = params.year || String(now.getFullYear());
   const monthNum = params.month || String(now.getMonth() + 1).padStart(2, "0");
   const docType = params.documentType || "Chung";
+  const typeFolderClean = docType.replace(/[/\\#?%[\]\s.]+/g, "_");
   const nameToSave = params.fileName || (params.file instanceof File ? params.file.name : ("document_" + Date.now() + ".pdf"));
 
   let targetFolderId: string | undefined = undefined;
@@ -913,7 +917,6 @@ export async function uploadFileDirectToGoogleDrive(params: {
     // 2. Year folder
     const yearId = await getOrCreateDriveFolderClient(yearStr, rootId, currentToken);
     // 3. Document type folder
-    const typeFolderClean = docType.replace(/[/\#?%[\]\s.]+/g, "_");
     const typeId = await getOrCreateDriveFolderClient(typeFolderClean, yearId, currentToken);
     // 4. Month folder
     const monthId = await getOrCreateDriveFolderClient("Thang_" + monthNum, typeId, currentToken);
@@ -981,6 +984,9 @@ export async function uploadFileDirectToGoogleDrive(params: {
     driveFileId,
     driveLink,
     downloadLink,
+    folderId: targetFolderId,
+    folderLink: targetFolderId ? `https://drive.google.com/drive/folders/${targetFolderId}` : "https://drive.google.com/drive/search?q=TSG_Business_Documents",
+    folderPath: `TSG_Business_Documents / ${yearStr} / ${typeFolderClean} / Thang_${monthNum}`,
     fileName: nameToSave,
   };
 }

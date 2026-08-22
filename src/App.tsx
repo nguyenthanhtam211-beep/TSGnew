@@ -968,6 +968,9 @@ export default function App() {
               }}
               onUpload={handleUploadToDrive}
               onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
+              onUpdateFile={(file) => handleUpdateToFirestore("file_storage", file)}
+              onPoClick={(val) => setSelectedPoDetails(val)}
+              onProductClick={(val) => setSelectedProductDetails(val)}
             />
           </div>
         )}

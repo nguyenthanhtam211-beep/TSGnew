@@ -21,25 +21,43 @@ import {
   Zap,
   Server,
   X,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  FolderOpen,
+  Filter,
+  Check,
+  Eye,
+  Building2,
+  MessageSquare
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 
-interface StorageFile {
+export interface StorageFile {
+  id?: string;
   fileId: string;
   fileName: string;
-  fileSize: number;
-  mimeType: string;
-  driveLink: string;
-  uploadDate: string;
-  documentType: 'PO' | 'PXK' | 'Invoice' | 'Others';
+  fileSize?: number | string;
+  mimeType?: string;
+  driveLink?: string;
+  folderLink?: string;
+  folderPath?: string;
+  uploadDate?: string;
+  documentType: string;
   documentNumber?: string;
   docNumber?: string;
-  year: number;
-  month: number;
+  customer?: string;
+  partnerName?: string;
+  doubleCheckStatus?: 'verified' | 'pending' | 'discrepancy';
+  checkedBy?: string;
+  checkedAt?: string;
+  checkNote?: string;
+  syncedToDrive?: boolean;
+  year?: number | string;
+  month?: number | string;
 }
 
 interface StorageViewProps {
@@ -59,23 +77,50 @@ interface StorageViewProps {
     commissionData: any[];
     fileStorageData: any[];
   };
-  onUpload?: (file: File, metadata: { documentType: string; documentNumber: string }) => Promise<void>;
+  onUpload?: (file: File, metadata: { documentType: string; documentNumber: string }) => Promise<any>;
   onDelete?: (fileId: string) => Promise<void>;
+  onUpdateFile?: (file: any) => Promise<void>;
   onRestoreData?: (importedData: any) => Promise<void>;
+  onPoClick?: (poNumber: string) => void;
+  onProductClick?: (productName: string) => void;
 }
 
-export default function StorageView({ files = [], allData, onUpload, onDelete, onRestoreData }: StorageViewProps) {
-  const [activeTab, setActiveTab] = useState<'memory' | 'files'>('memory');
+export default function StorageView({ 
+  files = [], 
+  allData, 
+  onUpload, 
+  onDelete, 
+  onUpdateFile,
+  onRestoreData,
+  onPoClick,
+  onProductClick 
+}: StorageViewProps) {
+  const [activeTab, setActiveTab] = useState<'memory' | 'files'>('files');
   const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [selectedCheckStatus, setSelectedCheckStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [isUploading, setIsUploading] = useState(false);
   const [isSavingMemory, setIsSavingMemory] = useState(false);
 
   // Upload Modal State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadDocType, setUploadDocType] = useState<string>('PO');
+  const [uploadDocType, setUploadDocType] = useState<string>('PXK');
   const [uploadDocNum, setUploadDocNum] = useState<string>('');
+  const [uploadPartner, setUploadPartner] = useState<string>('');
+  const [uploadNote, setUploadNote] = useState<string>('');
+
+  // Editing Note State
+  const [editingNoteFileId, setEditingNoteFileId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState<string>('');
+
+  // Double Check Stats
+  const checkStats = useMemo(() => {
+    const total = files.length;
+    const verified = files.filter(f => f.doubleCheckStatus === 'verified').length;
+    const pending = files.filter(f => !f.doubleCheckStatus || f.doubleCheckStatus === 'pending').length;
+    const discrepancy = files.filter(f => f.doubleCheckStatus === 'discrepancy').length;
+    return { total, verified, pending, discrepancy };
+  }, [files]);
 
   // Collections Stats Calculation
   const collectionsStats = useMemo(() => {
@@ -120,80 +165,62 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
       items: mapped,
       totalRecords,
       totalSizeKB: (totalApproxBytes / 1024).toFixed(1),
-      totalSizeMB: (totalApproxBytes / (1024 * 1024)).toFixed(2)
+      totalSizeMB: (totalApproxBytes / 1024 / 1024).toFixed(2)
     };
   }, [allData]);
 
-  // Memory Actions
-  const handleForceSaveMemory = async () => {
-    if (!allData) return;
+  // Force Save to Local Storage
+  const handleForceSaveMemory = () => {
     setIsSavingMemory(true);
-    const saveToast = toast.loading("Đang ghi đồng bộ vào bộ nhớ đệm và ổ đĩa...");
     try {
-      const collections = [
-        { name: "customers", data: allData.customerData },
-        { name: "suppliers", data: allData.supplierData },
-        { name: "pricing", data: allData.pricingData },
-        { name: "products", data: allData.productData },
-        { name: "po_headers", data: allData.poHeaderData },
-        { name: "po_lines", data: allData.poLinesData },
-        { name: "delivery_plans", data: allData.deliveryPlanData },
-        { name: "deliveries", data: allData.deliveryData },
-        { name: "contracts", data: allData.contractsData },
-        { name: "commissions", data: allData.commissionData },
-        { name: "specs", data: allData.specsData },
-        { name: "contacts", data: allData.contactData },
-      ];
-
-      for (const col of collections) {
-        if (Array.isArray(col.data) && col.data.length > 0) {
-          localStorage.setItem(`tsg_cache_${col.name}`, JSON.stringify(col.data));
-          localStorage.setItem(`tsg_last_backup_time`, new Date().toISOString());
-        }
+      if (allData) {
+        Object.entries(allData).forEach(([key, val]) => {
+          if (Array.isArray(val)) {
+            const storageKey = `tsg_cache_${key.replace('Data', '').toLowerCase()}`;
+            localStorage.setItem(storageKey, JSON.stringify(val));
+          }
+        });
       }
-
-      toast.success("Đã lưu trữ an toàn 100% dữ liệu vào bộ nhớ!", { id: saveToast });
-    } catch (err: any) {
-      toast.error("Lỗi khi lưu bộ nhớ: " + (err?.message || err), { id: saveToast });
+      toast.success("Đã ghi ép buộc toàn bộ trạng thái vào bộ nhớ máy tính!");
+    } catch (e: any) {
+      toast.error("Lỗi khi lưu bộ nhớ: " + (e?.message || e));
     } finally {
       setIsSavingMemory(false);
     }
   };
 
+  // Download Full JSON Backup
   const handleDownloadFullBackupJSON = () => {
-    if (!allData) return;
     try {
-      const fullBackupPayload = {
+      const backupPayload = {
         app: "TSG Business OS",
-        version: "2.5",
-        backupTimestamp: new Date().toISOString(),
-        backupDateFormatted: new Date().toLocaleString("vi-VN"),
+        version: "2026.1",
+        exportedAt: new Date().toISOString(),
         totalRecords: collectionsStats.totalRecords,
-        totalSizeKB: collectionsStats.totalSizeKB,
         data: allData
       };
 
-      const dataStr = JSON.stringify(fullBackupPayload, null, 2);
-      const blob = new Blob([dataStr], { type: "application/json;charset=utf-8" });
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `TSG_Full_Memory_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `TSG_Business_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      toast.success("Đã tải tệp sao lưu bộ nhớ (.json) về máy tính!");
-    } catch (err: any) {
-      toast.error("Lỗi tạo bản sao lưu: " + (err?.message || err));
+      toast.success("Đã tải tệp sao lưu JSON về máy tính!");
+    } catch (e: any) {
+      toast.error("Lỗi tạo bản sao lưu: " + (e?.message || e));
     }
   };
 
+  // Export Master Excel
   const handleExportMasterExcel = () => {
     if (!allData) return;
     try {
       const wb = XLSX.utils.book_new();
+
       const sheets = [
         { name: "Khach_Hang", data: allData.customerData },
         { name: "Nha_Cung_Cap", data: allData.supplierData },
@@ -206,7 +233,8 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
         { name: "Hop_Dong", data: allData.contractsData },
         { name: "Hoa_Hong", data: allData.commissionData },
         { name: "Specs_Ky_Thuat", data: allData.specsData },
-        { name: "Danh_Ba", data: allData.contactData }
+        { name: "Danh_Ba", data: allData.contactData },
+        { name: "So_Doi_Soat_File", data: files }
       ];
 
       sheets.forEach(s => {
@@ -217,67 +245,76 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
       });
 
       XLSX.writeFile(wb, `TSG_Master_Database_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success("Đã xuất sổ Excel tổng hợp 12 trang tính!");
+      toast.success("Đã xuất sổ Excel tổng hợp 13 trang tính!");
     } catch (err: any) {
       toast.error("Lỗi xuất Excel: " + (err?.message || err));
     }
   };
 
-  const handleRestoreFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const text = evt.target?.result as string;
-        const parsed = JSON.parse(text);
-        const dataToRestore = parsed.data || parsed;
-
-        const confirmRestore = window.confirm(
-          `Bạn có chắc muốn khôi phục dữ liệu từ bản sao lưu?\nTổng số bản ghi: ${parsed.totalRecords || "nhiều"} mục.`
-        );
-
-        if (confirmRestore) {
-          Object.keys(dataToRestore).forEach(col => {
-            const list = dataToRestore[col];
-            if (Array.isArray(list)) {
-              localStorage.setItem(`tsg_cache_${col}`, JSON.stringify(list));
-            }
-          });
-
-          if (onRestoreData) {
-            await onRestoreData(dataToRestore);
-          }
-
-          toast.success("Đã khôi phục bộ nhớ thành công! Hệ thống đang tải lại...");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-      } catch (err: any) {
-        toast.error("Lỗi đọc tệp sao lưu: " + (err?.message || err));
-      }
-    };
-    reader.readAsText(file);
-  };
-
   // Files Filter
   const filteredFiles = useMemo(() => {
     return files.filter(f => {
-      const matchType = selectedType === 'ALL' || f.documentType === selectedType;
-      const matchSearch = searchQuery === '' || 
-        f.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (f.documentNumber && f.documentNumber.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchType && matchSearch;
-    });
-  }, [files, selectedType, searchQuery]);
+      const docType = (f.documentType || '').toUpperCase();
+      const matchType = selectedType === 'ALL' || docType.includes(selectedType);
+      
+      const status = f.doubleCheckStatus || 'pending';
+      const matchStatus = selectedCheckStatus === 'ALL' || status === selectedCheckStatus;
 
-  const getFileIcon = (mimeType: string) => {
-    if (mimeType.includes('pdf')) return <FileText className="text-red-500" size={24} />;
-    if (mimeType.includes('sheet') || mimeType.includes('excel')) return <FileSpreadsheet className="text-green-600" size={24} />;
-    if (mimeType.includes('image')) return <FileImage className="text-blue-500" size={24} />;
-    return <File className="text-slate-500" size={24} />;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = q === '' || 
+        (f.fileName && f.fileName.toLowerCase().includes(q)) ||
+        (f.documentNumber && f.documentNumber.toLowerCase().includes(q)) ||
+        (f.docNumber && f.docNumber.toLowerCase().includes(q)) ||
+        (f.customer && f.customer.toLowerCase().includes(q)) ||
+        (f.partnerName && f.partnerName.toLowerCase().includes(q)) ||
+        (f.checkNote && f.checkNote.toLowerCase().includes(q)) ||
+        (f.folderPath && f.folderPath.toLowerCase().includes(q));
+
+      return matchType && matchStatus && matchSearch;
+    });
+  }, [files, selectedType, selectedCheckStatus, searchQuery]);
+
+  const getFileIcon = (mimeType?: string) => {
+    const m = (mimeType || '').toLowerCase();
+    if (m.includes('pdf')) return <FileText className="text-red-500" size={20} />;
+    if (m.includes('sheet') || m.includes('excel')) return <FileSpreadsheet className="text-emerald-600" size={20} />;
+    if (m.includes('image')) return <FileImage className="text-blue-500" size={20} />;
+    return <File className="text-slate-500" size={20} />;
+  };
+
+  const handleToggleCheckStatus = async (file: StorageFile) => {
+    const nextStatus: 'verified' | 'pending' | 'discrepancy' = 
+      file.doubleCheckStatus === 'verified' ? 'discrepancy' :
+      file.doubleCheckStatus === 'discrepancy' ? 'pending' : 'verified';
+
+    const updated = {
+      ...file,
+      doubleCheckStatus: nextStatus,
+      checkedBy: 'Ban Giám Đốc / Kế Toán TSG',
+      checkedAt: new Date().toISOString()
+    };
+
+    if (onUpdateFile) {
+      await onUpdateFile(updated);
+    } else {
+      localStorage.setItem(`tsg_cache_file_${file.fileId}`, JSON.stringify(updated));
+    }
+
+    const label = nextStatus === 'verified' ? '🟢 Khớp 100%' : nextStatus === 'discrepancy' ? '🔴 Lệch số liệu' : '🟡 Chờ rà soát';
+    toast.success(`Đã cập nhật đối soát ${file.documentNumber || file.fileName}: ${label}`);
+  };
+
+  const handleSaveNote = async (file: StorageFile) => {
+    const updated = {
+      ...file,
+      checkNote: editingNoteText
+    };
+
+    if (onUpdateFile) {
+      await onUpdateFile(updated);
+    }
+    setEditingNoteFileId(null);
+    toast.success("Đã cập nhật ghi chú đối soát!");
   };
 
   const handleConfirmUpload = async () => {
@@ -290,6 +327,8 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
       });
       setSelectedFile(null);
       setUploadDocNum('');
+      setUploadPartner('');
+      setUploadNote('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -304,48 +343,404 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
-                Persistent Data & Memory Engine
+              <span className="text-[10.5px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
+                TSG Master Storage & Double-Check Register
               </span>
               <span className="text-slate-300">•</span>
-              <span className="text-xs text-slate-500 font-medium">100% An toàn & Ngoại tuyến</span>
+              <span className="text-xs text-slate-500 font-medium">Sổ Kiểm Soát & Đối Soát Chứng Từ 2 Bên</span>
             </div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
               <Database className="text-[#007AFF]" size={26} />
-              <span>Trung Tâm Lưu Trữ & Bộ Nhớ Dữ Liệu</span>
+              <span>Kho Lưu Trữ & Sổ Đối Soát Chứng Từ</span>
             </h2>
           </div>
 
-          {/* Tab Switcher: Bộ Nhớ CSDL vs Kho File Drive */}
+          {/* Tab Switcher */}
           <div className="bg-[#F5F5F7] p-1.5 rounded-2xl flex items-center border border-slate-200/60 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('files')}
+              className={clsx(
+                "px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer",
+                activeTab === 'files' ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <HardDrive size={15} />
+              <span>Sổ Chứng Từ Scan ({files.length} tệp)</span>
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('memory')}
               className={clsx(
-                "px-4 py-2 rounded-xl transition-all flex items-center gap-2",
+                "px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer",
                 activeTab === 'memory' ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
               )}
             >
               <Zap size={15} />
               <span>Bộ Nhớ & CSDL ({collectionsStats.totalRecords} mục)</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('files')}
-              className={clsx(
-                "px-4 py-2 rounded-xl transition-all flex items-center gap-2",
-                activeTab === 'files' ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              <HardDrive size={15} />
-              <span>Kho File Drive ({files.length} tệp)</span>
-            </button>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: BỘ NHỚ & CƠ SỞ DỮ LIỆU BỀN VỮNG (MEMORY ENGINE) */}
+      {/* TAB 1: SỔ KIỂM SOÁT & ĐỐI SOÁT CHỨNG TỪ SCAN (DOUBLE-CHECK REGISTER) */}
+      {/* ========================================================================= */}
+      {activeTab === 'files' && (
+        <div className="space-y-6">
+          {/* 4 Bento KPI Metric Counters */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <button
+              type="button"
+              onClick={() => setSelectedCheckStatus('ALL')}
+              className={clsx(
+                "p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                selectedCheckStatus === 'ALL'
+                  ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900"
+                  : "bg-white text-slate-800 border-slate-200/80 hover:border-slate-300 hover:shadow-2xs"
+              )}
+            >
+              <span className={clsx("text-[10.5px] font-bold uppercase tracking-wider", selectedCheckStatus === 'ALL' ? "text-slate-300" : "text-slate-400")}>
+                Tổng Chứng Từ Scan
+              </span>
+              <div className="text-2xl font-bold font-sans tabular-nums mt-2">
+                {checkStats.total}
+              </div>
+              <span className={clsx("text-[10px] mt-1", selectedCheckStatus === 'ALL' ? "text-slate-300" : "text-slate-400")}>
+                Toàn bộ PO, PXK & HĐ
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedCheckStatus('verified')}
+              className={clsx(
+                "p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                selectedCheckStatus === 'verified'
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500"
+                  : "bg-white text-slate-800 border-slate-200/80 hover:border-emerald-300 hover:shadow-2xs"
+              )}
+            >
+              <span className={clsx("text-[10.5px] font-bold uppercase tracking-wider", selectedCheckStatus === 'verified' ? "text-emerald-100" : "text-slate-400")}>
+                Đã Khớp 100%
+              </span>
+              <div className={clsx("text-2xl font-bold font-sans tabular-nums mt-2", selectedCheckStatus === 'verified' ? "text-white" : "text-emerald-600")}>
+                {checkStats.verified}
+              </div>
+              <span className={clsx("text-[10px] mt-1", selectedCheckStatus === 'verified' ? "text-emerald-100" : "text-slate-400")}>
+                Đã double check kế toán
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedCheckStatus('pending')}
+              className={clsx(
+                "p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                selectedCheckStatus === 'pending'
+                  ? "bg-amber-500 text-white border-amber-500 shadow-md ring-2 ring-amber-400"
+                  : "bg-white text-slate-800 border-slate-200/80 hover:border-amber-300 hover:shadow-2xs"
+              )}
+            >
+              <span className={clsx("text-[10.5px] font-bold uppercase tracking-wider", selectedCheckStatus === 'pending' ? "text-amber-100" : "text-slate-400")}>
+                Chờ Rà Soát
+              </span>
+              <div className={clsx("text-2xl font-bold font-sans tabular-nums mt-2", selectedCheckStatus === 'pending' ? "text-white" : "text-amber-600")}>
+                {checkStats.pending}
+              </div>
+              <span className={clsx("text-[10px] mt-1", selectedCheckStatus === 'pending' ? "text-amber-100" : "text-slate-400")}>
+                Cần đối chiếu thêm
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedCheckStatus('discrepancy')}
+              className={clsx(
+                "p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                selectedCheckStatus === 'discrepancy'
+                  ? "bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-500"
+                  : "bg-white text-slate-800 border-slate-200/80 hover:border-rose-300 hover:shadow-2xs"
+              )}
+            >
+              <span className={clsx("text-[10.5px] font-bold uppercase tracking-wider", selectedCheckStatus === 'discrepancy' ? "text-rose-100" : "text-slate-400")}>
+                Lệch Số Liệu / Sự Cố
+              </span>
+              <div className={clsx("text-2xl font-bold font-sans tabular-nums mt-2", selectedCheckStatus === 'discrepancy' ? "text-white" : "text-rose-600")}>
+                {checkStats.discrepancy}
+              </div>
+              <span className={clsx("text-[10px] mt-1", selectedCheckStatus === 'discrepancy' ? "text-rose-100" : "text-slate-400")}>
+                Cần kiểm tra kỹ
+              </span>
+            </button>
+          </div>
+
+          {/* Quick Actions & Master Drive Navigation Bar */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <a
+                href="https://drive.google.com/drive/search?q=TSG_Business_Documents"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                title="Mở thư mục gốc TSG_Business_Documents trên Google Drive"
+              >
+                <FolderOpen size={16} className="text-blue-600" />
+                <span>Mở Thư Mục TSG_Business_Documents (Drive)</span>
+                <ExternalLink size={12} className="text-blue-400" />
+              </a>
+
+              <button
+                type="button"
+                onClick={handleExportMasterExcel}
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                title="Tải sổ đối soát chứng từ dạng bảng Excel"
+              >
+                <FileSpreadsheet size={15} className="text-emerald-600" />
+                <span>Xuất Sổ Đối Soát (.xlsx)</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                id="file-upload-input" 
+                className="hidden" 
+                onChange={(e) => {
+                  if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
+                }} 
+              />
+              <label 
+                htmlFor="file-upload-input"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm active:scale-98 transition"
+              >
+                <Upload size={14} />
+                <span>Đính Kèm Chứng Từ Mới</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="relative flex-1 w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+              <input 
+                type="text" 
+                placeholder="Tìm theo số PO, số PXK, đối tác, tên tệp..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-[#F5F5F7] border border-slate-200/60 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 bg-[#F5F5F7] border border-slate-200/60 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả loại chứng từ</option>
+                <option value="PXK">Phiếu xuất kho (PXK)</option>
+                <option value="PO">Đơn đặt hàng (PO)</option>
+                <option value="HD">Hợp đồng & Phụ lục</option>
+                <option value="INVOICE">Hóa đơn VAT</option>
+                <option value="SPEC">Tiêu chuẩn Specs</option>
+              </select>
+
+              <select
+                value={selectedCheckStatus}
+                onChange={(e) => setSelectedCheckStatus(e.target.value)}
+                className="px-3 py-2 bg-[#F5F5F7] border border-slate-200/60 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả trạng thái đối soát</option>
+                <option value="verified">🟢 Đã khớp 100%</option>
+                <option value="pending">🟡 Chờ rà soát</option>
+                <option value="discrepancy">🔴 Lệch số liệu</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Double-Check Table */}
+          {filteredFiles.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center text-slate-400 space-y-3 shadow-2xs">
+              <HardDrive size={44} className="mx-auto text-slate-300" />
+              <p className="font-bold text-slate-700 text-sm">Chưa có chứng từ nào khớp với bộ lọc</p>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Hãy quét chứng từ qua OCR hoặc bấm Đính Kèm Chứng Từ Mới để lưu bản scan và đối soát chéo cùng kế toán.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase font-bold text-slate-600 tracking-wider">
+                      <th className="px-3.5 py-3.5 text-center w-12">STT</th>
+                      <th className="px-3.5 py-3.5">Loại & Tên File Scan</th>
+                      <th className="px-3.5 py-3.5 text-center">Số Chứng Từ & PO</th>
+                      <th className="px-3.5 py-3.5">Thư Mục Trên Google Drive</th>
+                      <th className="px-3.5 py-3.5 text-center">Ngày Lưu</th>
+                      <th className="px-3.5 py-3.5 text-center">Trạng Thái Đối Soát</th>
+                      <th className="px-3.5 py-3.5">Ghi Chú Kế Toán / Giám Đốc</th>
+                      <th className="px-3.5 py-3.5 text-right">Hành Động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
+                    {filteredFiles.map((file, idx) => {
+                      const status = file.doubleCheckStatus || 'pending';
+                      const isVerified = status === 'verified';
+                      const isDiscrepancy = status === 'discrepancy';
+
+                      return (
+                        <tr key={file.fileId || file.id || idx} className="hover:bg-[#FBFBFD] transition">
+                          <td className="px-3.5 py-3.5 text-center font-mono text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="px-3.5 py-3.5">
+                            <div className="flex items-center gap-2.5 max-w-[220px]">
+                              {getFileIcon(file.mimeType)}
+                              <div className="truncate">
+                                <p className="font-semibold text-slate-900 truncate" title={file.fileName}>
+                                  {file.fileName}
+                                </p>
+                                <span className="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-100">
+                                  {file.documentType || "PXK"}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-3.5 text-center">
+                            <div className="space-y-0.5">
+                              <span className="font-mono font-bold text-slate-900 block">
+                                {file.documentNumber || file.docNumber || "---"}
+                              </span>
+                              {file.customer && (
+                                <span className="text-[10.5px] text-slate-500 font-medium block truncate max-w-[130px] mx-auto">
+                                  {file.customer}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-3.5">
+                            <div className="space-y-1 max-w-[220px]">
+                              <code className="text-[10px] font-mono text-slate-600 bg-[#F5F5F7] px-2 py-0.5 rounded border border-slate-200 block truncate" title={file.folderPath || "TSG_Business_Documents"}>
+                                {file.folderPath || "TSG_Business_Documents"}
+                              </code>
+                              {file.folderLink && (
+                                <a
+                                  href={file.folderLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10.5px] text-blue-600 hover:text-blue-800 flex items-center gap-1 font-semibold"
+                                >
+                                  <FolderOpen size={12} />
+                                  <span>Mở thư mục này</span>
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-3.5 text-center text-slate-500 text-[11px] font-mono">
+                            {file.uploadDate ? new Date(file.uploadDate).toLocaleDateString("vi-VN") : "---"}
+                          </td>
+                          <td className="px-3.5 py-3.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCheckStatus(file)}
+                              className={clsx(
+                                "px-2.5 py-1 rounded-xl text-[10.5px] font-bold inline-flex items-center gap-1.5 transition cursor-pointer active:scale-95",
+                                isVerified && "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100",
+                                isDiscrepancy && "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100",
+                                !isVerified && !isDiscrepancy && "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                              )}
+                              title="Bấm để chuyển đổi trạng thái đối soát"
+                            >
+                              {isVerified && <CheckCircle size={12} className="text-emerald-600" />}
+                              {isDiscrepancy && <AlertCircle size={12} className="text-rose-600" />}
+                              {!isVerified && !isDiscrepancy && <Clock size={12} className="text-amber-600" />}
+                              <span>
+                                {isVerified ? "Đã Khớp 100%" : isDiscrepancy ? "Lệch Số Liệu" : "Chờ Rà Soát"}
+                              </span>
+                            </button>
+                          </td>
+                          <td className="px-3.5 py-3.5">
+                            {editingNoteFileId === (file.fileId || file.id) ? (
+                              <div className="flex items-center gap-1.5 min-w-[180px]">
+                                <input
+                                  type="text"
+                                  value={editingNoteText}
+                                  onChange={(e) => setEditingNoteText(e.target.value)}
+                                  placeholder="Nhập ghi chú đối soát..."
+                                  className="w-full px-2 py-1 bg-white border border-blue-400 rounded-lg text-xs outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveNote(file)}
+                                  className="p-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                                >
+                                  <Check size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingNoteFileId(null)}
+                                  className="p-1 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div 
+                                onClick={() => {
+                                  setEditingNoteFileId(file.fileId || file.id || '');
+                                  setEditingNoteText(file.checkNote || '');
+                                }}
+                                className="cursor-pointer hover:bg-slate-100 px-2 py-1 rounded-lg text-slate-600 text-[11px] truncate max-w-[200px]"
+                                title="Bấm để sửa ghi chú đối soát"
+                              >
+                                {file.checkNote ? (
+                                  <span>{file.checkNote}</span>
+                                ) : (
+                                  <span className="text-slate-300 italic">+ Thêm ghi chú...</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {file.driveLink && (
+                                <a
+                                  href={file.driveLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition"
+                                  title="Xem tệp trên Google Drive"
+                                >
+                                  <ExternalLink size={14} />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => onDelete?.(file.fileId || file.id || '')}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Xóa"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: BỘ NHỚ CƠ SỞ DỮ LIỆU BỀN VỮNG (MEMORY ENGINE) */}
       {/* ========================================================================= */}
       {activeTab === 'memory' && (
         <div className="space-y-6">
@@ -418,7 +813,7 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
                 type="button"
                 onClick={handleForceSaveMemory}
                 disabled={isSavingMemory}
-                className="p-4 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98] disabled:opacity-50"
+                className="p-4 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
               >
                 <div className="font-bold text-xs flex items-center gap-2">
                   <RefreshCw size={15} className={isSavingMemory ? "animate-spin" : ""} />
@@ -430,7 +825,7 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
               <button
                 type="button"
                 onClick={handleDownloadFullBackupJSON}
-                className="p-4 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98]"
+                className="p-4 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98] cursor-pointer"
               >
                 <div className="font-bold text-xs flex items-center gap-2">
                   <Download size={15} />
@@ -442,195 +837,56 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
               <button
                 type="button"
                 onClick={handleExportMasterExcel}
-                className="p-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98]"
+                className="p-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98] cursor-pointer"
               >
                 <div className="font-bold text-xs flex items-center gap-2">
                   <FileSpreadsheet size={15} />
                   <span>Xuất Sổ Master Excel</span>
                 </div>
-                <p className="text-[11px] text-emerald-600">Sổ Excel 12 trang tính chuẩn hóa</p>
+                <p className="text-[11px] text-emerald-600">Tổng hợp 13 trang tính CSDL</p>
               </button>
 
               <label className="p-4 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-2xl text-left space-y-1 transition active:scale-[0.98] cursor-pointer block">
                 <div className="font-bold text-xs flex items-center gap-2">
-                  <Upload size={15} />
+                  <Database size={15} />
                   <span>Khôi Phục Từ File</span>
                 </div>
-                <p className="text-[11px] text-amber-700">Nạp lại tệp backup JSON</p>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleRestoreFromFile}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Detailed Breakdown Table */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-            <div className="p-5 bg-[#F5F5F7] border-b border-slate-200/80 flex items-center justify-between">
-              <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <Layers size={16} className="text-[#007AFF]" />
-                <span>Danh Mục Dữ Liệu Đang Được Lưu Trữ</span>
-              </div>
-              <span className="text-xs font-bold text-slate-700">
-                Tổng: <strong className="text-blue-600 font-mono">{collectionsStats.totalRecords}</strong> bản ghi
-              </span>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {collectionsStats.items.map((col, idx) => (
-                <div key={idx} className="p-4 flex items-center justify-between text-xs hover:bg-slate-50 transition">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{col.icon}</span>
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm">{col.name}</div>
-                      <div className="text-[10.5px] text-slate-400 font-mono">Khoá bộ nhớ: tsg_cache_{col.key}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-5 text-right">
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm tabular-nums font-sans">{col.count.toLocaleString("vi-VN")} mục</div>
-                      <div className="text-[10.5px] text-slate-400 font-mono">{col.sizeKB} KB</div>
-                    </div>
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Trạng thái: Đã lưu an toàn"></span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 2: KHO TỆP CHỨNG TỪ GOOGLE DRIVE (FILES) */}
-      {/* ========================================================================= */}
-      {activeTab === 'files' && (
-        <div className="space-y-6">
-          {/* Controls Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <p className="text-[11px] text-amber-700">Nạp lại file JSON đã lưu</p>
                 <input 
-                  type="text" 
-                  placeholder="Tìm tài liệu, số PO/PXK..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                  type="file" 
+                  accept=".json" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onRestoreData) {
+                      const reader = new FileReader();
+                      reader.onload = async (evt) => {
+                        try {
+                          const parsed = JSON.parse(evt.target?.result as string);
+                          await onRestoreData(parsed.data || parsed);
+                          toast.success("Khôi phục thành công!");
+                        } catch (err: any) {
+                          toast.error("Lỗi đọc file: " + (err.message || err));
+                        }
+                      };
+                      reader.readAsText(file);
+                    }
+                  }} 
                 />
-              </div>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="ALL">Tất cả loại</option>
-                <option value="PO">PO - Đơn đặt hàng</option>
-                <option value="PXK">PXK - Phiếu xuất kho</option>
-                <option value="Invoice">Hóa đơn VAT</option>
-                <option value="Others">Khác</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-              <input 
-                type="file" 
-                id="file-upload-input" 
-                className="hidden" 
-                onChange={(e) => {
-                  if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
-                }} 
-              />
-              <label 
-                htmlFor="file-upload-input"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-sm active:scale-95 transition"
-              >
-                <Upload size={14} />
-                Tải lên tệp mới
               </label>
             </div>
           </div>
-
-          {/* Files List */}
-          {filteredFiles.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 space-y-2">
-              <HardDrive size={40} className="mx-auto text-slate-300" />
-              <p className="font-semibold text-slate-700 text-sm">Chưa có tệp tài liệu nào trong kho</p>
-              <p className="text-xs text-slate-400">Hãy nhấn Tải lên tệp mới để đính kèm PO, PXK hoặc Hóa đơn vào Google Drive</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#F5F5F7] border-b border-slate-200 text-[10.5px] uppercase font-bold text-slate-600">
-                    <th className="px-4 py-3">Tên Tệp</th>
-                    <th className="px-4 py-3">Loại Tài Liệu</th>
-                    <th className="px-4 py-3">Số Chứng Từ</th>
-                    <th className="px-4 py-3">Ngày Tải Lên</th>
-                    <th className="px-4 py-3 text-right">Hành Động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredFiles.map((file, idx) => (
-                    <tr key={file.fileId || idx} className="hover:bg-[#FBFBFD] transition">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          {getFileIcon(file.mimeType)}
-                          <span className="font-semibold text-slate-900">{file.fileName}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
-                          {file.documentType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono font-bold text-slate-800">
-                        {file.documentNumber || file.docNumber || "---"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {file.uploadDate ? new Date(file.uploadDate).toLocaleString("vi-VN") : "---"}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <a
-                            href={file.driveLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="Xem trên Drive"
-                          >
-                            <ExternalLink size={15} />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => onDelete?.(file.fileId)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
-                            title="Xóa"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       )}
 
       {/* Upload File Modal */}
       {selectedFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <HardDrive className="text-blue-600" size={18} />
-                <span>Tải Lên Google Drive</span>
+                <span>Đính Kèm Chứng Từ Vào Google Drive</span>
               </h3>
               <button 
                 onClick={() => setSelectedFile(null)} 
@@ -649,51 +905,62 @@ export default function StorageView({ files = [], allData, onUpload, onDelete, o
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Loại tài liệu</label>
-                <select 
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Loại Chứng Từ</label>
+                <select
                   value={uploadDocType}
                   onChange={(e) => setUploadDocType(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
                 >
-                  <option value="PO">PO - Đơn đặt hàng</option>
-                  <option value="PXK">PXK - Phiếu xuất kho</option>
-                  <option value="Invoice">Hóa đơn VAT</option>
-                  <option value="Others">Khác</option>
+                  <option value="PXK">Phiếu xuất kho / Biên bản giao hàng</option>
+                  <option value="PO">Đơn đặt hàng (PO)</option>
+                  <option value="HD">Hợp đồng & Phụ lục</option>
+                  <option value="INVOICE">Hóa đơn VAT</option>
+                  <option value="SPEC">Tiêu chuẩn kỹ thuật Specs</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Số hiệu / Mã chứng từ</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Số Chứng Từ / Số PO</label>
                 <input 
                   type="text" 
+                  placeholder="VD: 26/PXK/16 hoặc 26/KHVT/0600"
                   value={uploadDocNum}
                   onChange={(e) => setUploadDocNum(e.target.value)}
-                  placeholder="Ví dụ: PO-2026-001 hoặc 26/PXK/01"
-                  className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none"
                 />
+              </div>
+
+              <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 text-[11px] text-blue-700 space-y-1">
+                <p className="font-bold">📁 Cây Thư Mục Lưu Trữ Tự Động:</p>
+                <p className="font-mono text-[10.5px]">TSG_Business_Documents / 2026 / {uploadDocType} / Thang_04</p>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button 
+              <button
+                type="button"
                 onClick={() => setSelectedFile(null)}
                 disabled={isUploading}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
               >
-                Hủy
+                Hủy bỏ
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={handleConfirmUpload}
                 disabled={isUploading}
-                className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition disabled:opacity-50"
+                className="px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
               >
                 {isUploading ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Đang tải lên...
+                    <span>Đang tải lên Drive...</span>
                   </>
                 ) : (
-                  'Lưu lên Drive'
+                  <>
+                    <Upload size={14} />
+                    <span>Tải Lên & Lưu Trữ</span>
+                  </>
                 )}
               </button>
             </div>

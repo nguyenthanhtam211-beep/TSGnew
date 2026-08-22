@@ -66,6 +66,12 @@ export default function OCRView({
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [savedDriveInfo, setSavedDriveInfo] = useState<{
+    documentNumber: string;
+    driveLink?: string;
+    folderLink?: string;
+    folderPath?: string;
+  } | null>(null);
 
   // Drag and drop states
   const [isDragging, setIsDragging] = useState(false);
@@ -287,6 +293,15 @@ export default function OCRView({
           documentType: dataToSave.documentType,
           documentNumber: dataToSave.documentNumber,
           fileName: file.name
+        }).then((res: any) => {
+          if (res) {
+            setSavedDriveInfo({
+              documentNumber: dataToSave.documentNumber,
+              driveLink: res.driveLink,
+              folderLink: res.folderLink,
+              folderPath: res.folderPath
+            });
+          }
         }).catch(err => {
           console.warn("Background upload to Drive skipped/failed:", err);
         });
@@ -431,6 +446,7 @@ export default function OCRView({
       }
       
       setShowConfirmModal(false);
+    setSavedDriveInfo(null);
       setIsSaved(true);
       toast.success(`🎉 Đã lưu thành công chứng từ ${dataToSave.documentNumber || ''} vào hệ thống!`, { id: toastId, duration: 5000 });
     } catch (err: any) {
