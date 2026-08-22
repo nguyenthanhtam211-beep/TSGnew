@@ -998,118 +998,35 @@ export default function OCRView({
                                   </div>
                                 </td>
 
-                                {/* Smart Price & Contract Selector Dropdown */}
-                                <td className="px-3 py-3">
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setPriceSearchQuery(item.name || item.code || '');
-                                        setActivePriceSelectIdx(activePriceSelectIdx === idx ? null : idx);
-                                      }}
-                                      className={clsx(
-                                        "px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-1.5 w-full text-left cursor-pointer border",
-                                        isLinked 
-                                          ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100" 
-                                          : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                                      )}
-                                      title="Bấm để chọn mã giá hoặc hợp đồng khác"
-                                    >
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <Tag size={12} className={isLinked ? "text-emerald-600" : "text-amber-600"} />
-                                        <span className="font-mono">
-                                          {item.priceCode ? item.priceCode : "Chọn Bảng Giá..."}
-                                        </span>
-                                        {item.contractNumber && (
-                                          <span className="text-[10px] text-emerald-600 font-normal truncate">
-                                            ({item.contractNumber})
-                                          </span>
-                                        )}
-                                      </div>
-                                      <ChevronDown size={12} className="text-slate-400 shrink-0" />
-                                    </button>
-
-                                    {/* Popover Selection List */}
-                                    {activePriceSelectIdx === idx && (
-                                      <div 
-                                        ref={pricePopoverRef}
-                                        className="absolute left-0 top-full mt-1.5 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 space-y-2.5 animate-in fade-in zoom-in-95"
-                                      >
-                                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                            <Tag size={13} className="text-blue-600" />
-                                            <span>Chọn Bảng Giá & Hợp Đồng (2026)</span>
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => setActivePriceSelectIdx(null)}
-                                            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-                                          >
-                                            <X size={13} />
-                                          </button>
-                                        </div>
-
-                                        <div className="relative">
-                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-                                          <input
-                                            type="text"
-                                            value={priceSearchQuery}
-                                            onChange={(e) => setPriceSearchQuery(e.target.value)}
-                                            placeholder="Tìm mã giá, tên SP, khách hàng, số HĐ..."
-                                            className="w-full pl-8 pr-3 py-1.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                                            autoFocus
-                                          />
-                                        </div>
-
-                                        <div className="max-h-60 overflow-y-auto space-y-1 divide-y divide-slate-50">
-                                          {filteredPricingOptions.slice(0, 30).map((p, pIdx) => {
-                                            const pCode = p['Mã giá bán'] || p['Mã giá'] || p['Mã sản phẩm'];
-                                            const pName = p['Tên sản phẩm'] || '';
-                                            const pCust = p['RP_Khách hàng'] || p['Khách hàng'] || 'Chung';
-                                            const pContract = p['Số hợp đồng'] || p['Hợp đồng căn cứ'] || '';
-                                            const sp = getSellPriceFromRecord(p);
-                                            const bp = getBuyPriceFromRecord(p);
-                                            const mg = sp > 0 ? (((sp - bp)/sp)*100).toFixed(1) : '0';
-
-                                            return (
-                                              <div
-                                                key={pIdx}
-                                                onClick={() => handleSelectPricingForLine(idx, p)}
-                                                className="p-2 hover:bg-blue-50 rounded-xl cursor-pointer transition space-y-1 text-left"
-                                              >
-                                                <div className="flex items-center justify-between">
-                                                  <span className="text-xs font-bold text-blue-700 font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                                    {pCode}
-                                                  </span>
-                                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                                                    LN: {mg}%
-                                                  </span>
-                                                </div>
-                                                <p className="text-xs font-semibold text-slate-900 truncate" title={pName}>
-                                                  {pName}
-                                                </p>
-                                                <div className="flex items-center justify-between text-[10.5px] text-slate-500">
-                                                  <span>Khách: <strong className="text-slate-700">{pCust}</strong></span>
-                                                  <span>Bán: <strong className="text-emerald-600 font-mono">{sp.toLocaleString("vi-VN")} đ</strong></span>
-                                                </div>
-                                                {pContract && (
-                                                  <div className="text-[10px] text-slate-400 font-mono">
-                                                    📜 HĐ: {pContract}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-
-                                          {filteredPricingOptions.length === 0 && (
-                                            <div className="p-4 text-center text-xs text-slate-400">
-                                              Không tìm thấy bảng giá khớp
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
+                                {/* Smart Price & Contract Selector Button */}
+                                <td className="px-3.5 py-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPriceSearchQuery(item.name || item.code || "");
+                                      setActivePriceSelectIdx(idx);
+                                    }}
+                                    className={clsx(
+                                      "px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between gap-1.5 w-full text-left cursor-pointer border shadow-2xs select-none",
+                                      isLinked 
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100" 
+                                        : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
                                     )}
-                                  </div>
+                                    title="Bấm để mở bảng chọn giá và hợp đồng căn cứ"
+                                  >
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <Tag size={13} className={isLinked ? "text-emerald-600" : "text-amber-600"} />
+                                      <span className="font-bold">
+                                        {item.priceCode ? item.priceCode : "Chọn Bảng Giá..."}
+                                      </span>
+                                      {item.contractNumber && (
+                                        <span className="text-[11px] text-emerald-700 font-medium truncate">
+                                          ({item.contractNumber})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                                  </button>
                                 </td>
 
                                 <td className="px-2.5 py-3 text-center">
@@ -1384,6 +1301,139 @@ export default function OCRView({
           </div>
         </div>
       )}
+    
+      {/* 🌟 DEDICATED PRICE & CONTRACT SELECTOR MODAL */}
+      {activePriceSelectIdx !== null && ocrResult && ocrResult.items[activePriceSelectIdx] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div 
+            ref={pricePopoverRef}
+            className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+          >
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Tag size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                    Chọn Bảng Giá & Hợp Đồng Căn Cứ (2026)
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate max-w-md">
+                    Áp dụng cho dòng #{activePriceSelectIdx + 1}: <strong className="text-slate-800">{ocrResult.items[activePriceSelectIdx]?.name || ocrResult.items[activePriceSelectIdx]?.code || "Sản phẩm"}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActivePriceSelectIdx(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  value={priceSearchQuery}
+                  onChange={(e) => setPriceSearchQuery(e.target.value)}
+                  placeholder="Tìm theo mã giá (Gsp_...), tên sản phẩm, khách hàng, số hợp đồng..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium shadow-2xs"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Pricing List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar min-h-[300px] max-h-[55vh]">
+              {filteredPricingOptions.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 space-y-2">
+                  <Tag size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
+                  <p className="text-xs">Không tìm thấy mức giá nào phù hợp với từ khóa tìm kiếm.</p>
+                </div>
+              ) : (
+                filteredPricingOptions.slice(0, 50).map((p, pIdx) => {
+                  const pCode = p['Mã giá bán'] || p['Mã giá'] || p['Mã sản phẩm'];
+                  const pName = p['Tên sản phẩm'] || '';
+                  const pCust = p['RP_Khách hàng'] || p['Khách hàng'] || 'Chung';
+                  const pContract = p['Số hợp đồng'] || p['Hợp đồng căn cứ'] || '';
+                  const sp = getSellPriceFromRecord(p);
+                  const bp = getBuyPriceFromRecord(p);
+                  const mg = sp > 0 ? (((sp - bp)/sp)*100).toFixed(1) : '0';
+                  const isSelected = ocrResult.items[activePriceSelectIdx]?.priceCode === pCode;
+
+                  return (
+                    <div
+                      key={pIdx}
+                      onClick={() => {
+                        handleSelectPricingForLine(activePriceSelectIdx, p);
+                        setActivePriceSelectIdx(null);
+                      }}
+                      className={clsx(
+                        "p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 hover:shadow-md select-none",
+                        isSelected
+                          ? "bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20"
+                          : "bg-white border-slate-200/80 hover:border-blue-200 hover:bg-slate-50/60"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                            {pCode}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900 truncate max-w-sm">
+                            {pName}
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">
+                          Biên LN: {mg}%
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Khách Hàng</span>
+                          <strong className="text-slate-800 truncate block">{pCust}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Hợp Đồng Căn Cứ</span>
+                          <span className="text-slate-700 font-medium truncate block">{pContract || "---"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Đơn Giá Bán</span>
+                          <strong className="text-blue-700">{sp.toLocaleString("vi-VN")} đ</strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Giá Vốn (COGS)</span>
+                          <strong className="text-amber-700">{bp.toLocaleString("vi-VN")} đ</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <span>Tìm thấy <strong>{filteredPricingOptions.length}</strong> kết quả bảng giá 2026</span>
+              <button
+                type="button"
+                onClick={() => setActivePriceSelectIdx(null)}
+                className="px-4 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
