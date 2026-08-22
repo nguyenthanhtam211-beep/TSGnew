@@ -426,7 +426,7 @@ export default function LogisticsHubView({
               <Package size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-slate-900 tabular-nums">
+          <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
             {logisticsKPIs.totalQtyOrdered.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-slate-500 font-medium">{poLines.length} mặt hàng trong {logisticsKPIs.activePOCount} PO</p>
@@ -439,7 +439,7 @@ export default function LogisticsHubView({
               <ClipboardList size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-teal-700 tabular-nums">
+          <div className="text-2xl font-bold tracking-tight text-teal-700 tabular-nums">
             {logisticsKPIs.totalQtyPlanned.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-teal-600 font-medium">{logisticsKPIs.planCount} chuyến điều độ</p>
@@ -452,7 +452,7 @@ export default function LogisticsHubView({
               <Truck size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-emerald-700 tabular-nums">
+          <div className="text-2xl font-bold tracking-tight text-emerald-700 tabular-nums">
             {logisticsKPIs.totalQtyDelivered.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-emerald-600 font-medium">Đạt {logisticsKPIs.overallProgress}% tiến độ</p>
@@ -465,7 +465,7 @@ export default function LogisticsHubView({
               <Clock size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-amber-700 tabular-nums">
+          <div className="text-2xl font-bold tracking-tight text-amber-700 tabular-nums">
             {logisticsKPIs.totalRemaining.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-amber-600 font-medium">Cần giao tiếp</p>
@@ -478,10 +478,10 @@ export default function LogisticsHubView({
               <DollarSign size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-indigo-900 tabular-nums truncate" title={`${logisticsKPIs.totalRevenueDelivered.toLocaleString('vi-VN')} đ`}>
+          <div className="text-2xl font-bold tracking-tight text-indigo-900 truncate tabular-nums" title={`${logisticsKPIs.totalRevenueDelivered.toLocaleString('vi-VN')} đ`}>
             {logisticsKPIs.totalRevenueDelivered >= 1e9 
-              ? `${(logisticsKPIs.totalRevenueDelivered / 1e9).toFixed(2)} Tỷ`
-              : `${(logisticsKPIs.totalRevenueDelivered / 1e6).toFixed(1)} Tr`}
+              ? `${(logisticsKPIs.totalRevenueDelivered / 1e9).toFixed(2)} tỷ đ`
+              : `${(logisticsKPIs.totalRevenueDelivered / 1e6).toFixed(1)} tr đ`}
           </div>
           <p className="text-[10.5px] text-indigo-600 font-medium">Từ {logisticsKPIs.deliveryCount} PXK xuất kho</p>
         </div>
@@ -493,10 +493,10 @@ export default function LogisticsHubView({
               <TrendingUp size={13} />
             </div>
           </div>
-          <div className="text-xl font-extrabold font-mono text-rose-700 tabular-nums truncate" title={`${logisticsKPIs.totalProfitDelivered.toLocaleString('vi-VN')} đ`}>
+          <div className="text-2xl font-bold tracking-tight text-rose-700 truncate tabular-nums" title={`${logisticsKPIs.totalProfitDelivered.toLocaleString('vi-VN')} đ`}>
             {logisticsKPIs.totalProfitDelivered >= 1e9 
-              ? `${(logisticsKPIs.totalProfitDelivered / 1e9).toFixed(2)} Tỷ`
-              : `${(logisticsKPIs.totalProfitDelivered / 1e6).toFixed(1)} Tr`}
+              ? `${(logisticsKPIs.totalProfitDelivered / 1e9).toFixed(2)} tỷ đ`
+              : `${(logisticsKPIs.totalProfitDelivered / 1e6).toFixed(1)} tr đ`}
           </div>
           <p className="text-[10.5px] text-rose-600 font-bold font-mono">Biên LN: {logisticsKPIs.profitMargin}%</p>
         </div>
@@ -616,7 +616,7 @@ export default function LogisticsHubView({
                 </h3>
                 <p className="text-xs text-slate-500">Đối chiếu chi tiết giữa Đặt Hàng (PO) • Kế Hoạch Điều Độ • Phiếu Xuất Kho (PXK)</p>
               </div>
-              <span className="text-xs font-mono font-bold bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-200">
+              <span className="text-xs font-semibold tabular-nums bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-200">
                 {reconciliationData.length} Dòng Sản Phẩm
               </span>
             </div>
@@ -648,14 +648,14 @@ export default function LogisticsHubView({
                   ) : (
                     reconciliationData.map((row, idx) => (
                       <tr key={row.id} className="hover:bg-slate-50/80 transition group">
-                        <td className="px-4 py-3.5 text-center font-mono text-slate-400">
+                        <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
                           {idx + 1}
                         </td>
                         <td className="px-4 py-3.5">
                           <button
                             type="button"
                             onClick={() => onPoClick?.(row.poNum)}
-                            className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline block text-left"
+                            className="font-semibold tabular-nums text-blue-600 hover:text-blue-800 hover:underline block text-left"
                           >
                             {row.poNum}
                           </button>
@@ -681,22 +681,22 @@ export default function LogisticsHubView({
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-slate-900">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-slate-900">
                           {row.qtyOrdered.toLocaleString("vi-VN")}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-teal-700">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-teal-700">
                           {row.qtyPlanned.toLocaleString("vi-VN")}
                           {row.plansCount > 0 && (
                             <span className="text-[9.5px] text-slate-400 block font-normal">({row.plansCount} đợt)</span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-emerald-700">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-emerald-700">
                           {row.qtyDelivered.toLocaleString("vi-VN")}
                           {row.deliveriesCount > 0 && (
                             <span className="text-[9.5px] text-slate-400 block font-normal">({row.deliveriesCount} PXK)</span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-amber-700">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-amber-700">
                           {row.remaining.toLocaleString("vi-VN")}
                         </td>
                         <td className="px-4 py-3.5 text-center">
@@ -709,7 +709,7 @@ export default function LogisticsHubView({
                               style={{ width: `${Math.min(100, row.progress)}%` }}
                             />
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-slate-600 mt-1 block">
+                          <span className="text-[10px] font-semibold tabular-nums text-slate-600 mt-1 block">
                             {row.progress}%
                           </span>
                         </td>
@@ -735,10 +735,10 @@ export default function LogisticsHubView({
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-900">
+                        <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">
                           {row.revenue > 0 ? `${row.revenue.toLocaleString("vi-VN")} đ` : "---"}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-mono font-bold text-rose-700">
+                        <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-rose-700">
                           {row.profit > 0 ? `${row.profit.toLocaleString("vi-VN")} đ` : "---"}
                         </td>
                       </tr>
@@ -829,7 +829,7 @@ export default function LogisticsHubView({
                     placeholder="VD: 5000"
                     value={quickPlanForm.quantity}
                     onChange={(e) => setQuickPlanForm({ ...quickPlanForm, quantity: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-semibold tabular-nums outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
               </div>
