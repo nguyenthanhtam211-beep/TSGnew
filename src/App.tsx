@@ -1120,7 +1120,9 @@ export default function App() {
           </div>
         )}
         {activeTab === "help" && (
-          <HelpGuideView onNavigateTab={(tab) => setActiveTab(tab)} />
+          <div className="w-full flex-1">
+            <HelpGuideView onNavigateTab={(tab) => setActiveTab(tab)} />
+          </div>
         )}
         {activeTab === "settings" && (
           <div className="p-3 sm:p-5 lg:p-8">
