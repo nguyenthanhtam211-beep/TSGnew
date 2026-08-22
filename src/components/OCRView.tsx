@@ -1,33 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import { 
   Upload, FileText, CheckCircle, AlertCircle, Loader2, Edit3, 
   Trash2, Plus, Sparkles, Save, ArrowRight, Eye, RefreshCw,
-  Search, Info, HelpCircle
+  Search, Info, HelpCircle, HardDrive, ExternalLink, ChevronDown,
+  Tag, FileSpreadsheet, Building2, Layers, Check, X, ShieldAlert,
+  Percent, DollarSign, Package
 } from 'lucide-react';
-import { findPriceRecord, parseNumber, parseDateToISO } from '../lib/business-logic';
+import { 
+  findPriceRecord, 
+  parseNumber, 
+  parseDateToISO, 
+  getSellPriceFromRecord, 
+  getBuyPriceFromRecord,
+  normalizeString
+} from '../lib/business-logic';
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
 import MacTrafficLights from './MacTrafficLights';
 
-interface OCRItem {
+export interface OCRItem {
   index: number;
   code: string;
   name: string;
-  specs: string;
+  specs?: string;
   unit: string;
   quantity: number;
-  price: number;
-  amount: number;
+  price: number; // Đơn giá bán
+  buyPrice: number; // Đơn giá nhập / Giá vốn (COGS)
+  priceCode?: string; // Mã giá bán Gsp_XXX
+  contractNumber?: string; // Số hợp đồng căn cứ
+  supplier?: string; // Nhà cung cấp
+  amount: number; // Doanh thu = Số lượng * Giá bán
+  profit: number; // Lợi nhuận gộp = (Giá bán - Giá mua) * Số lượng
+  marginPct: number; // Biên lợi nhuận %
   notes: string;
 }
 
-interface OCRData {
+export interface OCRData {
   documentType: string;
   documentTypeName: string;
   documentNumber: string;
-  documentReference?: string; // New field for PO number in PXK
+  documentReference?: string; // Số PO liên kết trong PXK
   documentDate: string;
   deliveryDate: string;
   buyerName: string;
@@ -45,9 +60,15 @@ interface OCRViewProps {
   onAddPOHeader: (row: any) => Promise<void>;
   onAddPOLines: (rows: any[]) => Promise<void>;
   onAddDelivery: (rows: any[]) => Promise<void>;
-  onUploadToDrive?: (file: File, metadata: any) => Promise<void>;
-  poHeaders: any[];
-  pricingData: any[];
+  onUploadToDrive?: (file: File, metadata: any) => Promise<any>;
+  poHeaders?: any[];
+  poLines?: any[];
+  deliveryPlans?: any[];
+  pricingData?: any[];
+  contractsData?: any[];
+  productData?: any[];
+  onUpdatePOLines?: (rows: any[]) => Promise<void>;
+  onUpdateDeliveryPlan?: (rows: any[]) => Promise<void>;
 }
 
 export default function OCRView({ 
@@ -55,8 +76,14 @@ export default function OCRView({
   onAddPOLines, 
   onAddDelivery, 
   onUploadToDrive,
-  poHeaders,
-  pricingData
+  poHeaders = [],
+  poLines = [],
+  deliveryPlans = [],
+  pricingData = [],
+  contractsData = [],
+  productData = [],
+  onUpdatePOLines,
+  onUpdateDeliveryPlan
 }: OCRViewProps) {
   const [file, setFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -73,15 +100,45 @@ export default function OCRView({
     folderPath?: string;
   } | null>(null);
 
+  // Price Selector Dropdown State
+  const [activePriceSelectIdx, setActivePriceSelectIdx] = useState<number | null>(null);
+  const [priceSearchQuery, setPriceSearchQuery] = useState<string>('');
+  const pricePopoverRef = useRef<HTMLDivElement>(null);
+
   // Drag and drop states
   const [isDragging, setIsDragging] = useState(false);
+
+  // Match buyer name to pre-existing standard customer IDs
+  const getMatchedCustomerID = (name: string): string => {
+    if (!name) return "Khách hàng mới";
+    const lower = name.toLowerCase();
+    if (lower.includes("thanh hóa") || lower.includes("thanh hoá")) return "Thanh Hoá";
+    if (lower.includes("thăng long")) return "Thăng Long";
+    if (lower.includes("bắc sơn")) return "Bắc Sơn";
+    if (lower.includes("ngân sơn")) return "Ngân Sơn";
+    if (lower.includes("sài gòn")) return "Sài Gòn";
+    if (lower.includes("bến tre")) return "Bến Tre";
+    return name;
+  };
+
+  // Close price popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (evt: MouseEvent) => {
+      if (pricePopoverRef.current && !pricePopoverRef.current.contains(evt.target as Node)) {
+        setActivePriceSelectIdx(null);
+      }
+    };
+    if (activePriceSelectIdx !== null) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activePriceSelectIdx]);
 
   const handleFile = async (selectedFile: File) => {
     setFile(selectedFile);
     setIsSaved(false);
     setErrorMessage("");
 
-    // Create a local object URL for preview if it's an image
     if (selectedFile.type.startsWith("image/")) {
       const url = URL.createObjectURL(selectedFile);
       setImagePreviewUrl(url);
@@ -92,64 +149,76 @@ export default function OCRView({
     setStatus("uploading");
 
     try {
-      // Process OCR using Dual-Engine (Direct Gemini REST + Serverless API)
+      // Process OCR using Gemini Multimodal Engine
       const rawData = await processDocumentOCR(selectedFile);
       
-      let data: OCRData = {
-        documentType: rawData.documentType || 'Unknown',
-        documentTypeName: rawData.documentTypeName || 'Chứng từ',
+      const buyerCustomer = getMatchedCustomerID(rawData.buyerName || rawData.sellerName || '');
+
+      const rawItems: OCRItem[] = Array.isArray(rawData.items) ? rawData.items.map((it: any, idx: number) => {
+        const qty = Number(it.quantity) || 1;
+        const initialSellPrice = Number(it.price) || 0;
+
+        // Auto-match against pricingData
+        const priceRecord = findPriceRecord(pricingData, { 
+          sku: it.code || it.name, 
+          name: it.name,
+          customer: buyerCustomer 
+        });
+
+        const sellPrice = priceRecord ? getSellPriceFromRecord(priceRecord) : initialSellPrice;
+        const buyPrice = priceRecord ? getBuyPriceFromRecord(priceRecord) : 0;
+        const priceCode = priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm'] || '') : '';
+        const contractNo = priceRecord ? (priceRecord['Số hợp đồng'] || priceRecord['Hợp đồng căn cứ'] || '') : '';
+        const supplier = priceRecord ? (priceRecord['RP_Nhà cung cấp'] || priceRecord['Nhà cung cấp'] || 'Tâm Sen') : 'Tâm Sen';
+        const normName = priceRecord ? (priceRecord['Tên sản phẩm'] || it.name) : (it.name || 'Sản phẩm OCR');
+        const normCode = priceRecord ? (priceRecord['Mã sản phẩm'] || it.code) : (it.code || '');
+        const normUnit = priceRecord ? (priceRecord['ĐVT'] || it.unit) : (it.unit || 'Cái');
+
+        const amount = sellPrice * qty;
+        const profit = (sellPrice - buyPrice) * qty;
+        const marginPct = sellPrice > 0 ? ((sellPrice - buyPrice) / sellPrice) * 100 : 0;
+
+        return {
+          index: it.index || idx + 1,
+          code: normCode,
+          name: normName,
+          specs: it.specs || '',
+          unit: normUnit,
+          quantity: qty,
+          price: sellPrice,
+          buyPrice: buyPrice,
+          priceCode: priceCode,
+          contractNumber: contractNo,
+          supplier: supplier,
+          amount: amount,
+          profit: profit,
+          marginPct: marginPct,
+          notes: priceCode ? `Khớp bảng giá: ${priceCode} (LN: ${marginPct.toFixed(1)}%)` : 'Chưa liên kết bảng giá'
+        };
+      }) : [];
+
+      const data: OCRData = {
+        documentType: rawData.documentType || 'PXK',
+        documentTypeName: rawData.documentTypeName || 'Phiếu xuất kho',
         documentNumber: rawData.documentNumber || '',
         documentReference: rawData.documentReference || '',
         documentDate: rawData.documentDate || '',
-        deliveryDate: rawData.deliveryDate || '',
+        deliveryDate: rawData.deliveryDate || rawData.documentDate || '',
         buyerName: rawData.buyerName || '',
         buyerAddress: rawData.buyerAddress || '',
         sellerName: rawData.sellerName || '',
         sellerAddress: rawData.sellerAddress || '',
-        items: Array.isArray(rawData.items) ? rawData.items.map((it: any, idx: number) => ({
-          index: it.index || idx + 1,
-          code: it.code || '',
-          name: it.name || '',
-          specs: it.specs || '',
-          unit: it.unit || 'Cái',
-          quantity: Number(it.quantity) || 0,
-          price: Number(it.price) || 0,
-          amount: Number(it.amount) || ((Number(it.quantity) || 0) * (Number(it.price) || 0)),
-          notes: it.notes || ''
-        })) : []
+        items: rawItems,
+        signers: rawData.signers
       };
-
-      // Enrich with internal pricing data immediately
-      const matchedCust = getMatchedCustomerID(data.buyerName);
-      data.items = data.items.map(item => {
-        // Robust matching: Try code first, then name
-        const priceRecord = findPriceRecord(pricingData, { 
-          sku: item.code || item.name, 
-          customer: matchedCust 
-        });
-        
-        if (priceRecord) {
-          const sellPrice = parseNumber(priceRecord['Giá bán']);
-          const buyPrice = parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua']);
-          return {
-            ...item,
-            code: priceRecord['Mã sản phẩm'] || item.code,
-            name: priceRecord['Tên sản phẩm'] || item.name, // Normalize name from DB
-            price: sellPrice || item.price,
-            amount: (sellPrice || item.price) * item.quantity,
-            notes: `Gsp_Matched: ${priceRecord['Mã giá']} | Margin: ${sellPrice > 0 ? (((sellPrice - buyPrice)/sellPrice)*100).toFixed(1) : 0}%`
-          };
-        }
-        return item;
-      });
       
       setOcrResult(data);
       setStatus("success");
-      toast.success("Trích xuất OCR thành công!", { icon: "✨" });
+      toast.success("Trích xuất OCR & Tự động đối chiếu Bảng giá thành công!", { icon: "✨" });
       
     } catch (err: any) {
       console.error("OCR Processing error:", err);
-      let msg = err?.message || "Không thể xử lý trích xuất văn bản từ chứng từ.";
+      const msg = err?.message || "Không thể xử lý trích xuất văn bản từ chứng từ.";
       setErrorMessage(msg);
       setStatus("error");
     }
@@ -193,11 +262,16 @@ export default function OCRView({
     const updatedItems = ocrResult.items.map((item, i) => {
       if (i === index) {
         const updatedItem = { ...item, [field]: value };
-        // Recalculate amount if quantity or price changes
-        if (field === 'quantity' || field === 'price') {
+        
+        // Recalculate amount, profit & margin if quantity, price, or buyPrice changes
+        if (field === 'quantity' || field === 'price' || field === 'buyPrice') {
           const qty = field === 'quantity' ? Number(value) : item.quantity;
-          const prc = field === 'price' ? Number(value) : item.price;
-          updatedItem.amount = qty * prc;
+          const sellPr = field === 'price' ? Number(value) : item.price;
+          const buyPr = field === 'buyPrice' ? Number(value) : item.buyPrice;
+
+          updatedItem.amount = qty * sellPr;
+          updatedItem.profit = (sellPr - buyPr) * qty;
+          updatedItem.marginPct = sellPr > 0 ? ((sellPr - buyPr) / sellPr) * 100 : 0;
         }
         return updatedItem;
       }
@@ -211,6 +285,54 @@ export default function OCRView({
     setIsSaved(false);
   };
 
+  // Select a specific pricing record for a line
+  const handleSelectPricingForLine = (index: number, priceRecord: any) => {
+    if (!ocrResult || !priceRecord) return;
+    
+    const sellPrice = getSellPriceFromRecord(priceRecord);
+    const buyPrice = getBuyPriceFromRecord(priceRecord);
+    const priceCode = priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm'] || '';
+    const contractNo = priceRecord['Số hợp đồng'] || priceRecord['Hợp đồng căn cứ'] || '';
+    const supplier = priceRecord['RP_Nhà cung cấp'] || priceRecord['Nhà cung cấp'] || 'Tâm Sen';
+    const prodName = priceRecord['Tên sản phẩm'] || '';
+    const prodCode = priceRecord['Mã sản phẩm'] || '';
+    const unit = priceRecord['ĐVT'] || '';
+
+    const currentQty = ocrResult.items[index]?.quantity || 1;
+    const amount = sellPrice * currentQty;
+    const profit = (sellPrice - buyPrice) * currentQty;
+    const marginPct = sellPrice > 0 ? ((sellPrice - buyPrice) / sellPrice) * 100 : 0;
+
+    const updatedItems = ocrResult.items.map((item, i) => {
+      if (i === index) {
+        return {
+          ...item,
+          code: prodCode || item.code,
+          name: prodName || item.name,
+          unit: unit || item.unit,
+          price: sellPrice,
+          buyPrice: buyPrice,
+          priceCode: priceCode,
+          contractNumber: contractNo,
+          supplier: supplier,
+          amount: amount,
+          profit: profit,
+          marginPct: marginPct,
+          notes: `Đã liên kết [${priceCode}] ${contractNo ? `(HĐ: ${contractNo})` : ''} - LN: ${marginPct.toFixed(1)}%`
+        };
+      }
+      return item;
+    });
+
+    setOcrResult({
+      ...ocrResult,
+      items: updatedItems
+    });
+    setActivePriceSelectIdx(null);
+    setIsSaved(false);
+    toast.success(`Đã liên kết mã giá ${priceCode} cho dòng ${index + 1}!`);
+  };
+
   const handleAddItem = () => {
     if (!ocrResult) return;
     const newItem: OCRItem = {
@@ -218,12 +340,19 @@ export default function OCRView({
       code: "",
       name: "",
       specs: "",
-      unit: "",
-      quantity: 0,
+      unit: "Cái",
+      quantity: 1,
       price: 0,
+      buyPrice: 0,
+      priceCode: "",
+      contractNumber: "",
+      supplier: "Tâm Sen",
       amount: 0,
-      notes: ""
+      profit: 0,
+      marginPct: 0,
+      notes: "Dòng hàng mới"
     };
+
     setOcrResult({
       ...ocrResult,
       items: [...ocrResult.items, newItem]
@@ -245,26 +374,65 @@ export default function OCRView({
     setIsSaved(false);
   };
 
-  // Match buyer name to pre-existing standard customer IDs
-  const getMatchedCustomerID = (name: string): string => {
-    const lower = name.toLowerCase();
-    if (lower.includes("thanh hóa") || lower.includes("thanh hoá")) return "Thanh Hoá";
-    if (lower.includes("thăng long")) return "Thăng Long";
-    if (lower.includes("bắc sơn")) return "Bắc Sơn";
-    if (lower.includes("ngân sơn")) return "Ngân Sơn";
-    if (lower.includes("sài gòn")) return "Sài Gòn";
-    if (lower.includes("bến tre")) return "Bến Tre";
-    return name || "Khách hàng mới";
-  };
-
   // Helper to format currency
   const formatMoney = (amount: number) => {
-    if (!amount) return "0.00";
-    return amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (!amount) return "0";
+    return Math.round(amount).toLocaleString("vi-VN");
   };
 
+  // Financial summary of current OCR document
+  const documentFinancials = useMemo(() => {
+    if (!ocrResult || !ocrResult.items) {
+      return { totalRevenue: 0, totalCOGS: 0, totalProfit: 0, avgMargin: 0, totalQty: 0 };
+    }
+    let totalRevenue = 0;
+    let totalCOGS = 0;
+    let totalQty = 0;
+
+    ocrResult.items.forEach(it => {
+      const q = Number(it.quantity) || 0;
+      const sp = Number(it.price) || 0;
+      const bp = Number(it.buyPrice) || 0;
+      totalQty += q;
+      totalRevenue += (sp * q);
+      totalCOGS += (bp * q);
+    });
+
+    const totalProfit = totalRevenue - totalCOGS;
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    return { totalRevenue, totalCOGS, totalProfit, avgMargin, totalQty };
+  }, [ocrResult]);
+
+  // Pricing candidates for active line selection
+  const filteredPricingOptions = useMemo(() => {
+    if (!pricingData || pricingData.length === 0) return [];
+    const q = priceSearchQuery.toLowerCase().trim();
+    const currentCustomer = ocrResult ? getMatchedCustomerID(ocrResult.buyerName) : '';
+
+    return pricingData.filter(p => {
+      const code = (p['Mã giá bán'] || p['Mã giá'] || p['Mã sản phẩm'] || '').toLowerCase();
+      const name = (p['Tên sản phẩm'] || '').toLowerCase();
+      const cust = (p['RP_Khách hàng'] || p['Khách hàng'] || p['Giao đến'] || '').toLowerCase();
+      const contract = (p['Số hợp đồng'] || p['Hợp đồng căn cứ'] || '').toLowerCase();
+
+      if (!q) return true;
+      return code.includes(q) || name.includes(q) || cust.includes(q) || contract.includes(q);
+    }).sort((a, b) => {
+      // Prioritize customer matching
+      const aCust = (a['RP_Khách hàng'] || a['Khách hàng'] || '').toLowerCase();
+      const bCust = (b['RP_Khách hàng'] || b['Khách hàng'] || '').toLowerCase();
+      const cur = currentCustomer.toLowerCase();
+      const aMatch = cur && aCust.includes(cur);
+      const bMatch = cur && bCust.includes(cur);
+
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  }, [pricingData, priceSearchQuery, ocrResult]);
+
   const handleSaveToSystem = (optionalData?: OCRData | React.MouseEvent) => {
-    // If it's a mouse event from onClick, we show the confirmation modal
     const isMouseEvent = optionalData && 'nativeEvent' in optionalData;
     
     if (isMouseEvent) {
@@ -272,7 +440,6 @@ export default function OCRView({
       return;
     }
 
-    // This part is now called by the confirmation modal's "Confirm" action
     executeSaveToSystem(optionalData as OCRData);
   };
 
@@ -284,7 +451,7 @@ export default function OCRView({
     const matchedCust = getMatchedCustomerID(dataToSave.buyerName);
     
     setIsSaving(true);
-    const toastId = toast.loading('Đang lưu vào hệ thống database...');
+    const toastId = toast.loading('Đang lưu và liên kết dữ liệu đa bảng...');
 
     try {
       // 1. Upload file to Google Drive in background (non-blocking)
@@ -314,25 +481,19 @@ export default function OCRView({
         const linesToInsert = (dataToSave.items || []).map((item, idx) => {
           const lineId = `D_OCR_${Date.now()}_${idx + 1}`;
           
-          const priceRecord = findPriceRecord(pricingData, { 
-            sku: item.code, 
-            name: item.name,
-            customer: matchedCust 
-          });
-
           const qty = Number(item.quantity) || 1;
-          const sellPrice = Number(item.price) || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
-          const buyPrice = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : 0;
+          const sellPrice = Number(item.price) || 0;
+          const buyPrice = Number(item.buyPrice) || 0;
           const revenue = sellPrice * qty;
           const profit = (sellPrice - buyPrice) * qty;
 
           return {
             "STT": lineId,
             "Số đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
-            "Mã giá bán": priceRecord ? (priceRecord['Mã giá'] || "Gsp_N/A") : "Gsp_N/A",
-            "Tên sản phẩm": item.name || (priceRecord ? priceRecord['Tên sản phẩm'] : "Sản phẩm OCR"),
-            "Mã của khách": item.code || (priceRecord ? priceRecord['Mã sản phẩm'] : "") || "",
-            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái") || "Cái",
+            "Mã giá bán": item.priceCode || "Gsp_N/A",
+            "Tên sản phẩm": item.name || "Sản phẩm OCR",
+            "Mã của khách": item.code || "",
+            "ĐVT": item.unit || "Cái",
             "Số lượng": qty.toString(),
             "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
             "Ngày giao": parseDateToISO(dataToSave.deliveryDate || dataToSave.documentDate) || new Date().toISOString().split('T')[0],
@@ -343,18 +504,19 @@ export default function OCRView({
             "Đơn giá nhập": (buyPrice || 0).toLocaleString("en-US"),
             "Thành tiền dòng": (revenue || 0).toLocaleString("en-US"),
             "Hoàn thành": "0",
+            "Đã giao": "0",
+            "Còn lại": qty.toString(),
             "Số lượng khách hàng": "4",
             "Đơn giá bán": (sellPrice || 0).toLocaleString("en-US"),
             "Lợi nhuận": (profit || 0).toLocaleString("en-US"),
             "Lợi nhuận dòng": (profit || 0).toLocaleString("en-US"),
-            "Các mục mẹ 2": "",
+            "Các mục mẹ 2": item.contractNumber || "",
             "Tiến độ sản phẩm": "0%"
           };
         });
 
         const totalOrderVal = linesToInsert.reduce((sum, line) => sum + parseNumber(line["Thành tiền dòng"]), 0);
 
-        // Await all database operations
         await onAddPOHeader({
           "Đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
           "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
@@ -368,30 +530,26 @@ export default function OCRView({
 
         await onAddPOLines(linesToInsert);
 
-      } else if (docType === "PXK" || docType === "INVOICE" || docType === "BIÊN BẢN GIAO HÀNG" || docType === "PHIẾU XUẤT KHO") {
-        const deliveryRows = (dataToSave.items || []).map((item, idx) => {
-          const priceRecord = findPriceRecord(pricingData, { 
-            sku: item.code || item.name, 
-            customer: matchedCust 
-          });
+      } else {
+        // DocType: PXK, INVOICE, BIÊN BẢN GIAO HÀNG, PHIẾU XUẤT KHO
+        const poNumber = dataToSave.documentReference || "PO-REF";
 
+        const deliveryRows = (dataToSave.items || []).map((item, idx) => {
           const qty = Number(item.quantity) || 1;
-          const sellPrice = Number(item.price) || (priceRecord ? parseNumber(priceRecord['Giá bán']) : 0);
-          const buyPrice = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : 0;
+          const sellPrice = Number(item.price) || 0;
+          const buyPrice = Number(item.buyPrice) || 0;
           const revenue = sellPrice * qty;
           const profit = (sellPrice - buyPrice) * qty;
           const margin = sellPrice > 0 ? (profit / revenue) * 100 : 0;
-
-          const poNumber = dataToSave.documentReference || "PO-REF";
 
           return {
             "STT": `${Date.now()}_${idx + 1}`,
             "Chi tiết đơn hàng": `D_OCR_${Date.now()}_${idx + 1}`,
             "Ngày giao": dataToSave.deliveryDate || dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
             "Đơn hàng": poNumber,
-            "Mã sản phẩm": priceRecord ? (priceRecord['Mã giá'] || "Gsp_N/A") : (item.code || "Gsp_N/A"),
-            "Tên sản phẩm": item.name || (priceRecord ? priceRecord['Tên sản phẩm'] : "Sản phẩm OCR"),
-            "ĐVT": item.unit || (priceRecord ? priceRecord['ĐVT'] : "Cái") || "Cái",
+            "Mã sản phẩm": item.priceCode || item.code || "Gsp_N/A",
+            "Tên sản phẩm": item.name || "Sản phẩm OCR",
+            "ĐVT": item.unit || "Cái",
             "Số lượng giao": qty.toString(),
             "Số lượng đặt": qty.toString(),
             "Đã giao": qty.toString(),
@@ -402,7 +560,7 @@ export default function OCRView({
             "Khách hàng": matchedCust,
             "Sự cố": "",
             "Chi tiết sự cố": "",
-            "Nhà cung cấp": priceRecord ? (priceRecord['Tên nhà cung cấp'] || "Tâm Sen") : "Tâm Sen",
+            "Nhà cung cấp": item.supplier || "Tâm Sen",
             "Nhóm hàng": matchedCust === "Thăng Long" ? "Nguyên liệu" : "Thùng carton",
             "Đơn giá nhập": (buyPrice || 0).toLocaleString("en-US"),
             "Đơn giá bán": (sellPrice || 0).toLocaleString("en-US"),
@@ -413,42 +571,68 @@ export default function OCRView({
           };
         });
 
+        // 1. Insert into Deliveries Table
         await onAddDelivery(deliveryRows);
-      } else {
-        const deliveryRows = (dataToSave.items || []).map((item, idx) => ({
-          "STT": `${Date.now()}_${idx + 1}`,
-          "Chi tiết đơn hàng": `D_GENERIC_${idx + 1}`,
-          "Ngày giao": dataToSave.documentDate || new Date().toLocaleDateString("vi-VN"),
-          "Đơn hàng": dataToSave.documentNumber || "REF-OCR",
-          "Mã sản phẩm": item.code || "GENERIC",
-          "Tên sản phẩm": item.name || "Sản phẩm OCR",
-          "ĐVT": item.unit || "Cái",
-          "Số lượng giao": (item.quantity || 1).toString(),
-          "Số lượng đặt": (item.quantity || 1).toString(),
-          "Đã giao": "0",
-          "Còn lại": "0",
-          "Tiến độ giao": "100%",
-          "Status": "Hoàn thành",
-          "Số PXK": dataToSave.documentNumber || `PXK-${Date.now()}`,
-          "Khách hàng": matchedCust,
-          "Sự cố": "",
-          "Chi tiết sự cố": "",
-          "Nhà cung cấp": "Tâm Sen",
-          "Nhóm hàng": "Nguyên liệu",
-          "Đơn giá nhập": "0.00",
-          "Đơn giá bán": "0.00",
-          "Doanh thu": "0.00",
-          "Lợi nhuận gộp": "0.00",
-          "% Lợi nhuận": "0.00%",
-          "Tháng": new Date().getMonth() + 1
-        }));
-        await onAddDelivery(deliveryRows);
+
+        // 2. Relational Auto-Propagation: Update po_lines if matching PO found
+        if (onUpdatePOLines && poLines.length > 0 && poNumber && poNumber !== "PO-REF") {
+          const poLinesToUpdate: any[] = [];
+
+          deliveryRows.forEach(delRow => {
+            const delQty = parseNumber(delRow["Số lượng giao"]);
+            const delProd = normalizeString(delRow["Tên sản phẩm"]);
+            const delCode = normalizeString(delRow["Mã sản phẩm"]);
+
+            const matchedLine = poLines.find(pl => {
+              const poMatch = normalizeString(pl["Số đơn hàng"] || pl["Đơn hàng"]) === normalizeString(poNumber);
+              const nameMatch = normalizeString(pl["Tên sản phẩm"]).includes(delProd) || delProd.includes(normalizeString(pl["Tên sản phẩm"]));
+              const codeMatch = delCode && (normalizeString(pl["Mã của khách"]) === delCode || normalizeString(pl["Mã giá bán"]) === delCode);
+              return poMatch && (nameMatch || codeMatch);
+            });
+
+            if (matchedLine) {
+              const currentDelivered = parseNumber(matchedLine["Đã giao"] || matchedLine["Hoàn thành"] || 0);
+              const newDelivered = currentDelivered + delQty;
+              const orderedQty = parseNumber(matchedLine["Số lượng"] || 0);
+              const remaining = Math.max(0, orderedQty - newDelivered);
+              const progressPct = orderedQty > 0 ? Math.min(100, Math.round((newDelivered / orderedQty) * 100)) : 100;
+
+              poLinesToUpdate.push({
+                ...matchedLine,
+                "Đã giao": newDelivered.toString(),
+                "Hoàn thành": newDelivered.toString(),
+                "Còn lại": remaining.toString(),
+                "Tiến độ sản phẩm": `${progressPct}%`
+              });
+            }
+          });
+
+          if (poLinesToUpdate.length > 0) {
+            await onUpdatePOLines(poLinesToUpdate);
+            console.log(`Đã tự động cập nhật ${poLinesToUpdate.length} dòng PO liên quan!`);
+          }
+        }
+
+        // 3. Relational Auto-Propagation: Update delivery_plans
+        if (onUpdateDeliveryPlan && deliveryPlans.length > 0 && poNumber) {
+          const plansToUpdate = deliveryPlans.filter(dp => 
+            normalizeString(dp["Đơn hàng"] || '') === normalizeString(poNumber) &&
+            dp["Trạng thái"] !== "Hoàn thành"
+          ).map(dp => ({
+            ...dp,
+            "Trạng thái": "Hoàn thành"
+          }));
+
+          if (plansToUpdate.length > 0) {
+            await onUpdateDeliveryPlan(plansToUpdate);
+            console.log(`Đã tự động cập nhật ${plansToUpdate.length} kế hoạch giao hàng sang Hoàn thành!`);
+          }
+        }
       }
       
       setShowConfirmModal(false);
-    setSavedDriveInfo(null);
       setIsSaved(true);
-      toast.success(`🎉 Đã lưu thành công chứng từ ${dataToSave.documentNumber || ''} vào hệ thống!`, { id: toastId, duration: 5000 });
+      toast.success(`🎉 Đã lưu chứng từ ${dataToSave.documentNumber || ''} & Tự động liên kết các bảng thành công!`, { id: toastId, duration: 5000 });
     } catch (err: any) {
        console.error("Save to system error:", err);
        toast.error(`Lỗi khi lưu dữ liệu: ${err.message || err}`, { id: toastId });
@@ -464,493 +648,588 @@ export default function OCRView({
     setOcrResult(null);
     setIsSaved(false);
     setShowConfirmModal(false);
+    setSavedDriveInfo(null);
+    setActivePriceSelectIdx(null);
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
-      {/* Top Banner / Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Quét OCR Chứng từ & Nhập liệu Tự động</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Tải lên hình ảnh hoặc PDF của Đơn hàng (PO), Phiếu xuất kho (PXK) để AI tự động trích xuất dữ liệu thực tế
-            </p>
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Top Header */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10.5px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
+                Gemini Vision OCR & Auto-Pricing Engine
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs text-slate-500 font-medium">Tự Động Nhận Diện • Liên Kết Bảng Giá & Hợp Đồng • Tính Giá Thành</span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+              <Sparkles className="text-[#007AFF]" size={26} />
+              <span>Quét Chứng Từ & Tự Động Định Giá Đa Bảng</span>
+            </h2>
           </div>
-          {status !== "idle" && (
-            <button 
+
+          {ocrResult && (
+            <button
+              type="button"
               onClick={handleReset}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
             >
-              <RefreshCw size={16} />
-              Quét tài liệu khác
+              <RefreshCw size={14} />
+              <span>Quét Chứng Từ Khác</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Workspace */}
-      <div className="flex-1 overflow-hidden p-6">
-        {/* Confirmation Modal - Apple macOS Window Style */}
-        {showConfirmModal && ocrResult && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08]">
-              {/* Apple macOS Window Header */}
-              <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
-                <div className="flex items-center gap-3">
-                  <MacTrafficLights onClose={() => setShowConfirmModal(false)} />
-                  <div className="h-4 w-px bg-black/[0.08]" />
-                  <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                    <Save size={16} className="text-blue-600" />
-                    Xác nhận Lưu Dữ liệu vào Hệ thống
-                  </h3>
-                </div>
+      {/* Main OCR Content */}
+      <div className="space-y-6">
+        {/* Upload Zone (Show when status === 'idle' or no result) */}
+        {status === "idle" && !ocrResult && (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={clsx(
+              "border-2 border-dashed rounded-3xl p-12 text-center transition-all bg-white shadow-2xs cursor-pointer",
+              isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.01]" : "border-slate-300 hover:border-blue-400 hover:bg-slate-50/50"
+            )}
+          >
+            <input
+              type="file"
+              id="ocr-file-upload"
+              className="hidden"
+              accept="image/*,application/pdf"
+              onChange={handleFileInput}
+            />
+            <label htmlFor="ocr-file-upload" className="cursor-pointer space-y-4 block">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-2xs border border-blue-100">
+                <Upload size={28} />
               </div>
-              
-              <div className="p-6">
-                <div className="flex items-start gap-3.5 mb-5 bg-blue-50/70 border border-blue-100 p-4 rounded-2xl">
-                  <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-xs font-bold text-blue-900">Kiểm tra thông tin trước khi ghi vào Database</p>
-                    <p className="text-[11px] text-blue-700/90 mt-0.5">
-                      Dữ liệu sẽ được tạo thành Đơn hàng PO / Phiếu xuất kho chính thức trong hệ thống ERP.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-100 text-xs sm:text-sm">
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
-                    <span className="text-slate-500">Loại tài liệu:</span>
-                    <span className="font-bold text-slate-900">{ocrResult.documentTypeName}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
-                    <span className="text-slate-500">Số hiệu chứng từ:</span>
-                    <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{ocrResult.documentNumber}</span>
-                  </div>
-                  {ocrResult.documentReference && (
-                    <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
-                      <span className="text-slate-500">Số PO tham chiếu:</span>
-                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{ocrResult.documentReference}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
-                    <span className="text-slate-500">Khách hàng:</span>
-                    <span className="font-bold text-slate-900 text-right max-w-[220px] truncate">{ocrResult.buyerName}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-200/60">
-                    <span className="text-slate-500">Số mặt hàng trích xuất:</span>
-                    <span className="font-bold text-slate-900">{ocrResult.items.length} mặt hàng</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 bg-blue-50/60 -mx-4 -mb-4 px-4 rounded-b-2xl border-t border-blue-100">
-                    <span className="font-bold text-slate-700">Tổng doanh thu dự kiến:</span>
-                    <span className="font-bold text-blue-600 text-base">
-                      {((ocrResult?.items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0)), 0) || 0).toLocaleString("vi-VN")} đ
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-6">
-                  <button
-                    onClick={() => setShowConfirmModal(false)}
-                    className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    Hủy, kiểm tra lại
-                  </button>
-                  <button
-                    onClick={() => executeSaveToSystem()}
-                    disabled={isSaving}
-                    className={clsx(
-                      "px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2",
-                      isSaving 
-                        ? "bg-slate-300 cursor-not-allowed text-slate-500" 
-                        : "bg-[#007AFF] hover:bg-[#0062CC] text-white shadow-blue-500/20"
-                    )}
-                  >
-                    {isSaving && <Loader2 size={18} className="animate-spin" />}
-                    {isSaving ? "Đang xử lý..." : "Xác nhận Lưu ngay"}
-                  </button>
-                </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold text-slate-900">
+                  Kéo thả Biên bản giao hàng, PXK hoặc Đơn hàng PO vào đây
+                </h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Hệ thống hỗ trợ tệp ảnh (PNG, JPG) và PDF. Trí tuệ nhân tạo Gemini sẽ tự động bóc tách số liệu, đối chiếu bảng giá 2026 và tính giá thành tức thì.
+                </p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {status === "idle" && (
-          <div className="max-w-4xl mx-auto h-full flex flex-col justify-center py-10">
-            <div 
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`bg-white border-2 border-dashed rounded-2xl p-16 flex flex-col items-center justify-center text-center transition-all cursor-pointer relative ${
-                isDragging 
-                  ? "border-blue-500 bg-blue-50/40 ring-4 ring-blue-50" 
-                  : "border-gray-300 hover:border-blue-400 hover:bg-gray-50/50"
-              }`}
-            >
-              <input 
-                type="file" 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                accept="image/*,application/pdf"
-                onChange={handleFileInput}
-                title="Tải lên hoặc Kéo thả file vào đây"
-              />
-              <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 text-blue-600 shadow-sm">
-                <Upload size={36} />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Kéo thả file vào đây hoặc click để chọn</h3>
-              <p className="text-gray-500 text-sm max-w-md leading-relaxed">
-                Hỗ trợ các định dạng hình ảnh (PNG, JPG, JPEG) hoặc PDF tài liệu. AI sẽ đọc văn bản, phân tích cấu trúc bảng và chuyển thành dữ liệu hệ thống.
-              </p>
-              
-              <div className="mt-8 flex items-center justify-center gap-6 text-xs text-gray-400 font-medium">
-                <span className="flex items-center gap-1">
-                  <Sparkles size={14} className="text-amber-500 animate-pulse" />
-                  Xử lý bởi Gemini 3.5 AI
+              <div className="pt-2">
+                <span className="inline-flex items-center gap-2 px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-sm transition">
+                  <FileText size={14} />
+                  <span>Chọn Tệp Từ Máy Tính</span>
                 </span>
-                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
-                <span>Tự động khớp dữ liệu</span>
-                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
-                <span>Chỉnh sửa trước khi lưu</span>
               </div>
-            </div>
+            </label>
           </div>
         )}
 
+        {/* Loading State */}
         {status === "uploading" && (
-          <div className="max-w-md mx-auto h-full flex flex-col justify-center items-center text-center py-12">
-            <div className="bg-white border border-gray-200 rounded-2xl p-10 shadow-sm flex flex-col items-center">
-              <Loader2 size={44} className="text-blue-600 animate-spin mb-6" />
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Đang đọc tài liệu bằng AI...</h3>
-              <p className="text-sm text-gray-500 mb-3">Tải lên: {file?.name}</p>
-              <div className="w-full bg-gray-100 rounded-full h-1.5 max-w-xs overflow-hidden">
-                <div className="bg-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: "80%" }}></div>
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center shadow-2xs space-y-4">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-blue-100 animate-ping opacity-50" />
+              <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-md">
+                <Loader2 size={26} className="animate-spin" />
               </div>
-              <p className="text-xs text-gray-400 mt-4 leading-relaxed">
-                Gemini đang thực hiện OCR nhận diện chữ viết tay, chữ in, trích xuất bảng biểu và thông tin đối tác...
-              </p>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900">Đang trích xuất văn bản & Đối chiếu Bảng Giá 2026...</h3>
+              <p className="text-xs text-slate-500">Đang phân tích bảng biểu, mã sản phẩm và hợp đồng liên kết</p>
             </div>
           </div>
         )}
 
+        {/* Error State */}
         {status === "error" && (
-          <div className="max-w-lg mx-auto h-full flex flex-col justify-center items-center text-center py-12">
-            <div className="bg-white border border-red-100 rounded-3xl p-8 sm:p-10 shadow-lg shadow-red-500/5 flex flex-col items-center">
-              <div className="bg-red-50 w-16 h-16 rounded-2xl flex items-center justify-center mb-5 text-red-500 shadow-xs">
-                <AlertCircle size={32} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Đã xảy ra sự cố khi quét OCR</h3>
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs text-slate-600 leading-relaxed mb-6 max-w-sm text-left">
-                <span className="font-semibold text-slate-700 block mb-1">Chi tiết thông báo:</span>
-                {errorMessage}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2.5 w-full">
-                <button 
-                  onClick={handleReset}
-                  className="flex-1 px-5 py-2.5 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors shadow-sm shadow-blue-500/20"
-                >
-                  Thử quét lại file khác
-                </button>
+          <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 text-rose-800 space-y-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={24} className="text-rose-600 shrink-0" />
+              <div>
+                <h4 className="font-bold text-sm">Có lỗi xảy ra trong quá trình quét</h4>
+                <p className="text-xs text-rose-700">{errorMessage}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition"
+            >
+              Thử lại với tệp khác
+            </button>
           </div>
         )}
 
+        {/* Results & Verification View */}
         {status === "success" && ocrResult && (
-          <div className="h-full flex gap-6 overflow-hidden">
-            {/* Left Column: Visual Preview */}
-            <div className="w-1/3 bg-white border border-gray-200 rounded-2xl flex flex-col overflow-hidden shadow-sm">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                <div className="flex items-center gap-2">
-                  <Eye size={16} className="text-gray-500" />
-                  <span className="font-semibold text-gray-700 text-sm">Xem trước Tài liệu Gốc</span>
-                </div>
-                <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2.5 py-1 rounded-md font-mono truncate max-w-[150px]">
-                  {file?.name}
-                </span>
-              </div>
-              <div className="flex-1 bg-gray-100 flex items-center justify-center p-6 overflow-auto">
-                {imagePreviewUrl ? (
-                  <img 
-                    src={imagePreviewUrl} 
-                    alt="Original Document Preview" 
-                    className="max-h-full max-w-full rounded-lg shadow-md object-contain border border-gray-200 bg-white" 
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="text-center p-8 text-gray-400">
-                    <FileText size={48} className="mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">Xem trước hình ảnh không khả dụng (Đang xem file PDF/Khác)</p>
-                    <p className="text-xs mt-1 text-gray-400">AI vẫn phân tích chính xác toàn bộ nội dung</p>
+          <div className="space-y-6">
+            {/* Drive Link Banner */}
+            {savedDriveInfo && (
+              <div className="bg-emerald-50/95 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <CheckCircle size={22} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-emerald-950 flex items-center gap-2">
+                        <span>Đã lưu & đồng bộ chứng từ:</span>
+                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-800 font-extrabold">{savedDriveInfo.documentNumber}</span>
+                      </h4>
+                      <p className="text-xs text-emerald-800 flex items-center gap-1.5 mt-1">
+                        <span className="font-semibold">📂 Vị trí Google Drive:</span>
+                        <code className="font-mono bg-white/80 px-2 py-0.5 rounded border border-emerald-200 text-emerald-900 text-[11px] font-bold">
+                          {savedDriveInfo.folderPath || "TSG_Business_Documents / 2026"}
+                        </code>
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Right Column: OCR Editor and Saver */}
-            <div className="flex-1 bg-white border border-gray-200 rounded-2xl flex flex-col overflow-hidden shadow-sm">
-              {/* Review status bar */}
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-green-50/40 border-t-4 border-t-green-500">
-                <div className="flex items-center gap-3">
-                  <div className="bg-green-100 text-green-700 p-1.5 rounded-lg">
-                    <CheckCircle size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm">Kết quả Đọc OCR Thực tế thành công</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Vui lòng đối chiếu với ảnh gốc bên trái, chỉnh sửa nếu cần và chọn "Lưu vào Hệ thống"
-                    </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {savedDriveInfo.driveLink && (
+                      <a
+                        href={savedDriveInfo.driveLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                      >
+                        <ExternalLink size={14} />
+                        <span>Xem Bản Scan Trên Drive</span>
+                      </a>
+                    )}
+                    {savedDriveInfo.folderLink && (
+                      <a
+                        href={savedDriveInfo.folderLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                      >
+                        <HardDrive size={14} />
+                        <span>Mở Thư Mục TSG_Business_Documents</span>
+                      </a>
+                    )}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Document Details Card */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
+              <div className="bg-[#F5F5F7] px-6 py-4 border-b border-slate-200/80 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MacTrafficLights />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Thông Tin Chứng Từ Đã Bóc Tách
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-blue-100 text-blue-700 rounded-md">
-                    Khớp loại: {ocrResult.documentTypeName} ({ocrResult.documentType})
+                  <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold font-mono uppercase">
+                    {ocrResult.documentType}
                   </span>
                 </div>
               </div>
 
-              {/* Form Workspace */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Meta Fields Section */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+              <div className="p-6 space-y-6">
+                {/* Meta Inputs Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Loại chứng từ</label>
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Loại Chứng Từ
+                    </label>
                     <select
                       value={ocrResult.documentType}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const nameMap: Record<string, string> = {
-                          "PO": "Đơn đặt hàng (PO)",
-                          "PXK": "Phiếu xuất kho (PXK)",
-                          "Invoice": "Hóa đơn đỏ (Invoice)",
-                          "Unknown": "Khác / Chưa phân loại"
-                        };
-                        setOcrResult({
-                          ...ocrResult,
-                          documentType: val,
-                          documentTypeName: nameMap[val] || "Khác"
-                        });
-                      }}
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors"
+                      onChange={(e) => handleMetaChange("documentType", e.target.value)}
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-bold text-slate-800 outline-none"
                     >
-                      <option value="PO">Đơn đặt hàng (PO)</option>
-                      <option value="PXK">Phiếu xuất kho (PXK)</option>
-                      <option value="Invoice">Hóa đơn (Invoice)</option>
-                      <option value="Unknown">Khác / Chưa rõ</option>
+                      <option value="PXK">PXK - Phiếu xuất kho / Biên bản giao hàng</option>
+                      <option value="PO">PO - Đơn đặt hàng</option>
+                      <option value="HD">Hợp đồng & Phụ lục</option>
+                      <option value="INVOICE">Hóa đơn VAT</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Số chứng từ</label>
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Số Chứng Từ / Số PXK
+                    </label>
                     <input
                       type="text"
                       value={ocrResult.documentNumber || ""}
                       onChange={(e) => handleMetaChange("documentNumber", e.target.value)}
-                      placeholder="Số PO / Số PXK..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors font-medium text-gray-900"
-                    />
-                  </div>
-
-                  {ocrResult.documentType === "PXK" && (
-                    <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                      <label className="block text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5">Số Đơn hàng (PO)</label>
-                      <input
-                        type="text"
-                        value={ocrResult.documentReference || ""}
-                        onChange={(e) => handleMetaChange("documentReference", e.target.value)}
-                        placeholder="Số PO tham chiếu..."
-                        className="w-full bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3.5 py-2 text-sm outline-none transition-colors font-bold text-blue-800"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Ngày lập</label>
-                    <input
-                      type="text"
-                      value={ocrResult.documentDate || ""}
-                      onChange={(e) => handleMetaChange("documentDate", e.target.value)}
-                      placeholder="Ngày lập (Ví dụ: 09/01/2026)"
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors"
+                      placeholder="VD: 26/PXK/16"
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-bold font-mono text-slate-900 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Thời hạn/Ngày giao</label>
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Số Đơn Hàng Liên Kết (Số PO)
+                    </label>
                     <input
                       type="text"
-                      value={ocrResult.deliveryDate || ""}
-                      onChange={(e) => handleMetaChange("deliveryDate", e.target.value)}
-                      placeholder="Ngày giao nhận hàng..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors"
+                      value={ocrResult.documentReference || ""}
+                      onChange={(e) => handleMetaChange("documentReference", e.target.value)}
+                      placeholder="VD: 4/TS/26 hoặc 26/KHVT/0600"
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-bold font-mono text-blue-700 outline-none"
                     />
                   </div>
 
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Bên mua / Bên nhận hàng</label>
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Ngày Chứng Từ / Giao Hàng
+                    </label>
+                    <input
+                      type="text"
+                      value={ocrResult.deliveryDate || ocrResult.documentDate || ""}
+                      onChange={(e) => {
+                        handleMetaChange("deliveryDate", e.target.value);
+                        handleMetaChange("documentDate", e.target.value);
+                      }}
+                      placeholder="VD: 28/04/2026"
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-bold font-mono text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Bên Nhận Hàng (Khách Hàng)
+                    </label>
                     <input
                       type="text"
                       value={ocrResult.buyerName || ""}
                       onChange={(e) => handleMetaChange("buyerName", e.target.value)}
-                      placeholder="Khách hàng mua hàng..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm font-semibold text-gray-800 outline-none transition-colors"
+                      placeholder="VD: CÔNG TY TNHH MTV THUỐC LÁ THANH HÓA"
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 outline-none"
                     />
                   </div>
-                </div>
 
-                {/* Seller/Buyer Addresses details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t border-gray-100">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Địa chỉ Bên nhận</label>
-                    <textarea
-                      value={ocrResult.buyerAddress || ""}
-                      onChange={(e) => handleMetaChange("buyerAddress", e.target.value)}
-                      rows={2}
-                      placeholder="Địa chỉ giao hàng..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Bên bán / Bên cung cấp</label>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Bên Giao Hàng (Nhà Cung Cấp / Đại Diện)
+                    </label>
                     <input
                       type="text"
                       value={ocrResult.sellerName || ""}
                       onChange={(e) => handleMetaChange("sellerName", e.target.value)}
-                      placeholder="Tên nhà cung cấp..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-sm outline-none transition-colors mb-2"
-                    />
-                    <input
-                      type="text"
-                      value={ocrResult.sellerAddress || ""}
-                      onChange={(e) => handleMetaChange("sellerAddress", e.target.value)}
-                      placeholder="Địa chỉ bên bán..."
-                      className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-2 text-xs outline-none transition-colors"
+                      placeholder="VD: CÔNG TY TNHH TM VÀ ĐT TẬP ĐOÀN TÂM SEN"
+                      className="w-full px-3 py-2 bg-[#F5F5F7] border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Items/Goods Table Section */}
-                <div className="pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Danh sách Chi tiết Hàng hóa</h4>
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <Package size={15} className="text-blue-600" />
+                        <span>Danh Sách Hàng Hóa & Bảng Giá Liên Kết</span>
+                      </h4>
+                      <span className="text-[10.5px] text-slate-400 font-medium">({ocrResult.items.length} dòng hàng)</span>
+                    </div>
+
                     <button
+                      type="button"
                       onClick={handleAddItem}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer"
                     >
-                      <Plus size={14} /> Thêm dòng hàng
+                      <Plus size={13} />
+                      <span>Thêm Dòng Hàng</span>
                     </button>
                   </div>
 
-                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 text-xs">
-                        <tr>
-                          <th className="px-3 py-3 w-10 text-center">STT</th>
-                          <th className="px-3 py-3 w-32">Mã SP</th>
-                          <th className="px-4 py-3">Tên sản phẩm/hàng hóa</th>
-                          <th className="px-3 py-3 w-28">Đối chiếu giá</th>
-                          <th className="px-3 py-3 w-16 text-center">ĐVT</th>
-                          <th className="px-3 py-3 w-24 text-right">Số lượng</th>
-                          <th className="px-3 py-3 w-28 text-right">Đơn giá bán</th>
-                          <th className="px-3 py-3 w-28 text-right">Doanh thu</th>
-                          <th className="px-3 py-3 w-12 text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {ocrResult.items.map((item, idx) => {
-                          const isMatched = item.notes?.includes('Matched');
-                          return (
-                          <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-3 py-2.5 text-center font-mono text-xs text-gray-400">
-                              {idx + 1}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <input
-                                type="text"
-                                value={item.code || ""}
-                                onChange={(e) => handleItemChange(idx, "code", e.target.value)}
-                                className={`w-full bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs outline-none ${isMatched ? 'text-blue-600 font-bold' : ''}`}
-                                placeholder="Auto"
-                              />
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={item.name || ""}
-                                  onChange={(e) => handleItemChange(idx, "name", e.target.value)}
-                                  className="flex-1 bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-sm font-semibold text-gray-900 outline-none"
-                                  placeholder="Nhập tên hàng hóa"
-                                />
-                                <ProductHoverCard productName={item.name} productCode={item.code} pricingData={pricingData}>
-                                  <div className="text-gray-300 hover:text-blue-500 transition-colors">
-                                    <HelpCircle size={14} />
-                                  </div>
-                                </ProductHoverCard>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              {isMatched ? (
-                                <div className="flex items-center gap-1.5 text-[10px] bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100 font-medium whitespace-nowrap overflow-hidden">
-                                  <CheckCircle size={10} className="shrink-0" />
-                                  <span className="truncate">{item.notes?.split('|')[0].replace('Matched: ', '')}</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 font-medium">
-                                  <AlertCircle size={10} className="shrink-0" />
-                                  Chưa khớp giá
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <input
-                                type="text"
-                                value={item.unit || ""}
-                                onChange={(e) => handleItemChange(idx, "unit", e.target.value)}
-                                className="w-full text-center bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs outline-none"
-                                placeholder="Đvt"
-                              />
-                            </td>
-                            <td className="px-3 py-2.5 text-right">
-                              <input
-                                type="number"
-                                value={item.quantity || 0}
-                                onChange={(e) => handleItemChange(idx, "quantity", parseInt(e.target.value) || 0)}
-                                className="w-full text-right bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-sm font-mono font-bold text-gray-900 outline-none"
-                              />
-                            </td>
-                            <td className="px-3 py-2.5 text-right">
-                              <input
-                                type="number"
-                                value={item.price || 0}
-                                onChange={(e) => handleItemChange(idx, "price", parseFloat(e.target.value) || 0)}
-                                className="w-full text-right bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-sm font-mono outline-none"
-                              />
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-mono text-sm font-bold text-blue-600">
-                              {(Number(item.amount) || ((item.quantity || 0) * (item.price || 0)) || 0).toLocaleString("vi-VN")}
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <button
-                                onClick={() => handleRemoveItem(idx)}
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
+                  {/* Items Table */}
+                  <div className="border border-slate-200/80 rounded-2xl overflow-hidden bg-white shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase font-bold text-slate-600">
+                            <th className="px-3 py-3 text-center w-10">STT</th>
+                            <th className="px-3 py-3 w-28">Mã SP</th>
+                            <th className="px-4 py-3 min-w-[200px]">Tên Hàng Hóa</th>
+                            <th className="px-3 py-3 min-w-[220px]">Bảng Giá & Hợp Đồng</th>
+                            <th className="px-2.5 py-3 text-center w-16">ĐVT</th>
+                            <th className="px-3 py-3 text-right w-24">Số Lượng</th>
+                            <th className="px-3 py-3 text-right w-28">Đơn Giá Bán</th>
+                            <th className="px-3 py-3 text-right w-28">Giá Vốn (COGS)</th>
+                            <th className="px-3 py-3 text-right w-28">Doanh Thu</th>
+                            <th className="px-3 py-3 text-right w-28">Lợi Nhuận</th>
+                            <th className="px-2.5 py-3 text-center w-10"></th>
                           </tr>
-                        );
-                        })}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {ocrResult.items.map((item, idx) => {
+                            const isLinked = Boolean(item.priceCode);
+                            const profit = (item.price - item.buyPrice) * item.quantity;
+
+                            return (
+                              <tr key={idx} className="hover:bg-[#FBFBFD] transition">
+                                <td className="px-3 py-3 text-center font-mono text-slate-400">
+                                  {idx + 1}
+                                </td>
+
+                                <td className="px-3 py-3">
+                                  <input
+                                    type="text"
+                                    value={item.code || ""}
+                                    onChange={(e) => handleItemChange(idx, "code", e.target.value)}
+                                    placeholder="Mã SKU"
+                                    className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-mono font-bold text-slate-800 outline-none"
+                                  />
+                                </td>
+
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={item.name || ""}
+                                      onChange={(e) => handleItemChange(idx, "name", e.target.value)}
+                                      placeholder="Nhập tên sản phẩm..."
+                                      className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-bold text-slate-900 outline-none"
+                                    />
+                                    <ProductHoverCard productName={item.name} productCode={item.code} pricingData={pricingData}>
+                                      <div className="text-slate-300 hover:text-blue-500 transition cursor-pointer shrink-0">
+                                        <HelpCircle size={14} />
+                                      </div>
+                                    </ProductHoverCard>
+                                  </div>
+                                </td>
+
+                                {/* Smart Price & Contract Selector Dropdown */}
+                                <td className="px-3 py-3">
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPriceSearchQuery(item.name || item.code || '');
+                                        setActivePriceSelectIdx(activePriceSelectIdx === idx ? null : idx);
+                                      }}
+                                      className={clsx(
+                                        "px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-1.5 w-full text-left cursor-pointer border",
+                                        isLinked 
+                                          ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100" 
+                                          : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                      )}
+                                      title="Bấm để chọn mã giá hoặc hợp đồng khác"
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <Tag size={12} className={isLinked ? "text-emerald-600" : "text-amber-600"} />
+                                        <span className="font-mono">
+                                          {item.priceCode ? item.priceCode : "Chọn Bảng Giá..."}
+                                        </span>
+                                        {item.contractNumber && (
+                                          <span className="text-[10px] text-emerald-600 font-normal truncate">
+                                            ({item.contractNumber})
+                                          </span>
+                                        )}
+                                      </div>
+                                      <ChevronDown size={12} className="text-slate-400 shrink-0" />
+                                    </button>
+
+                                    {/* Popover Selection List */}
+                                    {activePriceSelectIdx === idx && (
+                                      <div 
+                                        ref={pricePopoverRef}
+                                        className="absolute left-0 top-full mt-1.5 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 space-y-2.5 animate-in fade-in zoom-in-95"
+                                      >
+                                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                            <Tag size={13} className="text-blue-600" />
+                                            <span>Chọn Bảng Giá & Hợp Đồng (2026)</span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setActivePriceSelectIdx(null)}
+                                            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                                          >
+                                            <X size={13} />
+                                          </button>
+                                        </div>
+
+                                        <div className="relative">
+                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                                          <input
+                                            type="text"
+                                            value={priceSearchQuery}
+                                            onChange={(e) => setPriceSearchQuery(e.target.value)}
+                                            placeholder="Tìm mã giá, tên SP, khách hàng, số HĐ..."
+                                            className="w-full pl-8 pr-3 py-1.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                            autoFocus
+                                          />
+                                        </div>
+
+                                        <div className="max-h-60 overflow-y-auto space-y-1 divide-y divide-slate-50">
+                                          {filteredPricingOptions.slice(0, 30).map((p, pIdx) => {
+                                            const pCode = p['Mã giá bán'] || p['Mã giá'] || p['Mã sản phẩm'];
+                                            const pName = p['Tên sản phẩm'] || '';
+                                            const pCust = p['RP_Khách hàng'] || p['Khách hàng'] || 'Chung';
+                                            const pContract = p['Số hợp đồng'] || p['Hợp đồng căn cứ'] || '';
+                                            const sp = getSellPriceFromRecord(p);
+                                            const bp = getBuyPriceFromRecord(p);
+                                            const mg = sp > 0 ? (((sp - bp)/sp)*100).toFixed(1) : '0';
+
+                                            return (
+                                              <div
+                                                key={pIdx}
+                                                onClick={() => handleSelectPricingForLine(idx, p)}
+                                                className="p-2 hover:bg-blue-50 rounded-xl cursor-pointer transition space-y-1 text-left"
+                                              >
+                                                <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-bold text-blue-700 font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                    {pCode}
+                                                  </span>
+                                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                    LN: {mg}%
+                                                  </span>
+                                                </div>
+                                                <p className="text-xs font-semibold text-slate-900 truncate" title={pName}>
+                                                  {pName}
+                                                </p>
+                                                <div className="flex items-center justify-between text-[10.5px] text-slate-500">
+                                                  <span>Khách: <strong className="text-slate-700">{pCust}</strong></span>
+                                                  <span>Bán: <strong className="text-emerald-600 font-mono">{sp.toLocaleString("vi-VN")} đ</strong></span>
+                                                </div>
+                                                {pContract && (
+                                                  <div className="text-[10px] text-slate-400 font-mono">
+                                                    📜 HĐ: {pContract}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+
+                                          {filteredPricingOptions.length === 0 && (
+                                            <div className="p-4 text-center text-xs text-slate-400">
+                                              Không tìm thấy bảng giá khớp
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="px-2.5 py-3 text-center">
+                                  <input
+                                    type="text"
+                                    value={item.unit || ""}
+                                    onChange={(e) => handleItemChange(idx, "unit", e.target.value)}
+                                    placeholder="ĐVT"
+                                    className="w-full bg-[#F5F5F7] px-1 py-1 rounded-lg text-xs text-center font-semibold text-slate-700 outline-none"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  <input
+                                    type="number"
+                                    value={item.quantity || 0}
+                                    onChange={(e) => handleItemChange(idx, "quantity", parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-bold font-mono text-slate-900 text-right outline-none"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  <input
+                                    type="number"
+                                    value={item.price || 0}
+                                    onChange={(e) => handleItemChange(idx, "price", parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-bold font-mono text-emerald-700 text-right outline-none"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  <input
+                                    type="number"
+                                    value={item.buyPrice || 0}
+                                    onChange={(e) => handleItemChange(idx, "buyPrice", parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-bold font-mono text-amber-700 text-right outline-none"
+                                  />
+                                </td>
+
+                                <td className="px-3 py-3 text-right font-mono font-bold text-blue-600 text-xs">
+                                  {formatMoney(item.amount || (item.quantity * item.price))} đ
+                                </td>
+
+                                <td className="px-3 py-3 text-right font-mono font-bold text-emerald-600 text-xs">
+                                  {formatMoney(profit)} đ
+                                </td>
+
+                                <td className="px-2.5 py-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItem(idx)}
+                                    className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                    title="Xóa dòng này"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Document Financials Bento Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2">
+                    <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <DollarSign size={13} />
+                        <span>Tổng Doanh Thu</span>
+                      </span>
+                      <div className="text-lg sm:text-xl font-bold font-mono text-blue-900 tabular-nums">
+                        {formatMoney(documentFinancials.totalRevenue)} <span className="text-xs font-normal text-blue-600">đ</span>
+                      </div>
+                      <p className="text-[10px] text-blue-600">Tổng giá trị đơn / PXK</p>
+                    </div>
+
+                    <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Package size={13} />
+                        <span>Tổng Giá Vốn (COGS)</span>
+                      </span>
+                      <div className="text-lg sm:text-xl font-bold font-mono text-amber-900 tabular-nums">
+                        {formatMoney(documentFinancials.totalCOGS)} <span className="text-xs font-normal text-amber-600">đ</span>
+                      </div>
+                      <p className="text-[10px] text-amber-600">Chi phí nhập từ NCC</p>
+                    </div>
+
+                    <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <DollarSign size={13} />
+                        <span>Lợi Nhuận Gộp</span>
+                      </span>
+                      <div className="text-lg sm:text-xl font-bold font-mono text-emerald-900 tabular-nums">
+                        {formatMoney(documentFinancials.totalProfit)} <span className="text-xs font-normal text-emerald-600">đ</span>
+                      </div>
+                      <p className="text-[10px] text-emerald-600">Chênh lệch Bán - Mua</p>
+                    </div>
+
+                    <div className="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-1">
+                      <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Percent size={13} />
+                        <span>Biên Lợi Nhuận TB</span>
+                      </span>
+                      <div className="text-lg sm:text-xl font-bold font-mono text-purple-900 tabular-nums">
+                        {documentFinancials.avgMargin.toFixed(1)} <span className="text-xs font-normal text-purple-600">%</span>
+                      </div>
+                      <p className="text-[10px] text-purple-600">Hiệu suất tài chính</p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Signers Info */}
                 {ocrResult.signers && (
-                  <div className="pt-4 border-t border-gray-100 grid grid-cols-2 gap-5 text-sm">
+                  <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs">
                     <div>
-                      <span className="block text-xs font-semibold text-gray-400 uppercase mb-1">Người lập đơn/Chứng từ</span>
+                      <span className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Người Lập Đơn / Chứng Từ
+                      </span>
                       <input
                         type="text"
                         value={ocrResult.signers.creator || ""}
@@ -963,11 +1242,13 @@ export default function OCRView({
                             }
                           });
                         }}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-1.5 text-xs outline-none font-medium"
+                        className="w-full bg-[#F5F5F7] border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none"
                       />
                     </div>
                     <div>
-                      <span className="block text-xs font-semibold text-gray-400 uppercase mb-1">Người ký duyệt / Đại diện</span>
+                      <span className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Người Ký Duyệt / Đại Diện
+                      </span>
                       <input
                         type="text"
                         value={ocrResult.signers.approver || ""}
@@ -980,34 +1261,46 @@ export default function OCRView({
                             }
                           });
                         }}
-                        className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-lg px-3.5 py-1.5 text-xs outline-none font-medium"
+                        className="w-full bg-[#F5F5F7] border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none"
                       />
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Action Bar */}
-              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+              {/* Bottom Action Toolbar */}
+              <div className="px-6 py-4 border-t border-slate-200/80 bg-[#F5F5F7] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <button
+                  type="button"
                   onClick={handleReset}
-                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  className="px-5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition cursor-pointer"
                 >
-                  Bỏ qua & Quét lại
+                  Bỏ qua & Quét tệp khác
                 </button>
                 
                 {isSaved ? (
-                  <div className="flex items-center gap-2 text-green-700 font-bold text-sm bg-green-100 px-4 py-2.5 rounded-lg animate-in fade-in zoom-in-95 duration-150">
-                    <CheckCircle size={18} />
-                    <span>Đã lưu thành công dữ liệu thực tế vào danh sách {ocrResult.documentType === 'PO' ? 'Đơn hàng' : 'Giao hàng (PXK)'}!</span>
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs bg-emerald-100 border border-emerald-200 px-4 py-2.5 rounded-xl animate-in fade-in zoom-in-95">
+                    <CheckCircle size={16} className="text-emerald-700" />
+                    <span>Đã lưu thành công dữ liệu vào danh sách {ocrResult.documentType === 'PO' ? 'Đơn hàng' : 'Giao hàng (PXK)'} & Tự động liên kết các bảng!</span>
                   </div>
                 ) : (
                   <button
+                    type="button"
                     onClick={handleSaveToSystem}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-95"
+                    disabled={isSaving}
+                    className="px-6 py-2.5 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
                   >
-                    <Save size={18} />
-                    Lưu vào Hệ thống ({ocrResult.documentType})
+                    {isSaving ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Đang lưu và liên kết dữ liệu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={15} />
+                        <span>Lưu Vào Hệ Thống ({ocrResult.documentType})</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -1015,6 +1308,82 @@ export default function OCRView({
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && ocrResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <CheckCircle className="text-blue-600" size={20} />
+                <span>Xác Nhận Nhập Dữ Liệu Đa Bảng</span>
+              </h3>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-700">
+              <p className="leading-relaxed">
+                Hệ thống sẽ lưu dữ liệu bóc tách và tự động đồng bộ sang các bảng liên quan:
+              </p>
+
+              <div className="bg-[#F5F5F7] p-3.5 rounded-2xl space-y-2 border border-slate-200/60 font-medium">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Loại chứng từ:</span>
+                  <span className="font-bold text-slate-900 uppercase">{ocrResult.documentType}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Số chứng từ:</span>
+                  <span className="font-mono font-bold text-blue-700">{ocrResult.documentNumber || "Chưa có"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Số PO liên kết:</span>
+                  <span className="font-mono font-bold text-slate-800">{ocrResult.documentReference || "Không có"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Số dòng hàng hóa:</span>
+                  <span className="font-bold text-slate-900">{ocrResult.items.length} dòng</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-1.5">
+                  <span className="text-slate-600 font-bold">Tổng doanh thu:</span>
+                  <span className="font-mono font-bold text-emerald-700">{formatMoney(documentFinancials.totalRevenue)} đ</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 rounded-xl border border-blue-200/80 text-[11px] text-blue-800 space-y-1">
+                <p className="font-bold">🔄 Tự động đồng bộ đa bảng:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                  <li>Ghi nhận vào sổ Giao hàng / Đơn hàng</li>
+                  <li>Cập nhật tiến độ giao và số lượng còn lại trong Chi tiết Đơn hàng (PO Lines)</li>
+                  <li>Cập nhật trạng thái Kế hoạch giao hàng (Delivery Plans)</li>
+                  <li>Lưu tệp chứng từ scan vào Thư mục Google Drive `TSG_Business_Documents`</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Kiểm tra lại
+              </button>
+              <button
+                type="button"
+                onClick={() => executeSaveToSystem()}
+                className="px-5 py-2.5 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
+              >
+                Xác Nhận & Lưu Toàn Bộ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

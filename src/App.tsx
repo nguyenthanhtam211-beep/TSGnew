@@ -793,11 +793,17 @@ export default function App() {
         {activeTab === "ocr" && (
           <OCRView 
             pricingData={pricingData}
+            contractsData={contractsData}
+            productData={productData}
+            poHeaders={poHeaderData}
+            poLines={enrichedPoLinesData}
+            deliveryPlans={enrichedDeliveryPlanData}
             onAddPOHeader={async (row) => await handleAddToFirestore("po_headers", row)}
             onAddPOLines={async (rows) => { await handleBatchAddToFirestore("po_lines", rows); }}
             onAddDelivery={async (rows) => { await handleBatchAddToFirestore("deliveries", rows); }}
+            onUpdatePOLines={async (rows) => { for (const r of rows) await handleUpdateToFirestore("po_lines", r); }}
+            onUpdateDeliveryPlan={async (rows) => { for (const r of rows) await handleUpdateToFirestore("delivery_plans", r); }}
             onUploadToDrive={handleUploadToDrive}
-            poHeaders={poHeaderData}
           />
         )}
         {activeTab === "customers" && (
