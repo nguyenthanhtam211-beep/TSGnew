@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import HelpGuideModal from "./components/HelpGuideModal";
+import HelpGuideView from "./components/HelpGuideView";
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
@@ -592,15 +593,11 @@ export default function App() {
     ocr: "Quét OCR",
     tasks: "Công Việc & Lịch",
     storage: "Kho Lưu Trữ",
+    help: "Trợ Giúp & Hướng Dẫn",
     settings: "Cài Đặt"
   };
 
   const navItemClick = (tab: string) => {
-    if (tab === "help") {
-      setIsHelpModalOpen(true);
-      setMobileMenuOpen(false);
-      return;
-    }
     setActiveTab(tab);
     setMobileMenuOpen(false);
   };
@@ -1121,6 +1118,9 @@ export default function App() {
               onProductClick={(val) => setSelectedProductDetails(val)}
             />
           </div>
+        )}
+        {activeTab === "help" && (
+          <HelpGuideView onNavigateTab={(tab) => setActiveTab(tab)} />
         )}
         {activeTab === "settings" && (
           <div className="p-3 sm:p-5 lg:p-8">
