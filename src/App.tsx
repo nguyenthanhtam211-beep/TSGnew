@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx';
+import HelpGuideModal from "./components/HelpGuideModal";
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -71,6 +72,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   
   // 2-Way Deep Linking Cross-Module Navigation States
   const [targetCustomerId, setTargetCustomerId] = useState<string | null>(null);
@@ -566,6 +568,7 @@ export default function App() {
       id: "system",
       title: "Hệ Thống",
       items: [
+        { id: "help", label: "Trợ Giúp & Hướng Dẫn", icon: <HelpCircle size={15} />, iconBg: "bg-blue-600", badge: "Cẩm nang" },
         { id: "settings", label: "Cài Đặt Hệ Thống", icon: <Settings size={15} />, iconBg: "bg-slate-600" }
       ]
     }
@@ -593,6 +596,11 @@ export default function App() {
   };
 
   const navItemClick = (tab: string) => {
+    if (tab === "help") {
+      setIsHelpModalOpen(true);
+      setMobileMenuOpen(false);
+      return;
+    }
     setActiveTab(tab);
     setMobileMenuOpen(false);
   };
@@ -640,6 +648,14 @@ export default function App() {
           >
             <Bot size={16} />
             <span className="font-bold">AI</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)} 
+            className="p-2 text-slate-600 hover:text-blue-600 rounded-xl hover:bg-black/[0.04] active:scale-95 transition-all"
+            title="Trợ Giúp & Cẩm Nang Sử Dụng"
+          >
+            <HelpCircle size={18} />
           </button>
           <button 
             onClick={() => navItemClick("settings")} 
@@ -1112,6 +1128,16 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Help Guide Modal */}
+      <HelpGuideModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setIsHelpModalOpen(false);
+        }}
+      />
 
       {/* Memory & Storage Manager Modal */}
       <MemoryStorageModal

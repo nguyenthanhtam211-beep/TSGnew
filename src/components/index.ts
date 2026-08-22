@@ -33,3 +33,5 @@ export { default as CompanyLogo, TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLog
 export { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 export { default as UnifiedCalendar } from "./UnifiedCalendar";
 export { default as MacTrafficLights } from "./MacTrafficLights";
+
+export { default as HelpGuideModal } from "./HelpGuideModal";
