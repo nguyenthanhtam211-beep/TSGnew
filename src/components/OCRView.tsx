@@ -653,7 +653,7 @@ export default function OCRView({
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 w-full max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 py-4 font-sans">
       {/* Top Header */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -947,16 +947,16 @@ export default function OCRView({
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase font-bold text-slate-600">
-                            <th className="px-3 py-3 text-center w-10">STT</th>
-                            <th className="px-3 py-3 w-28">Mã SP</th>
-                            <th className="px-4 py-3 min-w-[200px]">Tên Hàng Hóa</th>
-                            <th className="px-3 py-3 min-w-[220px]">Bảng Giá & Hợp Đồng</th>
-                            <th className="px-2.5 py-3 text-center w-16">ĐVT</th>
-                            <th className="px-3 py-3 text-right w-24">Số Lượng</th>
-                            <th className="px-3 py-3 text-right w-28">Đơn Giá Bán</th>
-                            <th className="px-3 py-3 text-right w-28">Giá Vốn (COGS)</th>
-                            <th className="px-3 py-3 text-right w-28">Doanh Thu</th>
-                            <th className="px-3 py-3 text-right w-28">Lợi Nhuận</th>
+                            <th className="px-3.5 py-3.5 text-center w-12">STT</th>
+                            <th className="px-3.5 py-3.5 min-w-[140px]">Mã SP</th>
+                            <th className="px-4 py-3.5 min-w-[340px]">Tên Hàng Hóa</th>
+                            <th className="px-3.5 py-3.5 min-w-[250px]">Bảng Giá & Hợp Đồng</th>
+                            <th className="px-3.5 py-3.5 text-center w-20">ĐVT</th>
+                            <th className="px-3.5 py-3.5 text-right w-28">Số Lượng</th>
+                            <th className="px-3.5 py-3.5 text-right w-32">Đơn Giá Bán</th>
+                            <th className="px-3.5 py-3.5 text-right w-32">Giá Vốn (COGS)</th>
+                            <th className="px-4 py-3.5 text-right w-36">Doanh Thu</th>
+                            <th className="px-4 py-3.5 text-right w-36">Lợi Nhuận</th>
                             <th className="px-2.5 py-3 text-center w-10"></th>
                           </tr>
                         </thead>
@@ -977,7 +977,7 @@ export default function OCRView({
                                     value={item.code || ""}
                                     onChange={(e) => handleItemChange(idx, "code", e.target.value)}
                                     placeholder="Mã SKU"
-                                    className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-mono font-bold text-slate-800 outline-none"
+                                    className="w-full bg-[#F5F5F7] px-3 py-2 bg-[#F5F5F7] rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
                                   />
                                 </td>
 
@@ -988,7 +988,7 @@ export default function OCRView({
                                       value={item.name || ""}
                                       onChange={(e) => handleItemChange(idx, "name", e.target.value)}
                                       placeholder="Nhập tên sản phẩm..."
-                                      className="w-full bg-[#F5F5F7] px-2 py-1 rounded-lg text-xs font-bold text-slate-900 outline-none"
+                                      className="w-full bg-[#F5F5F7] px-3 py-2 bg-[#F5F5F7] rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-400"
                                     />
                                     <ProductHoverCard productName={item.name} productCode={item.code} pricingData={pricingData}>
                                       <div className="text-slate-300 hover:text-blue-500 transition cursor-pointer shrink-0">
