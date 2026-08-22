@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -29,6 +29,21 @@ import {
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
+
+interface NavItemConfig {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  iconBg?: string;
+  badge?: string | number;
+}
+
+interface NavGroupConfig {
+  id: string;
+  title: string;
+  badge?: string;
+  items: NavItemConfig[];
+}
 
 const FULL_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
 
@@ -64,6 +79,23 @@ export default function App() {
   
   // Apple macOS Window & Sidebar States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [menuSearchQuery, setMenuSearchQuery] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("tsg_nav_collapsed_groups");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [groupId]: !prev[groupId] };
+      localStorage.setItem("tsg_nav_collapsed_groups", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const handleToggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -490,6 +522,64 @@ export default function App() {
     }
   };
 
+  const navGroups: NavGroupConfig[] = useMemo(() => [
+    {
+      id: "executive",
+      title: "Tổng Quan & Điều Hành",
+      badge: "3",
+      items: [
+        { id: "dashboard", label: "Bàn Làm Việc", icon: <LayoutDashboard size={15} />, iconBg: "bg-blue-500" },
+        { id: "workflow", label: "Quy Trình 5 Bước", icon: <TrendingUp size={15} />, iconBg: "bg-indigo-500" },
+        { id: "profit_report", label: "Báo Cáo Lợi Nhuận", icon: <DollarSign size={15} />, iconBg: "bg-rose-500" },
+      ]
+    },
+    {
+      id: "logistics",
+      title: "Đơn Hàng & Giao Nhận",
+      badge: "5",
+      items: [
+        { id: "po", label: "Đơn Hàng (PO)", icon: <FileText size={15} />, iconBg: "bg-teal-500", badge: poHeaderData.length },
+        { id: "polines", label: "Chi Tiết Đơn Hàng", icon: <FileText size={15} />, iconBg: "bg-teal-600", badge: poLinesData.length },
+        { id: "delivery_plan", label: "Kế Hoạch Giao", icon: <CheckCircle size={15} />, iconBg: "bg-amber-500" },
+        { id: "calendar", label: "Lịch Giao Nhận (4 Tầng)", icon: <CalendarDays size={15} />, iconBg: "bg-blue-600" },
+        { id: "delivery", label: "Giao Hàng (PXK)", icon: <Truck size={15} />, iconBg: "bg-orange-500", badge: deliveryData.length },
+      ]
+    },
+    {
+      id: "commercial",
+      title: "Thương Mại & Danh Mục",
+      badge: "8",
+      items: [
+        { id: "customers", label: "Khách Hàng", icon: <Users size={15} />, iconBg: "bg-sky-500", badge: customerData.length },
+        { id: "suppliers", label: "Nhà Cung Cấp", icon: <BookUser size={15} />, iconBg: "bg-amber-600", badge: supplierData.length },
+        { id: "contacts", label: "Danh Bạ Liên Hệ", icon: <Users size={15} />, iconBg: "bg-red-500", badge: contactData.length },
+        { id: "pricing", label: "Bảng Giá 2026", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
+        { id: "contracts", label: "Hợp Đồng & Phụ Lục", icon: <Scale size={15} />, iconBg: "bg-blue-600", badge: contractsData.length },
+        { id: "commissions", label: "Hoa Hồng & Chiết Khấu", icon: <Percent size={15} />, iconBg: "bg-purple-600" },
+        { id: "products", label: "Sản Phẩm & Quy Cách", icon: <Package size={15} />, iconBg: "bg-purple-500", badge: productData.length },
+        { id: "specs", label: "Tiêu Chuẩn Specs", icon: <ShieldCheck size={15} />, iconBg: "bg-blue-600", badge: specsData.length },
+      ]
+    },
+    {
+      id: "ai_storage",
+      title: "AI & Trung Tâm Lưu Trữ",
+      badge: "4",
+      items: [
+        { id: "ocr", label: "Quét OCR & Định Giá", icon: <Camera size={15} />, iconBg: "bg-indigo-600" },
+        { id: "assistant", label: "Trợ Lý AI Gemini", icon: <Bot size={15} />, iconBg: "bg-gradient-to-tr from-purple-500 to-indigo-500" },
+        { id: "storage", label: "Kho Tệp & Sổ Đối Soát", icon: <HardDrive size={15} />, iconBg: "bg-slate-500", badge: fileStorageData.length },
+        { id: "tasks", label: "Công Việc & Lịch Hạn", icon: <CheckCircle size={15} />, iconBg: "bg-green-600" },
+      ]
+    },
+    {
+      id: "system",
+      title: "Hệ Thống",
+      items: [
+        { id: "settings", label: "Cài Đặt Hệ Thống", icon: <Settings size={15} />, iconBg: "bg-slate-600" }
+      ]
+    }
+  ], [poHeaderData.length, poLinesData.length, deliveryData.length, customerData.length, supplierData.length, contactData.length, pricingData.length, contractsData.length, productData.length, specsData.length, fileStorageData.length]);
+
   const TAB_TITLES: Record<string, string> = {
     dashboard: "Bảng Điều Hành",
     workflow: "Quy Trình Nghiệp Vụ",
@@ -591,37 +681,49 @@ export default function App() {
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 custom-scrollbar">
-              <div className="px-3 py-1.5 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Tổng quan</div>
-              <NavItem icon={<LayoutDashboard size={16} />} iconBg="bg-blue-500" label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => navItemClick("dashboard")} />
-              <NavItem icon={<TrendingUp size={16} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isActive={activeTab === "workflow"} onClick={() => navItemClick("workflow")} />
-              
-              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>
-              <NavItem icon={<Users size={16} />} iconBg="bg-sky-500" label="Khách hàng" isActive={activeTab === "customers"} onClick={() => navItemClick("customers")} />
-              <NavItem icon={<Package size={16} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isActive={activeTab === "pricing"} onClick={() => navItemClick("pricing")} />
-              <NavItem icon={<Scale size={16} />} iconBg="bg-blue-600" label="Hợp đồng & Phụ lục" isActive={activeTab === "contracts"} onClick={() => navItemClick("contracts")} />
-              <NavItem icon={<Percent size={16} />} iconBg="bg-purple-600" label="Hoa hồng (Commission)" isActive={activeTab === "commissions"} onClick={() => navItemClick("commissions")} />
-              <NavItem icon={<FileText size={16} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isActive={activeTab === "po"} onClick={() => navItemClick("po")} />
-              <NavItem icon={<FileText size={16} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isActive={activeTab === "polines"} onClick={() => navItemClick("polines")} />
-              <NavItem icon={<CheckCircle size={16} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isActive={activeTab === "delivery_plan"} onClick={() => navItemClick("delivery_plan")} />
-              <NavItem icon={<CalendarDays size={16} />} iconBg="bg-blue-600" label="Lịch giao nhận (4 Tầng)" isActive={activeTab === "calendar"} onClick={() => navItemClick("calendar")} />
-              <NavItem icon={<Truck size={16} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isActive={activeTab === "delivery"} onClick={() => navItemClick("delivery")} />
-              <NavItem icon={<TrendingUp size={16} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isActive={activeTab === "profit_report"} onClick={() => navItemClick("profit_report")} />
-              
-              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Dữ liệu nền tảng</div>
-              <NavItem icon={<Package size={16} />} iconBg="bg-purple-500" label="Sản phẩm" isActive={activeTab === "products"} onClick={() => navItemClick("products")} />
-              <NavItem icon={<ShieldCheck size={16} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isActive={activeTab === "specs"} onClick={() => navItemClick("specs")} />
-              <NavItem icon={<BookUser size={16} />} iconBg="bg-amber-600" label="Nhà cung cấp" isActive={activeTab === "suppliers"} onClick={() => navItemClick("suppliers")} />
-              <NavItem icon={<Users size={16} />} iconBg="bg-red-500" label="Danh bạ" isActive={activeTab === "contacts"} onClick={() => navItemClick("contacts")} />
-              
-              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Công cụ hỗ trợ & AI</div>
-              <NavItem icon={<Bot size={16} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isActive={activeTab === "assistant"} onClick={() => navItemClick("assistant")} />
-              <NavItem icon={<Camera size={16} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isActive={activeTab === "ocr"} onClick={() => navItemClick("ocr")} />
-              <NavItem icon={<CheckCircle size={16} />} iconBg="bg-green-600" label="Công việc & Lịch" isActive={activeTab === "tasks"} onClick={() => navItemClick("tasks")} />
-              <NavItem icon={<HardDrive size={16} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isActive={activeTab === "storage"} onClick={() => navItemClick("storage")} />
-              
-              <div className="px-3 py-1.5 mt-3 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Hệ thống</div>
-              <NavItem icon={<Settings size={16} />} iconBg="bg-slate-600" label="Cài đặt" isActive={activeTab === "settings"} onClick={() => navItemClick("settings")} />
+            <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 custom-scrollbar">
+              {navGroups.map(group => {
+                const isGroupCollapsed = collapsedGroups[group.id];
+                const hasActiveItem = group.items.some(it => it.id === activeTab);
+                
+                return (
+                  <div key={group.id} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.id)}
+                      className="w-full flex items-center justify-between px-2.5 py-1 text-[10.5px] font-extrabold text-slate-500 hover:text-slate-800 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03]"
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span>{group.title}</span>
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {group.badge && (
+                          <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/80 text-slate-600">
+                            {group.badge}
+                          </span>
+                        )}
+                        {isGroupCollapsed && !hasActiveItem ? <ChevronRight size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
+                      </div>
+                    </button>
+
+                    {(!isGroupCollapsed || hasActiveItem) && (
+                      <div className="space-y-0.5 pl-0.5 animate-in fade-in duration-150">
+                        {group.items.map(item => (
+                          <NavItem
+                            key={item.id}
+                            icon={item.icon}
+                            iconBg={item.iconBg}
+                            label={item.label}
+                            badge={item.badge}
+                            isActive={activeTab === item.id}
+                            onClick={() => navItemClick(item.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
 
             <div className="p-3 border-t border-black/[0.06] bg-white/50 text-center">
@@ -707,37 +809,85 @@ export default function App() {
         </div>
 
         {/* Apple Source List Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 space-y-0.5 custom-scrollbar px-2">
-          {!isSidebarCollapsed && <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tổng quan</div>}
-          <NavItem icon={<LayoutDashboard size={15} />} iconBg="bg-blue-500" label="Dashboard" isCollapsed={isSidebarCollapsed} isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-indigo-500" label="Quy trình nghiệp vụ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "workflow"} onClick={() => setActiveTab("workflow")} />
-          
-          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Kinh doanh & Đơn hàng</div>}
-          <NavItem icon={<Users size={15} />} iconBg="bg-sky-500" label="Khách hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "customers"} onClick={() => setActiveTab("customers")} />
-          <NavItem icon={<Package size={15} />} iconBg="bg-emerald-500" label="Bảng giá 2026" isCollapsed={isSidebarCollapsed} isActive={activeTab === "pricing"} onClick={() => setActiveTab("pricing")} />
-          <NavItem icon={<Scale size={15} />} iconBg="bg-blue-600" label="Hợp đồng & Phụ lục" isCollapsed={isSidebarCollapsed} isActive={activeTab === "contracts"} onClick={() => setActiveTab("contracts")} />
-          <NavItem icon={<Percent size={15} />} iconBg="bg-purple-600" label="Hoa hồng (Commission)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "commissions"} onClick={() => setActiveTab("commissions")} />
-          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-500" label="Đơn hàng (PO)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "po"} onClick={() => setActiveTab("po")} />
-          <NavItem icon={<FileText size={15} />} iconBg="bg-teal-600" label="Chi tiết đơn (Lines)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "polines"} onClick={() => setActiveTab("polines")} />
-          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-amber-500" label="Kế hoạch giao hàng" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery_plan"} onClick={() => setActiveTab("delivery_plan")} />
-          <NavItem icon={<CalendarDays size={15} />} iconBg="bg-blue-600" label="Lịch giao nhận (4 Tầng)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "calendar"} onClick={() => setActiveTab("calendar")} />
-          <NavItem icon={<Truck size={15} />} iconBg="bg-orange-500" label="Giao hàng (PXK)" isCollapsed={isSidebarCollapsed} isActive={activeTab === "delivery"} onClick={() => setActiveTab("delivery")} />
-          <NavItem icon={<TrendingUp size={15} />} iconBg="bg-rose-500" label="Báo cáo Lợi nhuận" isCollapsed={isSidebarCollapsed} isActive={activeTab === "profit_report"} onClick={() => setActiveTab("profit_report")} />
-          
-          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dữ liệu nền tảng</div>}
-          <NavItem icon={<Package size={15} />} iconBg="bg-purple-500" label="Sản phẩm" isCollapsed={isSidebarCollapsed} isActive={activeTab === "products"} onClick={() => setActiveTab("products")} />
-          <NavItem icon={<ShieldCheck size={15} />} iconBg="bg-blue-600" label="Tiêu chuẩn Specs" isCollapsed={isSidebarCollapsed} isActive={activeTab === "specs"} onClick={() => setActiveTab("specs")} />
-          <NavItem icon={<BookUser size={15} />} iconBg="bg-amber-600" label="Nhà cung cấp" isCollapsed={isSidebarCollapsed} isActive={activeTab === "suppliers"} onClick={() => setActiveTab("suppliers")} />
-          <NavItem icon={<Users size={15} />} iconBg="bg-red-500" label="Danh bạ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "contacts"} onClick={() => setActiveTab("contacts")} />
-          
-          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trí tuệ nhân tạo & Tiện ích</div>}
-          <NavItem icon={<Bot size={15} />} iconBg="bg-gradient-to-tr from-purple-500 to-indigo-500" label="Trợ lý AI Gemini" isCollapsed={isSidebarCollapsed} isActive={activeTab === "assistant"} onClick={() => setActiveTab("assistant")} />
-          <NavItem icon={<Camera size={15} />} iconBg="bg-indigo-600" label="Quét OCR Chứng từ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "ocr"} onClick={() => setActiveTab("ocr")} />
-          <NavItem icon={<CheckCircle size={15} />} iconBg="bg-green-600" label="Công việc & Lịch" isCollapsed={isSidebarCollapsed} isActive={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} />
-          <NavItem icon={<HardDrive size={15} />} iconBg="bg-slate-500" label="Kho Lưu trữ" isCollapsed={isSidebarCollapsed} isActive={activeTab === "storage"} onClick={() => setActiveTab("storage")} />
-          
-          {!isSidebarCollapsed && <div className="px-3 py-1.5 mt-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hệ thống</div>}
-          <NavItem icon={<Settings size={15} />} iconBg="bg-slate-600" label="Cài đặt" isCollapsed={isSidebarCollapsed} isActive={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
+        <nav className="flex-1 overflow-y-auto py-2 space-y-3 custom-scrollbar px-2">
+          {!isSidebarCollapsed && (
+            <div className="px-1 mb-1.5">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                <input
+                  type="text"
+                  value={menuSearchQuery}
+                  onChange={(e) => setMenuSearchQuery(e.target.value)}
+                  placeholder="Tìm nhanh tính năng..."
+                  className="w-full pl-7 pr-2 py-1 bg-black/[0.03] hover:bg-black/[0.05] focus:bg-white border border-transparent focus:border-blue-400 rounded-xl text-[11px] outline-none transition"
+                />
+                {menuSearchQuery && (
+                  <button
+                    onClick={() => setMenuSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {navGroups.map(group => {
+            const q = menuSearchQuery.toLowerCase().trim();
+            const filteredItems = q 
+              ? group.items.filter(it => it.label.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
+              : group.items;
+
+            if (q && filteredItems.length === 0) return null;
+
+            const isGroupCollapsed = collapsedGroups[group.id];
+            const hasActiveItem = group.items.some(it => it.id === activeTab);
+            const shouldShowItems = isSidebarCollapsed || (!isGroupCollapsed || hasActiveItem || Boolean(q));
+
+            return (
+              <div key={group.id} className="space-y-0.5">
+                {!isSidebarCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] cursor-pointer select-none"
+                  >
+                    <span className="truncate">{group.title}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {group.badge && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-500 font-semibold">
+                          {group.badge}
+                        </span>
+                      )}
+                      {isGroupCollapsed && !hasActiveItem && !q ? (
+                        <ChevronRight size={12} className="text-slate-400" />
+                      ) : (
+                        <ChevronDown size={12} className="text-slate-400" />
+                      )}
+                    </div>
+                  </button>
+                )}
+
+                {shouldShowItems && (
+                  <div className="space-y-0.5">
+                    {filteredItems.map(item => (
+                      <NavItem
+                        key={item.id}
+                        icon={item.icon}
+                        iconBg={item.iconBg}
+                        label={item.label}
+                        badge={item.badge}
+                        isCollapsed={isSidebarCollapsed}
+                        isActive={activeTab === item.id}
+                        onClick={() => setActiveTab(item.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
       </div>
 
@@ -1095,6 +1245,8 @@ function NavItem({
   label, 
   isActive, 
   isCollapsed = false,
+  badge,
+  badgeColor,
   onClick 
 }: { 
   icon: React.ReactNode, 
@@ -1102,18 +1254,20 @@ function NavItem({
   label: string, 
   isActive: boolean, 
   isCollapsed?: boolean,
+  badge?: string | number,
+  badgeColor?: string,
   onClick: () => void 
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.97 }}
       onClick={onClick}
       title={isCollapsed ? label : undefined}
       className={clsx(
         "relative flex items-center rounded-xl text-xs transition-all duration-150 cursor-pointer overflow-hidden group select-none text-left",
         isCollapsed 
-          ? "w-10 h-10 mx-auto justify-center p-0" 
-          : "w-full gap-2.5 px-3 py-2",
+          ? "w-9 h-9 mx-auto justify-center p-0 mb-1" 
+          : "w-full gap-2.5 px-2.5 py-1.5",
         isActive 
           ? "bg-[#007AFF] text-white shadow-xs font-semibold" 
           : "text-[#1D1D1F] hover:bg-black/[0.04] font-medium"
@@ -1128,8 +1282,18 @@ function NavItem({
       {!isCollapsed && (
         <>
           <span className="truncate flex-1 tracking-[-0.012em]">{label}</span>
+          {badge !== undefined && badge !== null && (
+            <span className={clsx(
+              "text-[9.5px] font-bold font-mono px-1.5 py-0.2 rounded-full",
+              isActive 
+                ? "bg-white/25 text-white" 
+                : badgeColor || "bg-black/[0.05] text-slate-500 group-hover:bg-black/[0.08]"
+            )}>
+              {badge}
+            </span>
+          )}
           {isActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+            <span className="w-1.5 h-1.5 rounded-full bg-white/90 shrink-0" />
           )}
         </>
       )}
