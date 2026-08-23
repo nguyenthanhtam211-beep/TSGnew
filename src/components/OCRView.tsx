@@ -19,6 +19,7 @@ import {
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
 import MacTrafficLights from './MacTrafficLights';
+import { generateSmartDocumentFileName } from '../lib/documentNaming';
 
 export interface OCRItem {
   index: number;
@@ -93,6 +94,7 @@ export default function OCRView({
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [customFileName, setCustomFileName] = useState<string>("");
   const [savedDriveInfo, setSavedDriveInfo] = useState<{
     documentNumber: string;
     driveLink?: string;
@@ -126,6 +128,7 @@ export default function OCRView({
     const handleClickOutside = (evt: MouseEvent) => {
       if (pricePopoverRef.current && !pricePopoverRef.current.contains(evt.target as Node)) {
         setActivePriceSelectIdx(null);
+    setCustomFileName("");
       }
     };
     if (activePriceSelectIdx !== null) {
@@ -212,6 +215,16 @@ export default function OCRView({
         signers: rawData.signers
       };
       
+      const autoName = generateSmartDocumentFileName({
+        documentType: data.documentType,
+        documentNumber: data.documentNumber,
+        documentDate: data.documentDate,
+        deliveryDate: data.deliveryDate,
+        documentReference: data.documentReference,
+        buyerName: data.buyerName,
+        originalFileName: selectedFile.name
+      });
+      setCustomFileName(autoName);
       setOcrResult(data);
       setStatus("success");
       toast.success("Trích xuất OCR & Tự động đối chiếu Bảng giá thành công!", { icon: "✨" });
@@ -250,11 +263,24 @@ export default function OCRView({
   // Editing handlers for OCR details
   const handleMetaChange = (field: keyof OCRData, value: string) => {
     if (!ocrResult) return;
-    setOcrResult({
+    const updated = {
       ...ocrResult,
       [field]: value
-    });
+    };
+    setOcrResult(updated);
     setIsSaved(false);
+    
+    // Auto-update smart filename when metadata changes
+    const newName = generateSmartDocumentFileName({
+      documentType: updated.documentType,
+      documentNumber: updated.documentNumber,
+      documentDate: updated.documentDate,
+      deliveryDate: updated.deliveryDate,
+      documentReference: updated.documentReference,
+      buyerName: updated.buyerName,
+      originalFileName: file?.name || "document.pdf"
+    });
+    setCustomFileName(newName);
   };
 
   const handleItemChange = (index: number, field: keyof OCRItem, value: any) => {
@@ -454,12 +480,22 @@ export default function OCRView({
     const toastId = toast.loading('Đang lưu và liên kết dữ liệu đa bảng...');
 
     try {
-      // 1. Upload file to Google Drive in background (non-blocking)
+      // 1. Upload file to Google Drive in background with smart scientific filename
+      const finalFileName = customFileName || generateSmartDocumentFileName({
+        documentType: dataToSave.documentType,
+        documentNumber: dataToSave.documentNumber,
+        documentDate: dataToSave.documentDate,
+        deliveryDate: dataToSave.deliveryDate,
+        documentReference: dataToSave.documentReference,
+        buyerName: dataToSave.buyerName,
+        originalFileName: file.name
+      });
+
       if (onUploadToDrive && file) {
         onUploadToDrive(file, {
           documentType: dataToSave.documentType,
           documentNumber: dataToSave.documentNumber,
-          fileName: file.name
+          fileName: finalFileName
         }).then((res: any) => {
           if (res) {
             setSavedDriveInfo({
@@ -834,6 +870,62 @@ export default function OCRView({
               </div>
 
               <div className="p-6 space-y-6">
+                {/* 📁 SMART STANDARDIZED FILE NAME FOR GOOGLE DRIVE */}
+                <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-emerald-50/70 p-4 rounded-2xl border border-blue-200/80 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+                        <HardDrive size={16} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                          <span>Tên Tệp Lưu Trữ Google Drive (Chuẩn Hóa Khoa Học)</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold">Auto Renamed</span>
+                        </span>
+                        <span className="text-[11px] text-slate-500 block">
+                          Định dạng: <code>[Loại_CT]_[Số_CT]_[Ngày]_[Khách_Hàng]_[Số_PO].[ext]</code>
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (ocrResult) {
+                          const regenerated = generateSmartDocumentFileName({
+                            documentType: ocrResult.documentType,
+                            documentNumber: ocrResult.documentNumber,
+                            documentDate: ocrResult.documentDate,
+                            deliveryDate: ocrResult.deliveryDate,
+                            documentReference: ocrResult.documentReference,
+                            buyerName: ocrResult.buyerName,
+                            originalFileName: file?.name || "document.pdf"
+                          });
+                          setCustomFileName(regenerated);
+                          toast.success("Đã tạo lại tên file chuẩn hóa!");
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer self-start sm:self-auto"
+                      title="Tạo lại tên file theo thông tin chứng từ hiện tại"
+                    >
+                      <RefreshCw size={13} />
+                      <span>Tạo Lại Tên Chuẩn</span>
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={customFileName}
+                      onChange={(e) => setCustomFileName(e.target.value)}
+                      placeholder="Tên file chuẩn hóa..."
+                      className="w-full pl-3.5 pr-28 py-2 bg-white border border-blue-300 rounded-xl text-xs font-mono font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10.5px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      ☁️ Drive Name
+                    </span>
+                  </div>
+                </div>
                 {/* Meta Inputs Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
