@@ -3,7 +3,7 @@ import HelpGuideModal from "./components/HelpGuideModal";
 import HelpGuideView from "./components/HelpGuideView";
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2 } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -1409,6 +1409,7 @@ function TableView({
   const isPOHeaderTable = useMemo(() => title.includes("Đơn hàng (PO_Header)"), [title]);
   const isPOLineTable = useMemo(() => title.includes("Chi tiết đơn (PO_Lines)") || title.includes("Báo cáo Lợi nhuận"), [title]);
   const isPOTable = useMemo(() => isPOHeaderTable || isPOLineTable, [isPOHeaderTable, isPOLineTable]);
+  const isPricingTable = useMemo(() => title.includes("Bảng giá") || title.includes("Pricing"), [title]);
 
   const isDuplicatePO = useMemo(() => {
     if (!isPOHeaderTable) return false;
@@ -1808,13 +1809,25 @@ function TableView({
         }
       }
 
-      // Safe search match
+      // Safe search match (including resolved product name)
       const searchLower = searchTerm.trim().toLowerCase();
       if (!searchLower) return true;
       
-      return Object.values(row).some(val => 
+      const inRow = Object.values(row).some(val => 
         val != null && String(val).toLowerCase().includes(searchLower)
       );
+      if (inRow) return true;
+
+      // Check resolved product name in products catalog
+      const sku = row["Mã sản phẩm"] || row["Mã giá bán"] || row["Mã hàng"] || "";
+      if (sku && products && products.length > 0) {
+        const found = products.find(p => p["Mã sản phẩm"] === sku || p["Mã hàng"] === sku || p.id === sku);
+        if (found) {
+          const pName = String(found["Tên sản phẩm"] || found["Sản phẩm"] || "").toLowerCase();
+          if (pName.includes(searchLower)) return true;
+        }
+      }
+      return false;
     });
   }, [data, searchTerm, columnFilters]);
 
@@ -2422,25 +2435,52 @@ function TableView({
                 } catch (e) {}
               }
 
-              // Extract title
-              let cardTitle = "";
-              const titleKeys = ["Số đơn hàng", "Đơn hàng", "Số PXK", "Mã sản phẩm", "Mã giá bán", "Mã hợp đồng", "Số hợp đồng", "Tên sản phẩm", "Sản phẩm", "Mã hàng"];
-              for (const k of titleKeys) {
-                if (row[k]) {
-                  cardTitle = String(row[k]);
-                  break;
+              // 1. Resolve Product Name & SKU with intelligent lookup
+              let resolvedProdName = row["Tên sản phẩm"] || row["Sản phẩm"] || row["Tên hàng"] || "";
+              const skuCode = row["Mã sản phẩm"] || row["Mã giá bán"] || row["Mã hàng"] || row["Mã của khách"] || "";
+              
+              if (!resolvedProdName && products && products.length > 0 && skuCode) {
+                const pMatch = products.find((p: any) => 
+                  (p["Mã sản phẩm"] && p["Mã sản phẩm"] === skuCode) ||
+                  (p["Mã hàng"] && p["Mã hàng"] === skuCode) ||
+                  (p.id && p.id === skuCode) ||
+                  (p["Mã giá bán"] && p["Mã giá bán"] === skuCode)
+                );
+                if (pMatch) {
+                  resolvedProdName = pMatch["Tên sản phẩm"] || pMatch["Sản phẩm"] || "";
                 }
               }
-              if (!cardTitle) cardTitle = String(row[visibleColumns[0]] || "Bản ghi");
 
-              // Extract subtitle
-              let cardSubtitle = "";
-              const subKeys = ["Khách hàng", "RP_Khách hàng", "Nhà cung cấp", "Tên sản phẩm", "Nhóm hàng", "Người liên hệ", "Công ty"];
-              for (const k of subKeys) {
-                if (row[k] && String(row[k]) !== cardTitle) {
-                  cardSubtitle = String(row[k]);
-                  break;
+              if (!resolvedProdName && pricingData && pricingData.length > 0 && skuCode) {
+                const prMatch = pricingData.find((p: any) => 
+                  (p["Mã sản phẩm"] && p["Mã sản phẩm"] === skuCode) ||
+                  (p["Mã giá bán"] && p["Mã giá bán"] === skuCode)
+                );
+                if (prMatch) {
+                  resolvedProdName = prMatch["Tên sản phẩm"] || prMatch["Sản phẩm"] || "";
                 }
+              }
+
+              // Customer / Partner name
+              const customerName = row["Khách hàng"] || row["RP_Khách hàng"] || row["Nhà cung cấp"] || "";
+              const contractNum = row["Số hợp đồng"] || row["Hợp đồng"] || "";
+
+              // Determine Primary Display Title & Subtitle
+              let primaryTitle = "";
+              let secondaryTitle = "";
+
+              if (isPricingTable) {
+                primaryTitle = resolvedProdName || skuCode || "Sản phẩm";
+                secondaryTitle = customerName;
+              } else if (isPOHeaderTable) {
+                primaryTitle = row["Số đơn hàng"] || row["Đơn hàng"] || "Đơn hàng";
+                secondaryTitle = customerName;
+              } else if (isPOLineTable) {
+                primaryTitle = resolvedProdName || skuCode || row["Số đơn hàng"] || "Chi tiết đơn";
+                secondaryTitle = row["Số đơn hàng"] ? `PO: ${row["Số đơn hàng"]}` : customerName;
+              } else {
+                primaryTitle = resolvedProdName || row["Số đơn hàng"] || row["Số PXK"] || row["Mã sản phẩm"] || String(row[visibleColumns[0]] || "Bản ghi");
+                secondaryTitle = customerName;
               }
 
               // Extract status
@@ -2455,14 +2495,30 @@ function TableView({
                 }
               }
 
-              // Extract metrics
+              // Extract metrics (prioritize money, price, profit, qty)
+              const excludeFromMetrics = ["id", "Tên sản phẩm", "Sản phẩm", "Khách hàng", "RP_Khách hàng", "Nhà cung cấp", "Trạng thái", "Trạng Thái", "Status", "Tình trạng", "Số hợp đồng", "Hợp đồng"];
               const metricCandidates = visibleColumns.filter(c => 
-                !titleKeys.includes(c) && 
-                !subKeys.includes(c) && 
-                !statusKeys.includes(c) && 
+                !excludeFromMetrics.includes(c) && 
                 row[c] != null && 
                 String(row[c]).trim() !== ""
               );
+
+              // Sort metrics logically
+              metricCandidates.sort((a, b) => {
+                const isPriceA = a.includes("giá bán") || a.includes("Giá bán");
+                const isPriceB = b.includes("giá bán") || b.includes("Giá bán");
+                if (isPriceA && !isPriceB) return -1;
+                if (!isPriceA && isPriceB) return 1;
+                const isBuyA = a.includes("giá mua") || a.includes("giá nhập") || a.includes("Giá AVP");
+                const isBuyB = b.includes("giá mua") || b.includes("giá nhập") || b.includes("Giá AVP");
+                if (isBuyA && !isBuyB) return -1;
+                if (!isBuyA && isBuyB) return 1;
+                const isQtyA = a.includes("Số lượng") || a.includes("ĐVT");
+                const isQtyB = b.includes("Số lượng") || b.includes("ĐVT");
+                if (isQtyA && !isQtyB) return -1;
+                if (!isQtyA && isQtyB) return 1;
+                return 0;
+              });
 
               const metrics = metricCandidates.slice(0, 4).map(c => ({
                 label: c,
@@ -2484,25 +2540,59 @@ function TableView({
                     isHighlighted ? "ring-2 ring-amber-400 bg-amber-50/30" : ""
                   )}
                 >
-                  {/* Card Top */}
+                  {/* Card Header: Prominent Product Name & Badges */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
-                          {renderCell(titleKeys.find(k => row[k]) || visibleColumns[0], cardTitle, row)}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-start gap-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight leading-snug">
+                          {isPricingTable || isPOLineTable ? (
+                            <ProductHoverCard 
+                              productName={resolvedProdName || primaryTitle}
+                              productCode={skuCode}
+                              pricingData={pricingData}
+                              specsData={specsData}
+                            >
+                              <span className="text-slate-900 hover:text-blue-600 transition-colors">
+                                {primaryTitle}
+                              </span>
+                            </ProductHoverCard>
+                          ) : (
+                            <span>{primaryTitle}</span>
+                          )}
                         </span>
+
                         {isOverdue && (
-                          <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full">
+                          <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full shrink-0">
                             <AlertTriangle size={10} /> Quá hạn
                           </span>
                         )}
                       </div>
-                      {cardSubtitle && (
-                        <p className="text-[11.5px] text-slate-500 font-medium truncate mt-0.5">
-                          {cardSubtitle}
-                        </p>
-                      )}
+
+                      {/* Subtitle / Badges row: SKU + Customer + Contract */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {skuCode && (
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60">
+                            <Tag size={10} className="text-blue-500" />
+                            <span>{skuCode}</span>
+                          </span>
+                        )}
+
+                        {customerName && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80 truncate max-w-[170px]">
+                            <Building2 size={10} className="text-slate-400 shrink-0" />
+                            <span className="truncate">{customerName}</span>
+                          </span>
+                        )}
+
+                        {contractNum && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">
+                            <FileText size={10} />
+                            <span>HĐ: {contractNum}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
+
                     {statusVal && (
                       <div className="shrink-0">
                         {renderCell(statusKey, statusVal, row)}
