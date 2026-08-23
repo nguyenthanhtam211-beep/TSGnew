@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import { 
-  Upload, FileText, CheckCircle, AlertCircle, Loader2, Edit3, 
+  Upload, FileText, Camera, CheckCircle, AlertCircle, Loader2, Edit3, 
   Trash2, Plus, Sparkles, Save, ArrowRight, Eye, RefreshCw,
   Search, Info, HelpCircle, HardDrive, ExternalLink, ChevronDown,
   Tag, FileSpreadsheet, Building2, Layers, Check, X, ShieldAlert,
@@ -693,7 +693,7 @@ export default function OCRView({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={clsx(
-              "border-2 border-dashed rounded-3xl p-12 text-center transition-all bg-white shadow-2xs cursor-pointer",
+              "border-2 border-dashed rounded-3xl p-6 sm:p-12 text-center transition-all bg-white shadow-2xs cursor-pointer",
               isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.01]" : "border-slate-300 hover:border-blue-400 hover:bg-slate-50/50"
             )}
           >
@@ -719,7 +719,8 @@ export default function OCRView({
               <div className="pt-2">
                 <span className="inline-flex items-center gap-2 px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-sm transition">
                   <FileText size={14} />
-                  <span>Chọn Tệp Từ Máy Tính</span>
+                  <Camera size={15} />
+                  <span>Chụp Ảnh / Chọn Tệp Chứng Từ</span>
                 </span>
               </div>
             </label>

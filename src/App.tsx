@@ -607,7 +607,7 @@ export default function App() {
       <Toaster position="top-right" />
 
       {/* Mobile Top Header - Apple iOS Style */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-2.5 bg-white/95 backdrop-blur-xl text-[#1D1D1F] border-b border-black/[0.06] shrink-0 z-30 shadow-2xs">
+      <div className="lg:hidden flex items-center justify-between px-4 py-2.5 ios-glass text-[#1D1D1F] border-b border-black/[0.06] shrink-0 z-30 shadow-2xs pt-[max(env(safe-area-inset-top),10px)]">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileMenuOpen(true)}
@@ -1163,48 +1163,75 @@ export default function App() {
       />
 
       {/* Mobile Floating Bottom Dock (Thumb-friendly Apple iOS Navigation) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-xl border-t border-black/[0.06] px-2 py-1.5 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 ios-glass border-t border-black/[0.06] px-2 py-1 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),10px)] shadow-[0_-4px_25px_rgba(0,0,0,0.06)]">
         <button 
           onClick={() => navItemClick("dashboard")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", activeTab === "dashboard" ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "dashboard" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
-          <LayoutDashboard size={20} className={activeTab === "dashboard" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Tổng quan</span>
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "dashboard" ? "bg-blue-50 text-[#007AFF]" : "")}>
+            <LayoutDashboard size={20} className={activeTab === "dashboard" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          <span className="text-[10px] tracking-tight font-medium">Tổng quan</span>
         </button>
+
         <button 
-          onClick={() => navItemClick("customers")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", activeTab === "customers" ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
+          onClick={() => navItemClick("logistics")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active relative cursor-pointer", activeTab === "logistics" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
-          <Users size={20} className={activeTab === "customers" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Khách hàng</span>
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "logistics" ? "bg-blue-50 text-[#007AFF]" : "")}>
+            <Truck size={20} className={activeTab === "logistics" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          {deliveryData.length > 0 && (
+            <span className="absolute top-1 right-2 px-1.5 py-0.2 bg-orange-500 text-white rounded-full text-[9px] font-bold font-mono">
+              {deliveryData.length}
+            </span>
+          )}
+          <span className="text-[10px] tracking-tight font-medium">Giao hàng</span>
         </button>
-        <button 
-          onClick={() => navItemClick("contracts")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", activeTab === "contracts" ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
-        >
-          <Scale size={20} className={activeTab === "contracts" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Hợp đồng</span>
-        </button>
+
         <button 
           onClick={() => navItemClick("po")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", activeTab === "po" ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active relative cursor-pointer", activeTab === "po" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
-          <FileText size={20} className={activeTab === "po" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Đơn hàng</span>
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "po" ? "bg-blue-50 text-[#007AFF]" : "")}>
+            <FileText size={20} className={activeTab === "po" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          {poHeaderData.length > 0 && (
+            <span className="absolute top-1 right-2 px-1.5 py-0.2 bg-blue-600 text-white rounded-full text-[9px] font-bold font-mono">
+              {poHeaderData.length}
+            </span>
+          )}
+          <span className="text-[10px] tracking-tight font-medium">Đơn PO</span>
         </button>
+
         <button 
-          onClick={() => navItemClick("commissions")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", activeTab === "commissions" ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
+          onClick={() => navItemClick("ocr")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "ocr" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
-          <Percent size={20} className={activeTab === "commissions" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Hoa hồng</span>
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "ocr" ? "bg-indigo-50 text-indigo-600" : "")}>
+            <Camera size={20} className={activeTab === "ocr" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          <span className="text-[10px] tracking-tight font-medium">Quét OCR</span>
         </button>
+
+        <button 
+          onClick={() => navItemClick("assistant")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "assistant" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+        >
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "assistant" ? "bg-purple-50 text-purple-600" : "")}>
+            <Bot size={20} className={activeTab === "assistant" ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          <span className="text-[10px] tracking-tight font-medium">Trợ lý AI</span>
+        </button>
+
         <button 
           onClick={() => setMobileMenuOpen(true)}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all min-w-[50px] min-h-[44px]", mobileMenuOpen ? "text-[#007AFF] font-bold scale-105" : "hover:text-slate-900 active:scale-95")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", mobileMenuOpen ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
-          <Menu size={20} className={mobileMenuOpen ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Tất cả</span>
+          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", mobileMenuOpen ? "bg-blue-50 text-[#007AFF]" : "")}>
+            <Menu size={20} className={mobileMenuOpen ? "stroke-[2.5]" : "stroke-[1.75]"} />
+          </div>
+          <span className="text-[10px] tracking-tight font-medium">Thêm</span>
         </button>
       </div>
 

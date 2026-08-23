@@ -333,7 +333,7 @@ export default function LogisticsHubView({
           </div>
 
           {/* 🌟 4 PILLARS SEGMENTED SWITCHER (Apple macOS Sequoia Glass Style) */}
-          <div className="bg-slate-900/70 p-1.5 rounded-2xl border border-white/10 backdrop-blur-xl flex items-center overflow-x-auto gap-1">
+          <div className="bg-slate-900/70 p-1.5 rounded-2xl border border-white/10 backdrop-blur-xl flex items-center overflow-x-auto gap-1 mobile-scroll-x select-none">
             <button
               type="button"
               onClick={() => setActiveSubTab('calendar')}
@@ -426,7 +426,7 @@ export default function LogisticsHubView({
               <Package size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
             {logisticsKPIs.totalQtyOrdered.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-slate-500 font-medium">{poLines.length} mặt hàng trong {logisticsKPIs.activePOCount} PO</p>
@@ -439,7 +439,7 @@ export default function LogisticsHubView({
               <ClipboardList size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-teal-700 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-teal-700 tabular-nums">
             {logisticsKPIs.totalQtyPlanned.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-teal-600 font-medium">{logisticsKPIs.planCount} chuyến điều độ</p>
@@ -452,7 +452,7 @@ export default function LogisticsHubView({
               <Truck size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-emerald-700 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-emerald-700 tabular-nums">
             {logisticsKPIs.totalQtyDelivered.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-emerald-600 font-medium">Đạt {logisticsKPIs.overallProgress}% tiến độ</p>
@@ -465,7 +465,7 @@ export default function LogisticsHubView({
               <Clock size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-amber-700 tabular-nums">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-amber-700 tabular-nums">
             {logisticsKPIs.totalRemaining.toLocaleString('vi-VN')}
           </div>
           <p className="text-[10.5px] text-amber-600 font-medium">Cần giao tiếp</p>
@@ -478,7 +478,7 @@ export default function LogisticsHubView({
               <DollarSign size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-indigo-900 truncate tabular-nums" title={`${logisticsKPIs.totalRevenueDelivered.toLocaleString('vi-VN')} đ`}>
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-900 truncate tabular-nums" title={`${logisticsKPIs.totalRevenueDelivered.toLocaleString('vi-VN')} đ`}>
             {logisticsKPIs.totalRevenueDelivered >= 1e9 
               ? `${(logisticsKPIs.totalRevenueDelivered / 1e9).toFixed(2)} tỷ đ`
               : `${(logisticsKPIs.totalRevenueDelivered / 1e6).toFixed(1)} tr đ`}
@@ -493,7 +493,7 @@ export default function LogisticsHubView({
               <TrendingUp size={13} />
             </div>
           </div>
-          <div className="text-2xl font-bold tracking-tight text-rose-700 truncate tabular-nums" title={`${logisticsKPIs.totalProfitDelivered.toLocaleString('vi-VN')} đ`}>
+          <div className="text-xl sm:text-2xl font-bold tracking-tight text-rose-700 truncate tabular-nums" title={`${logisticsKPIs.totalProfitDelivered.toLocaleString('vi-VN')} đ`}>
             {logisticsKPIs.totalProfitDelivered >= 1e9 
               ? `${(logisticsKPIs.totalProfitDelivered / 1e9).toFixed(2)} tỷ đ`
               : `${(logisticsKPIs.totalProfitDelivered / 1e6).toFixed(1)} tr đ`}

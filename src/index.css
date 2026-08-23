@@ -202,3 +202,42 @@ body {
 .font-condensed {
   font-family: var(--font-condensed) !important;
 }
+
+/* iOS Safe Area & iPhone Native Touch Support */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .ios-safe-top {
+    padding-top: max(env(safe-area-inset-top), 12px);
+  }
+  .ios-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+}
+
+/* Prevent unwanted zoom on iOS Safari input focus */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS Spring Tap Feedback & Smooth Touch Momentum */
+.ios-touch-active {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ios-touch-active:active {
+  transform: scale(0.94);
+  opacity: 0.85;
+}
+
+/* Glassmorphism for Apple iOS 18 Safari */
+.ios-glass {
+  background-color: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
