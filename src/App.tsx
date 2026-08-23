@@ -2258,8 +2258,9 @@ function TableView({
       </div>
 
       {/* Apple Inset-Grouped Table Container */}
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] flex-1 overflow-hidden flex flex-col min-h-[400px]">
-        <div className="overflow-auto flex-1">
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] flex-1 overflow-hidden flex flex-col min-h-[360px]">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-auto flex-1">
           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
             <thead className="bg-[#F5F5F7] text-slate-600 sticky top-0 border-b border-black/[0.06] z-10 font-semibold uppercase tracking-wider text-[11px]">
               <tr>
@@ -2394,6 +2395,152 @@ function TableView({
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Apple Inset-Grouped Card Feed */}
+        <div className="md:hidden overflow-y-auto flex-1 space-y-2.5 p-2.5 bg-[#F5F5F7]">
+          {paginatedData.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center text-slate-400 border border-black/[0.06] text-xs">
+              Không có dữ liệu phù hợp với bộ lọc.
+            </div>
+          ) : (
+            paginatedData.map((row) => {
+              const rowId = row.id || JSON.stringify(row);
+              const isHighlighted = highlightedRowIds.has(rowId);
+              
+              // Overdue check
+              let isOverdue = false;
+              if (row["Ngày giao"]) {
+                try {
+                  const dateStr = String(row["Ngày giao"]);
+                  const parsedDate = parse(dateStr.split(" ")[0], "dd/MM/yyyy", new Date());
+                  if (!isNaN(parsedDate.getTime()) && isBefore(parsedDate, startOfDay(new Date()))) {
+                    const status = String(row["Trạng Thái"] || row["Status"] || row["Trạng thái"] || "");
+                    if (!["Hoàn thành", "Đã giao", "Hoàn tất", "Hủy", "Đã hủy"].includes(status)) {
+                      isOverdue = true;
+                    }
+                  }
+                } catch (e) {}
+              }
+
+              // Extract title
+              let cardTitle = "";
+              const titleKeys = ["Số đơn hàng", "Đơn hàng", "Số PXK", "Mã sản phẩm", "Mã giá bán", "Mã hợp đồng", "Số hợp đồng", "Tên sản phẩm", "Sản phẩm", "Mã hàng"];
+              for (const k of titleKeys) {
+                if (row[k]) {
+                  cardTitle = String(row[k]);
+                  break;
+                }
+              }
+              if (!cardTitle) cardTitle = String(row[visibleColumns[0]] || "Bản ghi");
+
+              // Extract subtitle
+              let cardSubtitle = "";
+              const subKeys = ["Khách hàng", "RP_Khách hàng", "Nhà cung cấp", "Tên sản phẩm", "Nhóm hàng", "Người liên hệ", "Công ty"];
+              for (const k of subKeys) {
+                if (row[k] && String(row[k]) !== cardTitle) {
+                  cardSubtitle = String(row[k]);
+                  break;
+                }
+              }
+
+              // Extract status
+              let statusKey = "";
+              let statusVal = "";
+              const statusKeys = ["Trạng thái", "Trạng Thái", "Status", "Tình trạng"];
+              for (const k of statusKeys) {
+                if (row[k]) {
+                  statusKey = k;
+                  statusVal = String(row[k]);
+                  break;
+                }
+              }
+
+              // Extract metrics
+              const metricCandidates = visibleColumns.filter(c => 
+                !titleKeys.includes(c) && 
+                !subKeys.includes(c) && 
+                !statusKeys.includes(c) && 
+                row[c] != null && 
+                String(row[c]).trim() !== ""
+              );
+
+              const metrics = metricCandidates.slice(0, 4).map(c => ({
+                label: c,
+                value: row[c]
+              }));
+
+              return (
+                <div
+                  key={rowId}
+                  onClick={() => {
+                    setEditingRow(row);
+                    setFormData({ ...row });
+                    setIsEditModalOpen(true);
+                    setConfirmDelete(false);
+                  }}
+                  className={clsx(
+                    "bg-white rounded-2xl p-3.5 border border-black/[0.06] shadow-xs active:scale-[0.98] transition-all cursor-pointer space-y-2.5",
+                    isOverdue ? "border-l-4 border-l-rose-500 bg-rose-50/20" : "",
+                    isHighlighted ? "ring-2 ring-amber-400 bg-amber-50/30" : ""
+                  )}
+                >
+                  {/* Card Top */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
+                          {renderCell(titleKeys.find(k => row[k]) || visibleColumns[0], cardTitle, row)}
+                        </span>
+                        {isOverdue && (
+                          <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full">
+                            <AlertTriangle size={10} /> Quá hạn
+                          </span>
+                        )}
+                      </div>
+                      {cardSubtitle && (
+                        <p className="text-[11.5px] text-slate-500 font-medium truncate mt-0.5">
+                          {cardSubtitle}
+                        </p>
+                      )}
+                    </div>
+                    {statusVal && (
+                      <div className="shrink-0">
+                        {renderCell(statusKey, statusVal, row)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Metrics */}
+                  {metrics.length > 0 && (
+                    <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100">
+                      {metrics.map((m, mIdx) => (
+                        <div key={mIdx} className="bg-slate-50/80 rounded-xl p-2 border border-slate-100">
+                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block truncate">
+                            {m.label}
+                          </span>
+                          <div className="text-xs font-bold text-slate-800 mt-0.5 truncate">
+                            {renderCell(m.label, m.value, row)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Card Bottom */}
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs font-medium text-slate-500">
+                    <span className="text-[10.5px] text-slate-400 font-medium flex items-center gap-1">
+                      <span>Chạm để sửa chi tiết</span>
+                    </span>
+                    <div className="flex items-center gap-1 text-blue-600 font-bold text-xs">
+                      <span>Chi tiết</span>
+                      <ChevronRight size={14} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {totalPages > 1 && (
@@ -2445,8 +2592,8 @@ function TableView({
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden pb-safe sm:pb-0">
             <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
               <MacTrafficLights onClose={() => setIsModalOpen(false)} />
               <div className="h-4 w-px bg-black/[0.08]" />
@@ -2726,11 +2873,11 @@ function TableView({
       )}
 
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-end">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-end">
           <motion.div 
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-black/[0.08]"
+            className="w-full sm:max-w-md bg-white max-h-[90vh] sm:h-full rounded-t-[28px] sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-black/[0.08] pb-safe sm:pb-0 overflow-hidden"
           >
             <div className="px-6 py-4 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
               <MacTrafficLights onClose={() => {

@@ -1,3 +1,4 @@
+import clsx from 'clsx';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { 
   Truck, 
@@ -10,7 +11,7 @@ import {
   Package, 
   DollarSign, 
   TrendingUp, 
-  ChevronDown, 
+  ChevronDown, ChevronRight, 
   ChevronUp, 
   CheckCircle, 
   Clock, 
@@ -910,7 +911,7 @@ export default function DeliveryView({
               </span>
               <span className="text-[11px] text-slate-400 italic">Nhấp vào Mã Đơn Hàng hoặc Mã Sản Phẩm để xem chi tiết</span>
             </div>
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-bold uppercase text-slate-400">
@@ -1003,6 +1004,98 @@ export default function DeliveryView({
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Apple Inset Cards Feed */}
+            <div className="md:hidden space-y-2.5 p-2.5 bg-[#F5F5F7]">
+              {filteredDeliveries.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center text-slate-400 border border-black/[0.06] text-xs">
+                  Không tìm thấy dữ liệu giao hàng phù hợp với bộ lọc.
+                </div>
+              ) : (
+                filteredDeliveries.map((d, i) => {
+                  const qty = parseNumber(d["Số lượng giao"]);
+                  const rev = parseNumber(d["Doanh thu"]);
+                  const profit = parseNumber(d["Lợi nhuận gộp"]);
+                  const hasIncident = d["Sự cố"] === "1" || d["Sự cố"] === 1;
+                  const deliveryId = d.id || d.ID || `${d["Số PXK"] || ""}-${d["Đơn hàng"] || ""}-${d["Tên sản phẩm"] || ""}-${i}`;
+
+                  return (
+                    <div 
+                      key={deliveryId} 
+                      onClick={() => {
+                        setEditingSlip({...d});
+                        setIsEditModalOpen(true);
+                        setConfirmDelete(false);
+                      }}
+                      className="bg-white rounded-2xl p-3.5 border border-black/[0.06] shadow-xs active:scale-[0.98] transition-all cursor-pointer space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-xs sm:text-sm text-blue-700">
+                              {d["Số PXK"] || "PXK N/A"}
+                            </span>
+                            {hasIncident && (
+                              <span className="px-1.5 py-0.2 bg-rose-100 text-rose-700 rounded-full text-[9px] font-bold flex items-center gap-0.5">
+                                <AlertTriangle size={10} /> Sự cố
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold text-slate-900 truncate mt-0.5">
+                            {d["Khách hàng"]}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {d["Tên sản phẩm"]}
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className={clsx(
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold inline-block",
+                            String(d["Status"] || "").includes("Hoàn thành") 
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          )}>
+                            {d["Status"] || "Hoàn thành"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                            {d["Ngày giao"]}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100 text-center">
+                        <div className="bg-slate-50 rounded-xl p-1.5 border border-slate-100">
+                          <span className="text-[9.5px] font-medium text-slate-400 block">Số lượng</span>
+                          <span className="text-xs font-bold text-slate-900 font-mono">{qty.toLocaleString("vi-VN")}</span>
+                        </div>
+                        <div className="bg-blue-50/60 rounded-xl p-1.5 border border-blue-100/60">
+                          <span className="text-[9.5px] font-medium text-blue-600 block">Doanh thu</span>
+                          <span className="text-xs font-bold text-blue-700">{formatCurrency(rev)}</span>
+                        </div>
+                        <div className="bg-emerald-50/60 rounded-xl p-1.5 border border-emerald-100/60">
+                          <span className="text-[9.5px] font-medium text-emerald-600 block">Lợi nhuận</span>
+                          <span className={clsx("text-xs font-bold", profit >= 0 ? "text-emerald-700" : "text-rose-600")}>
+                            {formatCurrency(profit)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs font-medium text-slate-500">
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <span className="text-slate-400">PO:</span>
+                          <span className="font-bold text-blue-600 font-mono">{d["Đơn hàng"]}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-blue-600 font-bold text-xs">
+                          <span>Chi tiết</span>
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

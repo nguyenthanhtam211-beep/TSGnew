@@ -387,6 +387,7 @@ export default function DeliveryPlanView({
                 {/* PO Lines & Plans */}
                 {expandedPOs.has(po.poNumber) && (
                   <div className="border-t border-gray-100 bg-gray-50/30">
+                    <div className="hidden md:block">
                     <table className="w-full text-sm text-left">
                       <thead className="bg-gray-50/80 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                         <tr>
@@ -545,6 +546,111 @@ export default function DeliveryPlanView({
                         })}
                       </tbody>
                     </table>
+                    </div>
+
+                    {/* Mobile PO Lines Card View */}
+                    <div className="md:hidden space-y-2.5 p-2.5">
+                      {po.lines.map((line: any) => {
+                        const isFullyPlanned = line.qtyRemainingToPlan <= 0;
+                        const isFullyDelivered = line.qtyRemainingToDeliver <= 0;
+
+                        return (
+                          <div 
+                            key={line.lineId}
+                            className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs space-y-2.5"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="text-xs font-bold text-slate-900 block">
+                                  {line["Tên sản phẩm"] || line["Mã hàng"]}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  ĐVT: {line["ĐVT"] || "Cái"}
+                                </span>
+                              </div>
+                              <div className="shrink-0">
+                                {isFullyDelivered ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Đã giao đủ
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
+                                    {line.qtyOrdered > 0 ? Math.round((line.qtyDelivered / line.qtyOrdered) * 100) : 0}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-slate-100 text-center">
+                              <div className="bg-slate-50 rounded-xl p-1.5">
+                                <span className="text-[9px] text-slate-400 font-semibold block">ĐẶT HÀNG</span>
+                                <span className="text-xs font-bold text-slate-900 font-mono">{line.qtyOrdered.toLocaleString()}</span>
+                              </div>
+                              <div className="bg-blue-50/60 rounded-xl p-1.5">
+                                <span className="text-[9px] text-blue-500 font-semibold block">ĐÃ LÊN KH</span>
+                                <span className="text-xs font-bold text-blue-700 font-mono">{line.qtyPlanned.toLocaleString()}</span>
+                              </div>
+                              <div className="bg-amber-50/60 rounded-xl p-1.5">
+                                <span className="text-[9px] text-amber-600 font-semibold block">CẦN GIAO</span>
+                                <span className="text-xs font-bold text-amber-700 font-mono">{line.qtyRemainingToDeliver.toLocaleString()}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-1.5 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                {!isFullyPlanned && (
+                                  <button 
+                                    onClick={() => handleOpenAddPlan(line, po.poNumber, po.customer)}
+                                    className="text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus size={11} /> Thêm KH
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => handleOpenMultiBatch(line, po.poNumber, po.customer)}
+                                  className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-xl border border-indigo-200 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Calendar size={11} /> Chia đợt
+                                </button>
+                              </div>
+
+                              {line.plans.length > 0 && (
+                                <button
+                                  onClick={() => toggleLine(line.lineId)}
+                                  className="text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer ml-auto"
+                                >
+                                  <span>{line.plans.length} đợt</span>
+                                  <ChevronRight size={11} className={expandedLines.has(line.lineId) ? "rotate-90" : ""} />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Mobile expansion for line plans */}
+                            {expandedLines.has(line.lineId) && line.plans.length > 0 && (
+                              <div className="space-y-1.5 pt-2 border-t border-blue-100">
+                                {line.plans.map((p: any) => (
+                                  <div key={p.id} className="bg-blue-50/40 rounded-xl p-2 border border-blue-100 text-xs flex items-center justify-between">
+                                    <div>
+                                      <span className="font-mono font-bold text-blue-700 text-[11px] block">{p["Số PXK"] || "Đợt giao"}</span>
+                                      <span className="text-[10px] text-slate-500 font-mono">{p["Ngày giao dự kiến"]} • SL: <strong>{Number(p["Số lượng giao dự kiến"] || 0).toLocaleString()}</strong></span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button 
+                                        onClick={() => handleOpenEditPlan(p, line)}
+                                        className="p-1 text-slate-500 hover:text-blue-600 bg-white rounded-lg border border-slate-200"
+                                      >
+                                        <Edit2 size={12} />
+                                      </button>
+                                      
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -555,8 +661,8 @@ export default function DeliveryPlanView({
 
       {/* Plan Modal */}
       {isPlanModalOpen && planForm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe sm:pb-0">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                 {isEditing ? 'Chỉnh Sửa Kế Hoạch' : 'Thêm Kế Hoạch Mới'}
@@ -635,7 +741,7 @@ export default function DeliveryPlanView({
       {/* Multi-Batch Delivery Planning Modal */}
       {isMultiModalOpen && multiBatchData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe sm:pb-0">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50/60">
               <div>
                 <h3 className="font-bold text-indigo-950 text-base flex items-center gap-2">

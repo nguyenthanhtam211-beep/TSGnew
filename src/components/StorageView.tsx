@@ -571,7 +571,7 @@ export default function StorageView({
             </div>
           ) : (
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-[#F5F5F7] border-b border-slate-200/80 text-[10.5px] uppercase font-bold text-slate-600 tracking-wider">
@@ -733,6 +733,96 @@ export default function StorageView({
                     })}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Apple Inset File Cards */}
+              <div className="md:hidden space-y-2.5 p-2.5 bg-[#F5F5F7]">
+                {filteredFiles.map((file, idx) => {
+                  const status = file.doubleCheckStatus || "pending";
+                  const isVerified = status === "verified";
+                  const isDiscrepancy = status === "discrepancy";
+
+                  return (
+                    <div
+                      key={file.fileId || file.id || idx}
+                      className="bg-white rounded-2xl p-3.5 border border-black/[0.06] shadow-xs active:scale-[0.98] transition-all space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="shrink-0">
+                            {getFileIcon(file.mimeType)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-900 truncate" title={file.fileName}>
+                              {file.fileName}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-100">
+                                {file.documentType || "PXK"}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-500 font-bold">
+                                {file.documentNumber || file.docNumber || "---"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          {isVerified ? (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
+                              Khớp 100%
+                            </span>
+                          ) : isDiscrepancy ? (
+                            <span className="px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-[10px] font-bold">
+                              Lệch số
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[10px] font-bold">
+                              Chờ duyệt
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {file.customer && (
+                        <p className="text-[11px] text-slate-600 font-medium truncate">
+                          Khách hàng: <strong>{file.customer}</strong>
+                        </p>
+                      )}
+
+                      <div className="bg-slate-50 rounded-xl p-2 border border-slate-100 text-[10px] font-mono text-slate-500 truncate">
+                        📁 {file.folderPath || "TSG_Business_Documents"}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 gap-2">
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {file.uploadDate ? new Date(file.uploadDate).toLocaleDateString("vi-VN") : "---"}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          {file.driveLink && (
+                            <a
+                              href={file.driveLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200"
+                            >
+                              <ExternalLink size={12} />
+                              <span>Mở Drive</span>
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => file.driveLink && window.open(file.driveLink, "_blank")}
+                            className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-xl"
+                          >
+                            Chi tiết
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

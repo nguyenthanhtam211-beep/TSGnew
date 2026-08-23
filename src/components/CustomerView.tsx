@@ -1434,7 +1434,7 @@ export default function CustomerView({
 
       {/* Customer Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
             <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
               <div className="flex items-center gap-3.5">
@@ -1643,7 +1643,7 @@ export default function CustomerView({
 
       {/* Contact Add/Edit Modal */}
       {isContactModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
             <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
               <div className="flex items-center gap-3.5">
@@ -1764,9 +1764,9 @@ export default function CustomerView({
 
       {/* Customer Detail Drawer / Modal */}
       {selectedCustomerDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className={clsx(
-            "bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
+            "bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
             isCustomerModalMaximized ? "max-w-6xl h-[94vh]" : "max-w-3xl max-h-[88vh]"
           )}>
             
@@ -1953,7 +1953,7 @@ export default function CustomerView({
       {/* Contact Detail Inspector Modal */}
       {selectedContactDetail && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
             <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
               <div className="flex items-center gap-4">
                 <MacTrafficLights onClose={() => setSelectedContactDetail(null)} />
