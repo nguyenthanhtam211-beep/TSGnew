@@ -241,3 +241,11 @@ body {
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
+
+/* iOS Landscape Orientation Optimization */
+@media (orientation: landscape) and (max-height: 500px) {
+  .ios-glass {
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+}

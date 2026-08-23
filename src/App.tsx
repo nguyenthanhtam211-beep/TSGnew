@@ -607,7 +607,7 @@ export default function App() {
       <Toaster position="top-right" />
 
       {/* Mobile Top Header - Apple iOS Style */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-2.5 ios-glass text-[#1D1D1F] border-b border-black/[0.06] shrink-0 z-30 shadow-2xs pt-[max(env(safe-area-inset-top),10px)]">
+      <div className="lg:hidden flex items-center justify-between pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),16px)] py-2 landscape:py-1.5 ios-glass text-[#1D1D1F] border-b border-black/[0.06] shrink-0 z-40 shadow-2xs pt-[max(env(safe-area-inset-top),8px)] select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileMenuOpen(true)}
@@ -670,7 +670,7 @@ export default function App() {
             className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
           />
-          <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] flex flex-col text-[#1D1D1F] shadow-2xl h-full border-r border-black/[0.08] z-10 animate-in slide-in-from-left duration-200">
+          <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] flex flex-col text-[#1D1D1F] shadow-2xl h-full border-r border-black/[0.08] z-10 animate-in slide-in-from-left duration-200 pl-[max(env(safe-area-inset-left),0px)] pb-safe">
             <div className="p-4 border-b border-black/[0.06] flex items-center justify-between bg-white/70 backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <MacTrafficLights onClose={() => setMobileMenuOpen(false)} />
@@ -1163,10 +1163,10 @@ export default function App() {
       />
 
       {/* Mobile Floating Bottom Dock (Thumb-friendly Apple iOS Navigation) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 ios-glass border-t border-black/[0.06] px-2 py-1 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),10px)] shadow-[0_-4px_25px_rgba(0,0,0,0.06)]">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] ios-glass border-t border-black/[0.06] pl-[max(env(safe-area-inset-left),12px)] pr-[max(env(safe-area-inset-right),12px)] py-1 landscape:py-0.5 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-4px_25px_rgba(0,0,0,0.08)] pointer-events-auto select-none">
         <button 
           onClick={() => navItemClick("dashboard")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "dashboard" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "dashboard" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "dashboard" ? "bg-blue-50 text-[#007AFF]" : "")}>
             <LayoutDashboard size={20} className={activeTab === "dashboard" ? "stroke-[2.5]" : "stroke-[1.75]"} />
@@ -1176,7 +1176,7 @@ export default function App() {
 
         <button 
           onClick={() => navItemClick("logistics")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active relative cursor-pointer", activeTab === "logistics" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation relative cursor-pointer", activeTab === "logistics" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "logistics" ? "bg-blue-50 text-[#007AFF]" : "")}>
             <Truck size={20} className={activeTab === "logistics" ? "stroke-[2.5]" : "stroke-[1.75]"} />
@@ -1191,7 +1191,7 @@ export default function App() {
 
         <button 
           onClick={() => navItemClick("po")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active relative cursor-pointer", activeTab === "po" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation relative cursor-pointer", activeTab === "po" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "po" ? "bg-blue-50 text-[#007AFF]" : "")}>
             <FileText size={20} className={activeTab === "po" ? "stroke-[2.5]" : "stroke-[1.75]"} />
@@ -1206,7 +1206,7 @@ export default function App() {
 
         <button 
           onClick={() => navItemClick("ocr")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "ocr" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "ocr" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "ocr" ? "bg-indigo-50 text-indigo-600" : "")}>
             <Camera size={20} className={activeTab === "ocr" ? "stroke-[2.5]" : "stroke-[1.75]"} />
@@ -1216,7 +1216,7 @@ export default function App() {
 
         <button 
           onClick={() => navItemClick("assistant")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", activeTab === "assistant" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "assistant" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "assistant" ? "bg-purple-50 text-purple-600" : "")}>
             <Bot size={20} className={activeTab === "assistant" ? "stroke-[2.5]" : "stroke-[1.75]"} />
@@ -1226,7 +1226,7 @@ export default function App() {
 
         <button 
           onClick={() => setMobileMenuOpen(true)}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[50px] min-h-[48px] ios-touch-active cursor-pointer", mobileMenuOpen ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
+          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", mobileMenuOpen ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
         >
           <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", mobileMenuOpen ? "bg-blue-50 text-[#007AFF]" : "")}>
             <Menu size={20} className={mobileMenuOpen ? "stroke-[2.5]" : "stroke-[1.75]"} />
