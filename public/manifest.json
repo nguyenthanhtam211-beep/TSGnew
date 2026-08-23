@@ -6,12 +6,12 @@
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0f172a",
-  "theme_color": "#1e293b",
+  "theme_color": "#007AFF",
   "icons": [
     {
-      "src": "https://img.icons8.com/color/512/company.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

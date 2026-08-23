@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="tsgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#007AFF" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  
+  <!-- Outer Rounded Container with macOS Squircle Radius -->
+  <rect width="512" height="512" rx="128" fill="url(#tsgGrad)" />
+  
+  <!-- Subtle Inner Border -->
+  <rect x="8" y="8" width="496" height="496" rx="120" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="8" />
+  
+  <!-- Lotus & Diamond Geometric Crest (Tâm Sen Group) -->
+  <g transform="translate(256, 230) scale(1.15)" filter="url(#shadow)">
+    <!-- Center Core Lotus Petal -->
+    <path d="M 0 -105 C 38 -55, 48 30, 0 85 C -48 30, -38 -55, 0 -105 Z" fill="#FFFFFF" opacity="0.98" />
+    
+    <!-- Left Lotus Wing -->
+    <path d="M -15 -45 C -75 -25, -105 35, -45 75 C -15 65, 0 45, -5 10 Z" fill="#FFFFFF" opacity="0.85" />
+    
+    <!-- Right Lotus Wing -->
+    <path d="M 15 -45 C 75 -25, 105 35, 45 75 C 15 65, 0 45, 5 10 Z" fill="#FFFFFF" opacity="0.85" />
+  </g>
+  
+  <!-- Typography "TSG" at the bottom -->
+  <text x="256" y="425" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', sans-serif" font-size="78" font-weight="900" letter-spacing="6" fill="#FFFFFF">
+    TSG
+  </text>
+</svg>
