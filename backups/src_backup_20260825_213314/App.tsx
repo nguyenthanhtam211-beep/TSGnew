@@ -71,55 +71,6 @@ function parseCSV(csvText: string) {
 export default function App() {
   const [selectedProductDetails, setSelectedProductDetails] = useState<string | null>(null);
   const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<'north' | 'all' | 'south'>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("tsg_selected_region") as any) || "north";
-    }
-    return "north";
-  });
-
-  const handleRegionChange = (reg: 'north' | 'all' | 'south') => {
-    setSelectedRegion(reg);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("tsg_selected_region", reg);
-    }
-    toast.success(
-      reg === "north" 
-        ? "🌟 Đã lọc vùng: Miền Bắc (Thăng Long, Bắc Sơn, Thanh Hóa)" 
-        : reg === "south" 
-        ? "Đã lọc vùng: Miền Nam (Sài Gòn, Bến Tre, Quốc Đại)" 
-        : "🏢 Đã chuyển chế độ: Toàn bộ công ty (Kế toán)"
-    );
-  };
-
-  const isNorthCust = (name: string) => {
-    if (!name) return false;
-    const n = name.toLowerCase();
-    return n.includes("thăng long") || n.includes("thang long") || 
-           n.includes("bắc sơn") || n.includes("bac son") || 
-           n.includes("thanh hoá") || n.includes("thanh hoa");
-  };
-
-  const isSouthCust = (name: string) => {
-    if (!name) return false;
-    const n = name.toLowerCase();
-    return n.includes("sài gòn") || n.includes("sai gon") || 
-           n.includes("bến tre") || n.includes("ben tre") || 
-           n.includes("quốc đại") || n.includes("quoc dai");
-  };
-
-  const matchesRegion = (item: any) => {
-    if (selectedRegion === "all") return true;
-    const cust = String(item["Khách hàng"] || item["RP_Khách hàng"] || item["Tên khách hàng"] || item["Công ty"] || item.customer || item.partnerName || "");
-    if (selectedRegion === "north") {
-      return isNorthCust(cust) || (!cust && !isSouthCust(cust));
-    }
-    if (selectedRegion === "south") {
-      return isSouthCust(cust);
-    }
-    return true;
-  };
-
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
@@ -313,8 +264,6 @@ export default function App() {
     });
   }, [pricingData, productData]);
 
-  
-
   const enrichedPoLinesData = useMemo(() => {
     return poLinesData.map(row => {
       let productCode = row['Mã của khách']?.split(',')[0];
@@ -444,13 +393,6 @@ export default function App() {
       };
     });
   }, [poHeaderData, enrichedPoLinesData, deliveryData]);
-
-  const regionFilteredPoHeaders = useMemo(() => poHeaderData.filter(matchesRegion), [poHeaderData, selectedRegion]);
-  const regionFilteredPoLines = useMemo(() => enrichedPoLinesData.filter(matchesRegion), [enrichedPoLinesData, selectedRegion]);
-  const regionFilteredDeliveries = useMemo(() => enrichedDeliveryData.filter(matchesRegion), [enrichedDeliveryData, selectedRegion]);
-  const regionFilteredDeliveryPlans = useMemo(() => enrichedDeliveryPlanData.filter(matchesRegion), [enrichedDeliveryPlanData, selectedRegion]);
-  const regionFilteredCustomers = useMemo(() => customerData.filter(matchesRegion), [customerData, selectedRegion]);
-
 
 
   const handleAddToFirestore = async (colName: string, row: any) => {
@@ -938,18 +880,16 @@ export default function App() {
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
           dbCount={13}
           isSyncing={false}
-          selectedRegion={selectedRegion}
-          onRegionChange={handleRegionChange}
         />
 
         {/* Main Content Viewport */}
         <main className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-24 lg:pb-6 pl-[max(env(safe-area-inset-left),0px)] pr-[max(env(safe-area-inset-right),0px)]">
         {activeTab === "dashboard" && (
           <DashboardView 
-            poData={regionFilteredPoHeaders} 
-            deliveryData={regionFilteredDeliveries} 
-            poLinesData={regionFilteredPoLines} 
-            customersData={regionFilteredCustomers} 
+            poData={poHeaderData} 
+            deliveryData={enrichedDeliveryData} 
+            poLinesData={enrichedPoLinesData} 
+            customersData={customerData} 
             commissionData={commissionData}
           />
         )}
@@ -2597,13 +2537,6 @@ function TableView({
                           <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">
                             <FileText size={10} />
                             <span>HĐ: {contractNum}</span>
-                          </span>
-                        )}
-
-                        {(row["Thiếu chứng từ gốc"] || (!row.driveLink && !row["File chứng từ"] && !row["Ảnh BBGH"] && (row["Trạng thái"] === "Đã giao" || row["Trạng Thái"] === "Đã giao" || row["Số PXK"]))) && (
-                          <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded" title="Chưa đính kèm file scan BBGH/PXK gốc">
-                            <AlertTriangle size={10} className="text-amber-500 shrink-0" />
-                            <span>Thiếu chứng từ gốc</span>
                           </span>
                         )}
                       </div>

@@ -26,8 +26,6 @@ export interface HeaderProps {
   onToggleFullscreen?: () => void;
   onOpenMobileMenu?: () => void;
   dbCount?: number;
-  selectedRegion?: 'north' | 'all' | 'south';
-  onRegionChange?: (region: 'north' | 'all' | 'south') => void;
   isSyncing?: boolean;
   className?: string;
 }
@@ -53,8 +51,6 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleFullscreen,
   onOpenMobileMenu,
   dbCount = 13,
-  selectedRegion = 'north',
-  onRegionChange,
   isSyncing = false,
   className
 }) => {

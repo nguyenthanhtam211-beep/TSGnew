@@ -1,0 +1,468 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,500;1,700&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700;1,900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Inter", "Roboto Mono", SFMono-Regular, monospace;
+  --font-tabular: "Inter", "Roboto", system-ui, sans-serif;
+
+  --color-cockpit-bg: #F8F9FB;
+  --color-cockpit-surface: #FFFFFF;
+  --color-cockpit-subtle: #F1F5F9;
+  --color-cockpit-raised: #FAFAFC;
+  --color-cockpit-hover: #E2E8F0;
+  --color-cockpit-active: #CBD5E1;
+  --color-cockpit-hairline: rgba(203, 213, 225, 0.65);
+  --color-cockpit-hairline-subtle: rgba(226, 232, 240, 0.55);
+  --color-cockpit-hairline-strong: rgba(148, 163, 184, 0.80);
+
+  --color-cockpit-text: #0F172A;
+  --color-cockpit-secondary: #334155;
+  --color-cockpit-muted: #64748B;
+  --color-cockpit-faint: #94A3B8;
+
+  --color-accent-blue: #007AFF;
+  --color-accent-emerald: #10B981;
+  --color-accent-amber: #F59E0B;
+  --color-accent-indigo: #6366F1;
+  --color-accent-rose: #EF4444;
+  --color-accent-purple: #8B5CF6;
+}
+
+:root {
+  /* Cockpit Neutral Surfaces (4 Elevation Tiers) */
+  --cockpit-bg: #F8F9FB;
+  --cockpit-surface: #FFFFFF;
+  --cockpit-surface-subtle: #F1F5F9;
+  --cockpit-surface-raised: #FAFAFC;
+  --cockpit-surface-hover: #E2E8F0;
+  --cockpit-surface-active: #CBD5E1;
+
+  /* Anti-Coarse Hairlines & Dividers */
+  --cockpit-hairline: rgba(203, 213, 225, 0.65);
+  --cockpit-hairline-subtle: rgba(226, 232, 240, 0.55);
+  --cockpit-hairline-strong: rgba(148, 163, 184, 0.80);
+
+  /* Cockpit Typography Scale & Fonts */
+  --font-sans: "Roboto Condensed", "Roboto", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Roboto Condensed", sans-serif;
+  --font-body: "Inter", "Roboto", system-ui, sans-serif;
+  --font-mono: "Inter", "Roboto", system-ui, sans-serif;
+  --font-tabular: "Inter", "Roboto", system-ui, sans-serif;
+  --font-condensed: "Roboto Condensed", sans-serif;
+
+  /* Cockpit Text Scale */
+  --cockpit-text-primary: #0F172A;
+  --cockpit-text-secondary: #334155;
+  --cockpit-text-muted: #64748B;
+  --cockpit-text-faint: #94A3B8;
+
+  /* Vibrant Cockpit Semantic Accents */
+  --accent-blue: #007AFF;
+  --accent-blue-hover: #0066D6;
+  --accent-blue-subtle: rgba(0, 122, 255, 0.08);
+  --accent-blue-border: rgba(0, 122, 255, 0.25);
+
+  --accent-emerald: #10B981;
+  --accent-emerald-hover: #059669;
+  --accent-emerald-subtle: rgba(16, 185, 129, 0.08);
+  --accent-emerald-border: rgba(16, 185, 129, 0.25);
+
+  --accent-amber: #F59E0B;
+  --accent-amber-hover: #D97706;
+  --accent-amber-subtle: rgba(245, 158, 11, 0.08);
+  --accent-amber-border: rgba(245, 158, 11, 0.25);
+
+  --accent-indigo: #6366F1;
+  --accent-indigo-hover: #4F46E5;
+  --accent-indigo-subtle: rgba(99, 102, 241, 0.08);
+  --accent-indigo-border: rgba(99, 102, 241, 0.25);
+
+  --accent-rose: #EF4444;
+  --accent-rose-hover: #DC2626;
+  --accent-rose-subtle: rgba(239, 68, 68, 0.08);
+  --accent-rose-border: rgba(239, 68, 68, 0.25);
+
+  --accent-purple: #8B5CF6;
+  --accent-purple-hover: #7C3AED;
+  --accent-purple-subtle: rgba(139, 92, 246, 0.08);
+  --accent-purple-border: rgba(139, 92, 246, 0.25);
+
+  /* Fluid Responsive Typography */
+  --fluid-h1: clamp(1.35rem, 4vw + 0.5rem, 2.25rem);
+  --fluid-h2: clamp(1.15rem, 3vw + 0.4rem, 1.75rem);
+  --fluid-h3: clamp(1rem, 2.2vw + 0.35rem, 1.35rem);
+  --fluid-body: clamp(0.8125rem, 1vw + 0.45rem, 0.95rem);
+  --fluid-caption: clamp(0.6875rem, 0.8vw + 0.35rem, 0.8125rem);
+  --safe-bottom: env(safe-area-inset-bottom, 16px);
+
+  /* Cockpit Shadows */
+  --shadow-cockpit-card: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+  --shadow-cockpit-raised: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-cockpit-float: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 8px 16px -6px rgba(15, 23, 42, 0.04);
+  --shadow-cockpit-glass: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
+
+  /* Spring Physics Easings */
+  --ease-cockpit-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-cockpit-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fluid-body);
+  line-height: 1.5;
+  background-color: var(--cockpit-bg);
+  color: var(--cockpit-text-primary);
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+*, button, input, select, textarea {
+  font-family: var(--font-sans);
+}
+
+/* ==========================================================================
+   Tabular Numbers & High-Precision Typography
+   ========================================================================== */
+.font-mono,
+.tabular-nums,
+[data-tabular="true"],
+.font-tabular,
+.font-mono-numbers,
+[class*="font-mono"] {
+  font-family: "Inter", "Roboto", system-ui, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: -0.015em;
+}
+
+.font-condensed,
+.font-display {
+  font-family: var(--font-condensed) !important;
+}
+
+/* Fluid Typography Utilities */
+.fluid-h1 {
+  font-size: var(--fluid-h1);
+  line-height: 1.2;
+}
+
+.fluid-h2 {
+  font-size: var(--fluid-h2);
+  line-height: 1.25;
+}
+
+.fluid-h3 {
+  font-size: var(--fluid-h3);
+  line-height: 1.3;
+}
+
+.fluid-body {
+  font-size: var(--fluid-body);
+}
+
+.fluid-caption {
+  font-size: var(--fluid-caption);
+}
+
+/* ==========================================================================
+   Surface Elevation & Hairline Border Classes
+   ========================================================================== */
+.cockpit-surface-canvas {
+  background-color: var(--cockpit-bg);
+}
+
+.cockpit-surface-card {
+  background-color: var(--cockpit-surface);
+  border: 1px solid var(--cockpit-hairline);
+  box-shadow: var(--shadow-cockpit-card);
+}
+
+.cockpit-surface-overlay {
+  background-color: var(--cockpit-surface-subtle);
+  border: 1px solid var(--cockpit-hairline-subtle);
+}
+
+.cockpit-surface-elevated {
+  background-color: var(--cockpit-surface-raised);
+  border: 1px solid var(--cockpit-hairline);
+  box-shadow: var(--shadow-cockpit-raised);
+}
+
+.border-cockpit-hairline {
+  border-color: var(--cockpit-hairline);
+}
+
+.border-cockpit-hairline-subtle {
+  border-color: var(--cockpit-hairline-subtle);
+}
+
+.border-cockpit-hairline-strong {
+  border-color: var(--cockpit-hairline-strong);
+}
+
+.divide-cockpit-hairline > * + * {
+  border-color: var(--cockpit-hairline-subtle);
+}
+
+/* ==========================================================================
+   Spring Physics & Tactile Micro-Interactions
+   ========================================================================== */
+.cockpit-spring-press {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.15s ease,
+              border-color 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cockpit-spring-press:active {
+  transform: scale(0.97) translateY(1px);
+}
+
+.cockpit-spring-press:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cockpit-bg), 0 0 0 4px rgba(0, 122, 255, 0.45);
+}
+
+.cockpit-card-hover {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.18s ease;
+}
+
+.cockpit-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-cockpit-raised);
+  border-color: var(--cockpit-hairline-strong);
+}
+
+.cockpit-glow-accent {
+  box-shadow: 0 0 16px -2px rgba(0, 122, 255, 0.25);
+}
+
+.cockpit-glow-emerald {
+  box-shadow: 0 0 16px -2px rgba(16, 185, 129, 0.25);
+}
+
+.cockpit-glow-amber {
+  box-shadow: 0 0 16px -2px rgba(245, 158, 11, 0.25);
+}
+
+/* ==========================================================================
+   Frosted Glassmorphism Cockpit Header & Dock
+   ========================================================================== */
+.cockpit-glass {
+  background-color: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: var(--cockpit-hairline);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 4px 20px -4px rgba(15, 23, 42, 0.05);
+}
+
+.ios-glass {
+  background-color: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.ios-touch-active {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ios-touch-active:active {
+  transform: scale(0.96) translateY(1px);
+  opacity: 0.88;
+}
+
+/* ==========================================================================
+   Mobile-Friendly Smooth Scroll & Safe Area Utilities
+   ========================================================================== */
+.mobile-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.mobile-scroll-x::-webkit-scrollbar {
+  height: 4px;
+}
+
+.mobile-scroll-x::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+.pb-mobile-nav {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 16px));
+}
+
+@media (min-width: 1024px) {
+  .pb-mobile-nav {
+    padding-bottom: 2rem;
+  }
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .ios-safe-top {
+    padding-top: max(env(safe-area-inset-top), 12px);
+  }
+  .ios-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .cockpit-glass,
+  .ios-glass {
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* Prevent unwanted zoom on iOS Safari input focus */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ==========================================================================
+   Markdown Styles with Hairline Borders
+   ========================================================================== */
+.markdown-body table {
+  @apply w-full border-collapse mb-4;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--cockpit-hairline-subtle);
+  @apply px-4 py-2 text-left text-sm;
+}
+.markdown-body th {
+  background-color: var(--cockpit-surface-subtle);
+  @apply font-semibold text-slate-700;
+}
+.markdown-body tr:nth-child(even) {
+  background-color: rgba(241, 245, 249, 0.4);
+}
+.markdown-body p {
+  @apply mb-4 last:mb-0;
+}
+.markdown-body ul {
+  @apply list-disc list-inside mb-4;
+}
+.markdown-body ol {
+  @apply list-decimal list-inside mb-4;
+}
+.markdown-body strong {
+  @apply font-semibold;
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  body {
+    font-size: 11px;
+  }
+
+  #root,
+  #dashboard-content,
+  .h-screen,
+  .h-full {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    width: 100% !important;
+  }
+
+  .grid {
+    display: grid !important;
+  }
+  .grid-cols-1.lg\:grid-cols-2,
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+
+  .print\:break-inside-avoid,
+  .recharts-wrapper,
+  .recharts-surface,
+  .bg-white,
+  .bg-slate-50,
+  .rounded-xl {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+  
+  .recharts-responsive-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Accessibility: Reduced Motion Safety
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-spring-press,
+  .cockpit-card-hover,
+  .ios-touch-active {
+    transition: none !important;
+    transform: none !important;
+  }
+}
