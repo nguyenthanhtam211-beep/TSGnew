@@ -10,6 +10,19 @@ export const parseNumber = (val: any): number => {
   let str = String(val).trim();
   if (!str) return 0;
 
+  // Handle accounting parentheses negative: (100) -> -100
+  let isNegative = false;
+  if (str.startsWith('(') && str.endsWith(')')) {
+    isNegative = true;
+    str = str.slice(1, -1).trim();
+  } else if (str.startsWith('-')) {
+    isNegative = true;
+    str = str.slice(1).trim();
+  }
+
+  // Remove currency signs, percentage signs and words
+  str = str.replace(/[₫đ$VNDvnd%\s]/gi, '');
+
   // If both dot and comma exist:
   if (str.includes('.') && str.includes(',')) {
     if (str.indexOf('.') < str.indexOf(',')) {
@@ -20,15 +33,15 @@ export const parseNumber = (val: any): number => {
       str = str.replace(/,/g, '');
     }
   } else if (str.includes(',')) {
-    // Only commas exist: e.g. "9,008" or "2,316" or "10,861" or "2,5"
+    // Only commas exist: e.g. "9,008" or "2,316" or "10,861" or "2,5" or "35,63"
     const parts = str.split(',');
-    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
       str = str.replace(/,/g, '');
     } else {
       str = str.replace(',', '.');
     }
   } else if (str.includes('.')) {
-    // Only dots exist: e.g. "10.861" or "9.008" or "718.062.120"
+    // Only dots exist: e.g. "10.861" or "9.008" or "718.062.120" vs "35.63" or "2.5"
     const parts = str.split('.');
     if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
       str = str.replace(/\./g, '');
@@ -37,7 +50,8 @@ export const parseNumber = (val: any): number => {
 
   const cleaned = str.replace(/[^0-9.-]+/g, '');
   const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+  return isNegative ? -Math.abs(num) : num;
 };
 
 export const formatVND = (amount: number) => {
@@ -80,7 +94,7 @@ export const scoreProductMatch = (ocrQuery: string, priceRecord: any, customer?:
   const normQuery = normalizeString(ocrQuery);
   if (!normQuery) return 0;
 
-  const recordCode = normalizeString(priceRecord["Mã sản phẩm"] || priceRecord["Mã hàng"] || priceRecord["Mã giá"] || priceRecord["Mã giá bán"] || "");
+  const recordCode = normalizeString(priceRecord["Mã giá bán"] || priceRecord["Mã giá"] || priceRecord["Mã sản phẩm"] || priceRecord["Mã hàng"] || priceRecord["SKU"] || "");
   const recordName = normalizeString(priceRecord["Tên sản phẩm"] || priceRecord["Tên hàng hóa"] || "");
   const recordCust = normalizeString(priceRecord["RP_Khách hàng"] || priceRecord["Khách hàng"] || priceRecord["Tên khách hàng"] || priceRecord["Giao đến"] || "");
 
@@ -95,12 +109,12 @@ export const scoreProductMatch = (ocrQuery: string, priceRecord: any, customer?:
   }
 
   // 2. Exact code match
-  if (recordCode && (normQuery.includes(recordCode) || recordCode.includes(normQuery))) {
+  if (recordCode && (normQuery === recordCode || normQuery.includes(recordCode) || recordCode.includes(normQuery))) {
     score += 50;
   }
 
   // 3. Exact name match
-  if (recordName && (normQuery.includes(recordName) || recordName.includes(normQuery))) {
+  if (recordName && (normQuery === recordName || normQuery.includes(recordName) || recordName.includes(normQuery))) {
     score += 40;
   }
 
@@ -141,8 +155,20 @@ export const findPriceRecord = (pricingData: any[], params: PriceLookupParams | 
     location = params.location || "";
   }
 
+  const normSku = normalizeString(sku);
+  const normName = normalizeString(name);
   const combinedQuery = `${sku} ${name}`.trim();
-  if (!combinedQuery) return null;
+  if (!combinedQuery && !normSku && !normName) return null;
+
+  // 0. Direct exact match by Price Code (Mã giá bán / Mã giá) or Product Code across whole pricing table
+  if (normSku) {
+    const directPriceMatch = pricingData.find(p => {
+      const pPriceCode = normalizeString(p["Mã giá bán"] || p["Mã giá"] || "");
+      const pProdCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || p["SKU"] || "");
+      return (pPriceCode && pPriceCode === normSku) || (pProdCode && pProdCode === normSku);
+    });
+    if (directPriceMatch) return directPriceMatch;
+  }
 
   // 1. Filter by customer if provided and matches exist
   let candidates = pricingData;
@@ -157,36 +183,64 @@ export const findPriceRecord = (pricingData: any[], params: PriceLookupParams | 
     }
   }
 
-  // 2. Priority match with location if location provided
+  // 2. Priority match with destination / location if provided
   if (location) {
     const normLoc = normalizeString(location);
     const matchedLoc = candidates.find(p => {
-      const pLoc = normalizeString(p["Địa điểm giao hàng"] || p["Địa chỉ giao hàng"] || "");
-      const pCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || "");
-      return pLoc.includes(normLoc) && (pCode === normalizeString(sku) || combinedQuery.includes(pCode));
+      const pLoc = normalizeString(p["Giao đến"] || p["Địa điểm giao hàng"] || p["Địa chỉ giao hàng"] || "");
+      const pPriceCode = normalizeString(p["Mã giá bán"] || p["Mã giá"] || "");
+      const pProdCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || "");
+      const pName = normalizeString(p["Tên sản phẩm"] || p["Tên hàng hóa"] || "");
+      const isLocMatch = pLoc && (pLoc.includes(normLoc) || normLoc.includes(pLoc));
+      const isCodeMatch = (normSku && (pPriceCode === normSku || pProdCode === normSku || pPriceCode.includes(normSku) || normSku.includes(pPriceCode) || pProdCode.includes(normSku) || normSku.includes(pProdCode)));
+      const isNameMatch = (normName && (pName.includes(normName) || normName.includes(pName)));
+      return isLocMatch && (isCodeMatch || isNameMatch);
     });
     if (matchedLoc) return matchedLoc;
   }
 
-  // 3. Exact SKU / Code match
-  if (sku) {
-    const normSku = normalizeString(sku);
+  // 3. Exact Code Match in candidates (Mã giá bán, Mã giá, Mã sản phẩm, Mã hàng)
+  if (normSku) {
     const exactCodeMatch = candidates.find(p => {
-      const pCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || "");
-      return pCode && (pCode === normSku || normSku.includes(pCode) || pCode.includes(normSku));
+      const pPriceCode = normalizeString(p["Mã giá bán"] || p["Mã giá"] || "");
+      const pProdCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || "");
+      return (pPriceCode && (pPriceCode === normSku || normSku.includes(pPriceCode) || pPriceCode.includes(normSku))) ||
+             (pProdCode && (pProdCode === normSku || normSku.includes(pProdCode) || pProdCode.includes(normSku)));
     });
     if (exactCodeMatch) return exactCodeMatch;
   }
 
-  // 4. Fuzzy score all candidates
+  // 4. Fallback search on whole pricing data if candidates had no exact match
+  if (normSku && candidates !== pricingData) {
+    const globalCodeMatch = pricingData.find(p => {
+      const pPriceCode = normalizeString(p["Mã giá bán"] || p["Mã giá"] || "");
+      const pProdCode = normalizeString(p["Mã sản phẩm"] || p["Mã hàng"] || "");
+      return (pPriceCode && (pPriceCode === normSku || normSku.includes(pPriceCode) || pPriceCode.includes(normSku))) ||
+             (pProdCode && (pProdCode === normSku || normSku.includes(pProdCode) || pProdCode.includes(normSku)));
+    });
+    if (globalCodeMatch) return globalCodeMatch;
+  }
+
+  // 5. Fuzzy score all candidates
   let bestRecord: any = null;
   let maxScore = 0;
 
   for (const record of candidates) {
-    const score = scoreProductMatch(combinedQuery, record, customer);
+    const score = scoreProductMatch(combinedQuery || sku || name, record, customer);
     if (score > maxScore) {
       maxScore = score;
       bestRecord = record;
+    }
+  }
+
+  // If score not enough and candidates was filtered, try entire pricingData
+  if (maxScore < 10 && candidates !== pricingData) {
+    for (const record of pricingData) {
+      const score = scoreProductMatch(combinedQuery || sku || name, record, customer);
+      if (score > maxScore) {
+        maxScore = score;
+        bestRecord = record;
+      }
     }
   }
 
@@ -222,7 +276,7 @@ export const findMatchingSuggestions = (pricingData: any[], query: string, custo
   const uniqueSuggestions: any[] = [];
 
   for (const item of scored) {
-    const code = item.record["Mã sản phẩm"] || item.record["Mã hàng"] || item.record["Mã giá"];
+    const code = item.record["Mã giá bán"] || item.record["Mã giá"] || item.record["Mã sản phẩm"] || item.record["Mã hàng"];
     if (code && !seenCodes.has(code)) {
       seenCodes.add(code);
       uniqueSuggestions.push(item.record);
@@ -235,12 +289,22 @@ export const findMatchingSuggestions = (pricingData: any[], query: string, custo
 
 export const getSellPriceFromRecord = (record: any): number => {
   if (!record) return 0;
-  return parseNumber(record['Đơn giá bán']) || parseNumber(record['Giá bán']) || parseNumber(record['Đơn giá bán mới']) || 0;
+  return parseNumber(record['Đơn giá bán mới']) ||
+         parseNumber(record['Đơn giá bán']) ||
+         parseNumber(record['Giá bán']) ||
+         0;
 };
 
 export const getBuyPriceFromRecord = (record: any): number => {
   if (!record) return 0;
-  return parseNumber(record['Đơn giá mua']) || parseNumber(record['Giá nhập']) || parseNumber(record['Đơn giá mua mới']) || 0;
+  return parseNumber(record['Đơn giá mua mới']) ||
+         parseNumber(record['Đơn giá mua']) ||
+         parseNumber(record['Giá nhập']) ||
+         parseNumber(record['Giá mua']) ||
+         parseNumber(record['Giá AVP']) ||
+         parseNumber(record['Giá vốn']) ||
+         parseNumber(record['Giá trị vốn']) ||
+         0;
 };
 
 /**
@@ -251,43 +315,68 @@ export const calculateDeliveryFinances = (
   pricingData: any[], 
   poLinesData: any[]
 ) => {
-  const sku = delivery["Mã sản phẩm"] || delivery["Mã hàng"] || delivery["Tên sản phẩm"];
+  const sku = delivery["Mã sản phẩm"] || delivery["Mã hàng"] || delivery["Mã giá"] || delivery["Mã giá bán"] || delivery["Tên sản phẩm"];
   const customer = delivery["Khách hàng"] || delivery["Tên khách hàng"];
-  const location = delivery["Địa điểm giao hàng"] || delivery["Địa chỉ giao hàng"];
-  const qty = parseNumber(delivery["Số lượng giao"]);
+  const location = delivery["Địa điểm giao hàng"] || delivery["Địa chỉ giao hàng"] || delivery["Giao đến"];
+  const qty = parseNumber(delivery["Số lượng giao"] ?? delivery["Số lượng"]);
 
   // Lookup source prices
-  const priceRecord = findPriceRecord(pricingData, { sku, customer, location });
+  const priceRecord = findPriceRecord(pricingData, { sku, name: delivery["Tên sản phẩm"], customer, location });
   
   // Find associated PO Line for secondary lookup
-  const poLine = poLinesData.find(l => 
+  const poLine = (poLinesData || []).find(l => 
     !l.isDeleted && (
       (delivery["Chi tiết đơn hàng"] && String(l["STT"] || l.id) === String(delivery["Chi tiết đơn hàng"])) ||
-      (l["Số đơn hàng"] && delivery["Đơn hàng"] && String(l["Số đơn hàng"]).trim().toLowerCase() === String(delivery["Đơn hàng"]).trim().toLowerCase() && (l["Tên sản phẩm"] === delivery["Tên sản phẩm"] || l["Mã sản phẩm"] === sku))
+      (l["Số đơn hàng"] && delivery["Đơn hàng"] && String(l["Số đơn hàng"]).trim().toLowerCase() === String(delivery["Đơn hàng"]).trim().toLowerCase() && (
+        l["Tên sản phẩm"] === delivery["Tên sản phẩm"] || 
+        l["Mã sản phẩm"] === sku || 
+        l["Mã của khách"] === sku || 
+        l["Mã giá bán"] === sku
+      ))
     )
   );
 
   const priceRecSell = getSellPriceFromRecord(priceRecord);
   const priceRecBuy = getBuyPriceFromRecord(priceRecord);
 
-  // Determine Prices (Priority: Price Table -> PO Line -> Delivery Row)
-  const sellPrice = priceRecSell > 0 ? priceRecSell : 
-                    (poLine ? parseNumber(poLine['Đơn giá bán']) : parseNumber(delivery['Đơn giá bán']));
+  // Determine Prices (Priority: Price Table -> PO Line -> Delivery Row -> Inferred from Total / Qty)
+  let sellPrice = priceRecSell > 0 ? priceRecSell : 
+                  (poLine && parseNumber(poLine['Đơn giá bán']) > 0 ? parseNumber(poLine['Đơn giá bán']) : parseNumber(delivery['Đơn giá bán'] || delivery['Đơn giá']));
   
-  const buyPrice = priceRecBuy > 0 ? priceRecBuy : 
-                   (poLine ? parseNumber(poLine['Đơn giá nhập']) : parseNumber(delivery['Đơn giá nhập']));
+  if (sellPrice <= 0 && poLine && parseNumber(poLine['Thành tiền dòng'] || poLine['Thành tiền']) > 0 && parseNumber(poLine['Số lượng']) > 0) {
+    sellPrice = parseNumber(poLine['Thành tiền dòng'] || poLine['Thành tiền']) / parseNumber(poLine['Số lượng']);
+  }
+  if (sellPrice <= 0 && qty > 0) {
+    const delRevenue = parseNumber(delivery['Doanh thu'] || delivery['Thành tiền']);
+    if (delRevenue > 0) {
+      sellPrice = delRevenue / qty;
+    }
+  }
+
+  let buyPrice = priceRecBuy > 0 ? priceRecBuy : 
+                 (poLine && parseNumber(poLine['Đơn giá nhập'] || poLine['Đơn giá mua']) > 0 ? parseNumber(poLine['Đơn giá nhập'] || poLine['Đơn giá mua']) : parseNumber(delivery['Đơn giá nhập'] || delivery['Đơn giá mua'] || delivery['Giá vốn']));
+
+  if (buyPrice <= 0 && poLine && parseNumber(poLine['Thành tiền mua'] || poLine['Giá trị vốn']) > 0 && parseNumber(poLine['Số lượng']) > 0) {
+    buyPrice = parseNumber(poLine['Thành tiền mua'] || poLine['Giá trị vốn']) / parseNumber(poLine['Số lượng']);
+  }
+  if (buyPrice <= 0 && qty > 0) {
+    const delCost = parseNumber(delivery['Giá trị vốn'] || delivery['Thành tiền mua'] || delivery['Giá vốn']);
+    if (delCost > 0) {
+      buyPrice = delCost / qty;
+    }
+  }
 
   const revenue = sellPrice * qty;
   const profit = (sellPrice - buyPrice) * qty;
   const margin = sellPrice > 0 ? ((sellPrice - buyPrice) / sellPrice) * 100 : 0;
 
   return {
-    sellPrice,
-    buyPrice,
-    revenue,
-    profit,
-    margin,
-    priceCode: priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm']) : 'N/A',
+    sellPrice: isNaN(sellPrice) ? 0 : sellPrice,
+    buyPrice: isNaN(buyPrice) ? 0 : buyPrice,
+    revenue: isNaN(revenue) ? 0 : revenue,
+    profit: isNaN(profit) ? 0 : profit,
+    margin: isNaN(margin) ? 0 : margin,
+    priceCode: priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm']) : (poLine?.['Mã giá bán'] || 'N/A'),
     isDiscrepancy: parseNumber(delivery["Doanh thu"]) !== revenue || parseNumber(delivery["Lợi nhuận gộp"]) !== profit
   };
 };
@@ -299,29 +388,43 @@ export const calculatePOLineFinances = (
   poLine: any,
   pricingData: any[]
 ) => {
-  const sku = poLine["Mã của khách"] || poLine["Mã sản phẩm"] || poLine["Tên sản phẩm"];
-  const customer = poLine["Khách hàng"];
+  const sku = poLine["Mã của khách"] || poLine["Mã sản phẩm"] || poLine["Mã giá bán"] || poLine["Mã hàng"] || poLine["Tên sản phẩm"];
+  const customer = poLine["Khách hàng"] || poLine["Tên khách hàng"];
+  const location = poLine["Địa điểm giao hàng"] || poLine["Đơn vị nhận hàng"] || poLine["Giao đến"];
   const qty = parseNumber(poLine["Số lượng"]);
 
   // Lookup source prices
-  const priceRecord = findPriceRecord(pricingData, { sku, customer });
+  const priceRecord = findPriceRecord(pricingData, { sku, name: poLine["Tên sản phẩm"], customer, location });
 
   const priceRecSell = getSellPriceFromRecord(priceRecord);
   const priceRecBuy = getBuyPriceFromRecord(priceRecord);
 
-  const sellPrice = priceRecSell > 0 ? priceRecSell : parseNumber(poLine['Đơn giá bán']);
-  const buyPrice = priceRecBuy > 0 ? priceRecBuy : parseNumber(poLine['Đơn giá nhập']);
+  let sellPrice = priceRecSell > 0 ? priceRecSell : parseNumber(poLine['Đơn giá bán'] || poLine['Đơn giá']);
+  if (sellPrice <= 0 && qty > 0) {
+    const lineTotal = parseNumber(poLine['Thành tiền dòng'] || poLine['Thành tiền'] || poLine['Tổng tiền']);
+    if (lineTotal > 0) {
+      sellPrice = lineTotal / qty;
+    }
+  }
+
+  let buyPrice = priceRecBuy > 0 ? priceRecBuy : parseNumber(poLine['Đơn giá nhập'] || poLine['Đơn giá mua'] || poLine['Giá vốn']);
+  if (buyPrice <= 0 && qty > 0) {
+    const cogsTotal = parseNumber(poLine['Thành tiền mua'] || poLine['Tổng tiền mua'] || poLine['Giá trị vốn']);
+    if (cogsTotal > 0) {
+      buyPrice = cogsTotal / qty;
+    }
+  }
 
   const revenue = sellPrice * qty;
   const profit = (sellPrice - buyPrice) * qty;
   const margin = sellPrice > 0 ? ((sellPrice - buyPrice) / sellPrice) * 100 : 0;
 
   return {
-    sellPrice,
-    buyPrice,
-    revenue,
-    profit,
-    margin,
+    sellPrice: isNaN(sellPrice) ? 0 : sellPrice,
+    buyPrice: isNaN(buyPrice) ? 0 : buyPrice,
+    revenue: isNaN(revenue) ? 0 : revenue,
+    profit: isNaN(profit) ? 0 : profit,
+    margin: isNaN(margin) ? 0 : margin,
     priceCode: priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm']) : (poLine['Mã giá bán'] || 'N/A')
   };
 };

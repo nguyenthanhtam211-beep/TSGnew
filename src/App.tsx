@@ -280,7 +280,7 @@ export default function App() {
       const associatedDeliveries = deliveryData.filter(d => !d.isDeleted && d['Chi tiết đơn hàng'] === lineId);
       const totalDelivered = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
       const ordered = parseNumber(row['Số lượng']);
-      const remaining = Math.max(0, ordered - totalDelivered);
+      const remaining = ordered - totalDelivered;
       const progressPercent = ordered > 0 ? (totalDelivered / ordered) * 100 : 0;
       const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
       const isCompleted = totalDelivered >= ordered ? "1" : "0";
@@ -332,7 +332,7 @@ export default function App() {
       const totalDeliveredForLine = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
       const qtyOrdered = poLine ? parseNumber(poLine['Số lượng']) : parseNumber(row['Số lượng đặt']);
       
-      const remainingForLine = Math.max(0, qtyOrdered - totalDeliveredForLine);
+      const remainingForLine = qtyOrdered - totalDeliveredForLine;
       const progressPercent = qtyOrdered > 0 ? (totalDeliveredForLine / qtyOrdered) * 100 : 0;
       const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
 
@@ -434,7 +434,7 @@ export default function App() {
       
       // Remove temporary runtime UI calculations, but NEVER delete Tên sản phẩm, ĐVT, or business keys
       const transientFields = [
-        'id', 'Doanh thu dự kiến', 'Lợi nhuận dự kiến', 'Tiến độ', 'Số dòng', 'Status',
+        'id', 'Doanh thu dự kiến', 'Lợi nhuận dự kiến', 'Tiến độ', 'Số dòng',
         'Doanh thu', 'Lợi nhuận gộp', 'Tiến độ giao', 'isOverdue', 'qtyOrdered', 
         'qtyDelivered', 'remainingQty', 'currentRevenue', 'currentProfit', 'margin', 
         'isDelayed', 'isReconciled'
@@ -477,7 +477,7 @@ export default function App() {
       // 1. Kiểm tra mã token Google hiện tại mà KHÔNG ép mở popup
       let token = googleToken || localStorage.getItem('google_access_token');
 
-      let driveData: { driveFileId?: string; driveLink?: string; downloadLink?: string } = {};
+      let driveData: { driveFileId?: string; driveLink?: string; downloadLink?: string; folderId?: string; folderLink?: string; folderPath?: string; fileName?: string } = {};
 
       if (token) {
         try {
@@ -520,8 +520,19 @@ export default function App() {
         syncedToDrive: Boolean(driveData.driveFileId)
       });
 
+      const folderPath = driveData.folderPath || `TSG_Business_Documents/${year}/${metadata.documentType || 'Chung'}/Thang_${month}`;
+      const folderLink = driveData.folderLink || (driveData.driveLink ? driveData.driveLink.substring(0, driveData.driveLink.lastIndexOf('/')) : '');
+
+      return {
+        ...driveData,
+        fileId,
+        fileName: fileNameToSave,
+        folderPath,
+        folderLink
+      };
     } catch (error: any) {
       console.warn('Background handleUploadToDrive error:', error);
+      return null;
     }
   };
 

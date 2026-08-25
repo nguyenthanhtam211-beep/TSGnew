@@ -184,11 +184,11 @@ export async function registerAndUploadDriveDocument(params: {
   };
 
   try {
-    // Lưu bản ghi vào collection storage_files trên Firestore
-    const docRef = doc(db, 'storage_files', record.id);
+    // Lưu bản ghi vào collection file_storage trên Firestore
+    const docRef = doc(db, 'file_storage', record.id);
     await writeBatch(db).set(docRef, record).commit();
   } catch (e) {
-    console.warn('Lưu storage_files Firestore:', e);
+    console.warn('Lưu file_storage Firestore:', e);
   }
 
   return record;
@@ -836,7 +836,7 @@ export async function getOrCreateDriveFolderClient(
   const currentToken = token || getStoredGoogleToken() || localStorage.getItem("google_access_token") || "";
   if (!currentToken) throw new Error("Chưa đăng nhập Google");
 
-  const safeName = folderName.replace(/'/g, "\'");
+  const safeName = folderName.replace(/'/g, "\\'");
   let q = "name = '" + safeName + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
   if (parentFolderId) {
     q += " and '" + parentFolderId + "' in parents";

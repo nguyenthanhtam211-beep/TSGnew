@@ -75,6 +75,7 @@ export default async function handler(req: any, res: any) {
 
     let base64Data = '';
     let mimeType = 'image/jpeg';
+    let customPrompt = body?.prompt || '';
 
     if (body?.base64) {
       base64Data = body.base64;
@@ -90,6 +91,7 @@ export default async function handler(req: any, res: any) {
         const parsed = JSON.parse(body);
         base64Data = parsed.base64 || parsed.data || parsed.image || '';
         mimeType = parsed.mimeType || 'image/jpeg';
+        customPrompt = parsed.prompt || customPrompt;
       } catch (_) {}
     }
 
@@ -120,13 +122,20 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const prompt = `Bạn là một chuyên gia OCR tài liệu doanh nghiệp hàng đầu của Tập đoàn Tâm Sen (TSG). Hãy phân tích kỹ lưỡng tài liệu đính kèm (hình ảnh hoặc PDF) và trích xuất thông tin chính xác.
+    const defaultPrompt = `Bạn là một chuyên gia OCR tài liệu doanh nghiệp hàng đầu của Tập đoàn Tâm Sen (TSG). Hãy phân tích kỹ lưỡng tài liệu đính kèm (hình ảnh hoặc PDF) và trích xuất thông tin chính xác.
 
 ĐẶC BIỆT LƯU Ý VỀ SỐ ĐƠN HÀNG (PO):
 1. Nếu là "BIÊN BẢN GIAO HÀNG" hoặc "PHIẾU XUẤT KHO" (PXK): 
    - Số hiệu ở góc trên bên phải là "documentNumber" (Số PXK).
    - BẮT BUỘC tìm số ĐƠN ĐẶT HÀNG (Số PO) nằm trong văn bản (ví dụ: "Theo đơn đặt hàng số...", "Căn cứ PO số...", "06/TS/26", v.v.) và điền vào trường "documentReference".
 2. Nếu là "ĐƠN ĐẶT HÀNG": Số đơn hàng là "documentNumber", trường "documentReference" để trống.
+
+QUAN TRỌNG VỀ THUẾ & MÃ SỐ THUẾ (Tax & VAT):
+- buyerTaxCode: Mã số thuế bên mua / khách hàng
+- sellerTaxCode: Mã số thuế bên bán / nhà cung cấp
+- vatRate: Thuế suất VAT (% hoặc số, ví dụ "8%", "10%", 0, 8, 10)
+- vatAmount: Tiền thuế GTGT / VAT bằng số
+- totalAmountWithVat: Tổng cộng tiền thanh toán đã bao gồm thuế VAT
 
 QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
 1. BẮT BUỘC đọc tất cả các cột trong bảng kê hàng hóa (Tên hàng hóa, Quy cách, Ký hiệu, Mã vật tư, ĐVT, Số lượng, Đơn giá, Thành tiền).
@@ -138,15 +147,20 @@ QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
 Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
 {
   "documentType": "PO" | "PXK" | "Invoice" | "Unknown",
-  "documentTypeName": "Phiếu xuất kho" | "Đơn đặt hàng" | "Biên bản giao hàng",
+  "documentTypeName": "Phiếu xuất kho" | "Đơn đặt hàng" | "Biên bản giao hàng" | "Hóa đơn giá trị gia tăng",
   "documentNumber": string,
   "documentReference": string,
   "documentDate": "DD/MM/YYYY",
   "deliveryDate": "DD/MM/YYYY",
   "buyerName": string,
+  "buyerTaxCode": string,
   "buyerAddress": string,
   "sellerName": string,
+  "sellerTaxCode": string,
   "sellerAddress": string,
+  "vatRate": string | number,
+  "vatAmount": number,
+  "totalAmountWithVat": number,
   "items": [
     {
       "index": number,
@@ -161,6 +175,8 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
     }
   ]
 }`;
+
+    const prompt = customPrompt || defaultPrompt;
 
     const models = ["gemini-2.5-flash", "gemini-2.0-flash"];
     let lastError: any = null;

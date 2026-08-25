@@ -366,11 +366,27 @@ export default function ContactView({
     }
   };
 
+  const getContactDossierKey = (contact: any): string => {
+    if (!contact) return '';
+    return String(contact.id || contact.ID || `${contact["Tên"] || ""}-${contact["Công ty"] || ""}`).trim();
+  };
+
+  const getDossierList = <T,>(store: { [key: string]: T[] }, contact: any): T[] => {
+    if (!contact) return [];
+    const key1 = contact.id ? String(contact.id).trim() : '';
+    const key2 = contact.ID ? String(contact.ID).trim() : '';
+    const key3 = `${contact["Tên"] || ""}-${contact["Công ty"] || ""}`.trim();
+    if (key1 && store[key1]?.length) return store[key1];
+    if (key2 && store[key2]?.length) return store[key2];
+    if (key3 && store[key3]?.length) return store[key3];
+    return [];
+  };
+
   // Task Actions
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskForm.title || !selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
     const newTask: Task = {
       id: `task_${Date.now()}`,
       title: taskForm.title,
@@ -378,7 +394,8 @@ export default function ContactView({
       priority: taskForm.priority,
       status: taskForm.status
     };
-    const newTasks = { ...tasks, [contactId]: [...(tasks[contactId] || []), newTask] };
+    const existingList = getDossierList(tasks, selectedContact);
+    const newTasks = { ...tasks, [contactId]: [...existingList, newTask] };
     saveTasks(newTasks);
     setTaskForm({ title: '', dueDate: '', priority: 'medium', status: 'todo' });
     setShowAddTaskForm(false);
@@ -387,32 +404,30 @@ export default function ContactView({
 
   const handleToggleTask = (taskId: string) => {
     if (!selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
+    const existingList = getDossierList(tasks, selectedContact);
     const newTasks = { ...tasks };
-    if (newTasks[contactId]) {
-      newTasks[contactId] = newTasks[contactId].map(t => 
-        t.id === taskId ? { ...t, status: t.status === 'done' ? 'todo' : 'done' } : t
-      );
-      saveTasks(newTasks);
-    }
+    newTasks[contactId] = existingList.map(t => 
+      t.id === taskId ? { ...t, status: t.status === 'done' ? 'todo' : 'done' } : t
+    );
+    saveTasks(newTasks);
   };
 
   const handleDeleteTask = (taskId: string) => {
     if (!selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
+    const existingList = getDossierList(tasks, selectedContact);
     const newTasks = { ...tasks };
-    if (newTasks[contactId]) {
-      newTasks[contactId] = newTasks[contactId].filter(t => t.id !== taskId);
-      saveTasks(newTasks);
-      toast.success("Đã xóa công việc!");
-    }
+    newTasks[contactId] = existingList.filter(t => t.id !== taskId);
+    saveTasks(newTasks);
+    toast.success("Đã xóa công việc!");
   };
 
   // Project Actions
   const handleAddProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectForm.name || !selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
     const newProject: Project = {
       id: `proj_${Date.now()}`,
       name: projectForm.name,
@@ -420,7 +435,8 @@ export default function ContactView({
       description: projectForm.description,
       status: projectForm.status
     };
-    const newProjects = { ...projects, [contactId]: [...(projects[contactId] || []), newProject] };
+    const existingList = getDossierList(projects, selectedContact);
+    const newProjects = { ...projects, [contactId]: [...existingList, newProject] };
     saveProjects(newProjects);
     setProjectForm({ name: '', code: '', description: '', status: 'active' });
     setShowAddProjectForm(false);
@@ -429,20 +445,19 @@ export default function ContactView({
 
   const handleDeleteProject = (projectId: string) => {
     if (!selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
+    const existingList = getDossierList(projects, selectedContact);
     const newProjects = { ...projects };
-    if (newProjects[contactId]) {
-      newProjects[contactId] = newProjects[contactId].filter(p => p.id !== projectId);
-      saveProjects(newProjects);
-      toast.success("Đã xóa dự án!");
-    }
+    newProjects[contactId] = existingList.filter(p => p.id !== projectId);
+    saveProjects(newProjects);
+    toast.success("Đã xóa dự án!");
   };
 
   // Activity Actions
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activityForm.content || !selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
     const newAct: ActivityLog = {
       id: `act_${Date.now()}`,
       type: activityForm.type,
@@ -450,7 +465,8 @@ export default function ContactView({
       timestamp: new Date().toLocaleString('vi-VN'),
       user: activityForm.user
     };
-    const newActs = { ...activities, [contactId]: [newAct, ...(activities[contactId] || [])] };
+    const existingList = getDossierList(activities, selectedContact);
+    const newActs = { ...activities, [contactId]: [newAct, ...existingList] };
     saveActivities(newActs);
     setActivityForm({ type: 'call', content: '', user: 'Quản trị viên' });
     setShowAddActivityForm(false);
@@ -459,12 +475,11 @@ export default function ContactView({
 
   const handleDeleteActivity = (actId: string) => {
     if (!selectedContact) return;
-    const contactId = selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`;
+    const contactId = getContactDossierKey(selectedContact);
+    const existingList = getDossierList(activities, selectedContact);
     const newActs = { ...activities };
-    if (newActs[contactId]) {
-      newActs[contactId] = newActs[contactId].filter(a => a.id !== actId);
-      saveActivities(newActs);
-    }
+    newActs[contactId] = existingList.filter(a => a.id !== actId);
+    saveActivities(newActs);
   };
 
   const handleExportExcel = () => {
@@ -497,10 +512,10 @@ export default function ContactView({
   };
 
   // Selected contact details
-  const selectedContactId = selectedContact ? (selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`) : null;
-  const currentTasks = selectedContactId ? (tasks[selectedContactId] || []) : [];
-  const currentProjects = selectedContactId ? (projects[selectedContactId] || []) : [];
-  const currentActivities = selectedContactId ? (activities[selectedContactId] || []) : [];
+  const selectedContactId = selectedContact ? (selectedContact.id || selectedContact.ID || `${selectedContact["Tên"]}-${selectedContact["Công ty"]}`) : null;
+  const currentTasks = useMemo(() => getDossierList(tasks, selectedContact), [tasks, selectedContact]);
+  const currentProjects = useMemo(() => getDossierList(projects, selectedContact), [projects, selectedContact]);
+  const currentActivities = useMemo(() => getDossierList(activities, selectedContact), [activities, selectedContact]);
 
   const { salutation: selectedSalutation, cleanName: selectedCleanName } = selectedContact 
     ? parseContactSalutation(selectedContact["Tên"] || "", selectedContact["Danh xưng"] || "")

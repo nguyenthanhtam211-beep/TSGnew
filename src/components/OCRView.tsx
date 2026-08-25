@@ -513,6 +513,16 @@ export default function OCRView({
       const docType = (dataToSave.documentType || "").toUpperCase();
       
       if (docType === "PO" || docType === "ĐƠN ĐẶT HÀNG") {
+        const poNum = (dataToSave.documentNumber || "").trim();
+        if (poNum && poHeaders.some(p => (p["Đơn hàng"] || p["Số đơn hàng"] || p["id"] || "").trim().toLowerCase() === poNum.toLowerCase())) {
+          const confirmOverwrite = window.confirm(`Cảnh báo: Đơn hàng "${poNum}" đã tồn tại trong hệ thống. Bạn có chắc chắn muốn tiếp tục lưu và ghi đè/cập nhật đơn hàng này không?`);
+          if (!confirmOverwrite) {
+            setIsSaving(false);
+            toast.dismiss(toastId);
+            return;
+          }
+        }
+
         // 1. Calculate total order value with real pricing lookup
         const linesToInsert = (dataToSave.items || []).map((item, idx) => {
           const lineId = `D_OCR_${Date.now()}_${idx + 1}`;

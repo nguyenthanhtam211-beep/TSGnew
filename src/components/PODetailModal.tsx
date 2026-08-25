@@ -32,6 +32,7 @@ import { ProductCombobox } from './ProductCombobox';
 import { PricingCombobox } from './PricingCombobox';
 import clsx from 'clsx';
 import MacTrafficLights from './MacTrafficLights';
+import { parseNumber } from '../lib/business-logic';
 
 interface PODetailModalProps {
   poNumber: string;
@@ -114,9 +115,9 @@ export function PODetailModal({
           updates['Đơn giá nhập'] = pricing['Đơn giá mua'] || pricing['Đơn giá nhập'] || '';
           updates['Lợi nhuận'] = pricing['Lợi nhuận'] || '';
           
-          const qty = parseFloat(newLineData['Số lượng'] || '0');
-          const price = parseFloat(String(pricing['Đơn giá bán'] || '0').replace(/[^0-9.-]+/g, ""));
-          if (!isNaN(qty) && !isNaN(price)) {
+          const qty = parseNumber(newLineData['Số lượng']);
+          const price = parseNumber(pricing['Đơn giá bán']);
+          if (qty > 0 || price > 0) {
             updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
           }
         }
@@ -146,9 +147,9 @@ export function PODetailModal({
         updates['Tên sản phẩm'] = pricing['Tên sản phẩm'] || '';
       }
       
-      const qty = parseFloat(newLineData['Số lượng'] || '0');
-      const price = parseFloat(String(pricing['Đơn giá bán'] || '0').replace(/[^0-9.-]+/g, ""));
-      if (!isNaN(qty) && !isNaN(price)) {
+      const qty = parseNumber(newLineData['Số lượng']);
+      const price = parseNumber(pricing['Đơn giá bán']);
+      if (qty > 0 || price > 0) {
         updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
       }
     }
@@ -157,9 +158,9 @@ export function PODetailModal({
 
   const handleQtyChangeInModal = (val: string) => {
     const updates: any = { 'Số lượng': val };
-    const qty = parseFloat(val || '0');
-    const price = parseFloat(String(newLineData['Đơn giá bán'] || '0').replace(/[^0-9.-]+/g, ""));
-    if (!isNaN(qty) && !isNaN(price)) {
+    const qty = parseNumber(val);
+    const price = parseNumber(newLineData['Đơn giá bán']);
+    if (qty > 0 || price > 0) {
       updates['Thành tiền dòng'] = (qty * price).toLocaleString('vi-VN');
     }
     setNewLineData((prev: any) => ({ ...prev, ...updates }));
@@ -218,15 +219,16 @@ export function PODetailModal({
     let totalAmount = 0;
 
     relatedPoLines.forEach(line => {
-      const qty = parseFloat(String(line['Số lượng'] || '0').replace(/,/g, ''));
-      const price = parseFloat(String(line['Đơn giá bán'] || '0').replace(/,/g, ''));
-      totalOrderedQty += isNaN(qty) ? 0 : qty;
-      totalAmount += isNaN(qty || price) ? 0 : (qty * price);
+      const qty = parseNumber(line['Số lượng']);
+      const price = parseNumber(line['Đơn giá bán']);
+      const lineTotal = parseNumber(line['Thành tiền dòng'] || line['Thành tiền']);
+      totalOrderedQty += qty;
+      totalAmount += (qty > 0 && price > 0) ? (qty * price) : lineTotal;
     });
 
     relatedDeliveries.forEach(del => {
-      const delQty = parseFloat(String(del['Số lượng giao'] || '0').replace(/,/g, ''));
-      totalDeliveredQty += isNaN(delQty) ? 0 : delQty;
+      const delQty = parseNumber(del['Số lượng giao']);
+      totalDeliveredQty += delQty;
     });
 
     const completionRate = totalOrderedQty > 0 ? (totalDeliveredQty / totalOrderedQty) * 100 : 0;
@@ -245,20 +247,20 @@ export function PODetailModal({
 
     relatedPoLines.forEach(line => {
       const pName = line['Tên sản phẩm'] || line['Mã của khách'] || 'Sản phẩm khác';
-      const qty = parseFloat(String(line['Số lượng'] || '0').replace(/,/g, ''));
+      const qty = parseNumber(line['Số lượng']);
       if (!productGroups[pName]) {
         productGroups[pName] = { ordered: 0, delivered: 0 };
       }
-      productGroups[pName].ordered += isNaN(qty) ? 0 : qty;
+      productGroups[pName].ordered += qty;
     });
 
     relatedDeliveries.forEach(del => {
       const pName = del['Tên sản phẩm'] || del['Mã sản phẩm'] || 'Sản phẩm khác';
-      const qty = parseFloat(String(del['Số lượng giao'] || '0').replace(/,/g, ''));
+      const qty = parseNumber(del['Số lượng giao']);
       if (!productGroups[pName]) {
         productGroups[pName] = { ordered: 0, delivered: 0 };
       }
-      productGroups[pName].delivered += isNaN(qty) ? 0 : qty;
+      productGroups[pName].delivered += qty;
     });
 
     return Object.entries(productGroups).map(([name, vals]) => ({
@@ -407,7 +409,7 @@ export function PODetailModal({
                   <div>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Tổng giá trị đơn</p>
                     <p className="text-base font-bold text-gray-900 truncate" title={poHeader['Tổng giá trị đơn hàng'] || currencyFormatter.format(stats.totalAmount)}>
-                      {poHeader['Tổng giá trị đơn hàng'] ? (poHeader['Tổng giá trị đơn hàng'].includes('₫') || poHeader['Tổng giá trị đơn hàng'].includes('VND') ? poHeader['Tổng giá trị đơn hàng'] : currencyFormatter.format(parseFloat(String(poHeader['Tổng giá trị đơn hàng']).replace(/,/g, '')))) : currencyFormatter.format(stats.totalAmount)}
+                      {poHeader['Tổng giá trị đơn hàng'] ? (String(poHeader['Tổng giá trị đơn hàng']).includes('₫') || String(poHeader['Tổng giá trị đơn hàng']).includes('VND') ? poHeader['Tổng giá trị đơn hàng'] : currencyFormatter.format(parseNumber(poHeader['Tổng giá trị đơn hàng']))) : currencyFormatter.format(stats.totalAmount)}
                     </p>
                   </div>
                 </div>
@@ -668,12 +670,12 @@ export function PODetailModal({
                                 </ProductHoverCard>
                               </td>
                               <td className="px-4 py-3 text-gray-600">{po['ĐVT'] || 'Cái'}</td>
-                              <td className="px-4 py-3 text-right font-medium">{numberFormatter.format(parseFloat(String(po['Số lượng'] || '0').replace(/,/g, '')))}</td>
+                              <td className="px-4 py-3 text-right font-medium">{numberFormatter.format(parseNumber(po['Số lượng']))}</td>
                               <td className="px-4 py-3 text-right text-gray-600 font-medium">
-                                {po['Đơn giá bán'] ? (po['Đơn giá bán'].includes('₫') ? po['Đơn giá bán'] : currencyFormatter.format(parseFloat(String(po['Đơn giá bán']).replace(/,/g, '')))) : '-'}
+                                {po['Đơn giá bán'] ? (String(po['Đơn giá bán']).includes('₫') ? po['Đơn giá bán'] : currencyFormatter.format(parseNumber(po['Đơn giá bán']))) : '-'}
                               </td>
                               <td className="px-4 py-3 text-right text-emerald-600 font-bold">
-                                {po['Thành tiền dòng'] ? (po['Thành tiền dòng'].includes('₫') ? po['Thành tiền dòng'] : currencyFormatter.format(parseFloat(String(po['Thành tiền dòng']).replace(/,/g, '')))) : '-'}
+                                {po['Thành tiền dòng'] ? (String(po['Thành tiền dòng']).includes('₫') ? po['Thành tiền dòng'] : currencyFormatter.format(parseNumber(po['Thành tiền dòng']))) : '-'}
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-500">{po['Tiến độ sản phẩm'] || '-'}</td>
                             </tr>
@@ -732,7 +734,7 @@ export function PODetailModal({
                                 </ProductHoverCard>
                               </td>
                               <td className="px-4 py-3 font-medium text-blue-600">{plan['Ngày dự kiến']}</td>
-                              <td className="px-4 py-3 text-right font-medium">{numberFormatter.format(parseFloat(String(plan['Số lượng cần giao'] || '0').replace(/,/g, '')))}</td>
+                              <td className="px-4 py-3 text-right font-medium">{numberFormatter.format(parseNumber(plan['Số lượng cần giao']))}</td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                                   plan['Trạng thái'] === 'Mới' ? 'bg-blue-50 text-blue-700' :
@@ -783,7 +785,7 @@ export function PODetailModal({
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {relatedDeliveries.map((del, idx) => {
-                            const percent = parseFloat(String(del['Tiến độ giao'] || '0').replace('%',''));
+                            const percent = parseNumber(del['Tiến độ giao']);
                             return (
                               <tr key={idx} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-medium text-gray-900">{del['Số PXK'] || '-'}</td>
@@ -801,9 +803,9 @@ export function PODetailModal({
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">{del['Ngày giao']}</td>
                                 <td className="px-4 py-3 text-right">
-                                  <span className="font-semibold text-gray-900">{numberFormatter.format(parseFloat(String(del['Số lượng giao'] || '0').replace(/,/g, '')))}</span>
+                                  <span className="font-semibold text-gray-900">{numberFormatter.format(parseNumber(del['Số lượng giao']))}</span>
                                   <span className="text-gray-400 mx-1">/</span>
-                                  <span className="text-gray-500">{numberFormatter.format(parseFloat(String(del['Số lượng đặt'] || '0').replace(/,/g, '')))}</span>
+                                  <span className="text-gray-500">{numberFormatter.format(parseNumber(del['Số lượng đặt']))}</span>
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2">

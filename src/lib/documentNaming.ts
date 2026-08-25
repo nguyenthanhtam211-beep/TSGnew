@@ -11,9 +11,10 @@ export function sanitizeFileNamePart(str: string): string {
   if (!str) return '';
   return str
     .trim()
+    .replace(/[đĐ]/g, (m) => (m === 'đ' ? 'd' : 'D'))
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Bỏ dấu tiếng Việt
-    .replace(/[đĐ]/g, (m) => (m === 'đ' ? 'd' : 'D'))
+    .replace(/[^\x00-\x7F]/g, '') // Đảm bảo 100% clean ASCII
     .replace(/[\/\\:*?"<>|#%&{}\\<>*?/$!'":@+`|=]/g, '-') // Đổi ký tự cấm thành dấu gạch ngang
     .replace(/\s+/g, '') // Bỏ khoảng trắng
     .replace(/-+/g, '-') // Gộp nhiều dấu gạch ngang liên tiếp
@@ -60,11 +61,13 @@ export function getShortCustomerName(fullName?: string): string {
   const clean = fullName.trim();
   const lower = clean.toLowerCase();
 
+  if (lower.includes('thăng long') || lower.includes('thang long') || lower.includes('tltl') || lower === 'tl') return 'ThuocLaThangLong';
   if (lower.includes('thanh hóa') || lower.includes('thanh hoa')) return 'ThuocLaThanhHoa';
-  if (lower.includes('bắc sơn') || lower.includes('bac son')) return 'ThuocLaBacSon';
+  if (lower.includes('bắc sơn') || lower.includes('bac son') || lower.includes('tlbs')) return 'ThuocLaBacSon';
   if (lower.includes('long an')) return 'ThuocLaLongAn';
   if (lower.includes('đà nẵng') || lower.includes('da nang')) return 'ThuocLaDaNang';
   if (lower.includes('sài gòn') || lower.includes('sai gon')) return 'ThuocLaSaiGon';
+  if (lower.includes('ngân sơn') || lower.includes('ngan son')) return 'ThuocLaNganSon';
   if (lower.includes('an việt phát') || lower.includes('an viet phat') || lower.includes('avp')) return 'AnVietPhat';
   if (lower.includes('tâm sen') || lower.includes('tam sen')) return 'TamSen';
 
@@ -108,6 +111,8 @@ export function generateSmartDocumentFileName(params: {
   const typeUpper = (documentType || '').toUpperCase();
   if (typeUpper.includes('BBGH') || typeUpper.includes('BIÊN BẢN')) {
     prefix = 'BBGH';
+  } else if (typeUpper.includes('BG') || typeUpper.includes('BÁO GIÁ') || typeUpper.includes('BAO GIA') || typeUpper.includes('QUOTATION') || typeUpper.includes('QUOTE')) {
+    prefix = 'BG';
   } else if (typeUpper.includes('PO') || typeUpper.includes('ĐƠN HÀNG') || typeUpper.includes('ĐẶT HÀNG')) {
     prefix = 'PO';
   } else if (typeUpper.includes('HD') || typeUpper.includes('HỢP ĐỒNG')) {

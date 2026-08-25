@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 import { DualPODocumentModal } from "./DualPODocumentModal";
-import { findPriceRecord, parseNumber, getSupplierShortCode, getDefaultSpecs } from "../lib/business-logic";
+import { findPriceRecord, parseNumber, getSupplierShortCode, getDefaultSpecs, parseDateToISO } from "../lib/business-logic";
 import { exportGenericTableToPDF, formatVND } from "../lib/pdf-exporter";
 import { processDocumentOCR } from "../lib/gemini";
 
@@ -435,7 +435,8 @@ export default function WorkflowView({
       setPoCustomer(cust);
       setNewPoNumber(ocrData.documentNumber || `PO-${Date.now()}`);
       if (ocrData.documentDate) {
-        setPoDate(ocrData.documentDate);
+        const isoDate = parseDateToISO(ocrData.documentDate);
+        setPoDate(isoDate || ocrData.documentDate);
       }
 
       const lines = (ocrData.items || []).map((item: any) => {
@@ -632,6 +633,21 @@ export default function WorkflowView({
     if (poLines.length === 0) {
       toast.error("Vui lòng thêm ít nhất một dòng sản phẩm!");
       return;
+    }
+
+    const trimmedPoNum = newPoNumber.trim();
+    const isDuplicate = combinedPoHeadersData.some(h => {
+      const existingPo = (h["Đơn hàng"] || h["Số đơn hàng"] || h["id"] || "").trim().toLowerCase();
+      return existingPo === trimmedPoNum.toLowerCase();
+    });
+
+    if (isDuplicate) {
+      const confirmOverwrite = window.confirm(
+        `Cảnh báo: Đơn hàng "${trimmedPoNum}" đã tồn tại trong hệ thống. Bạn có chắc chắn muốn tiếp tục lưu và ghi đè/cập nhật đơn hàng này không?`
+      );
+      if (!confirmOverwrite) {
+        return;
+      }
     }
 
     const loadToast = toast.loading("Đang lưu Đơn hàng (PO)...");
@@ -966,6 +982,7 @@ export default function WorkflowView({
       const formattedDate = plannedDate.includes("-") ? plannedDate.split("-").reverse().join("/") : plannedDate;
 
       const payload = {
+        "Mã kế hoạch": planId,
         "Kế hoạch ID": planId,
         "id": planId,
         "Chi tiết đơn hàng": planningPoLine["STT"] || planningPoLine.id || rawLineId,
@@ -975,6 +992,7 @@ export default function WorkflowView({
         "Số lượng kế hoạch": plannedQty,
         "Số lượng cần giao": plannedQty,
         "Số lượng": plannedQty, // Compatibility
+        "Ngày dự kiến": formattedDate,
         "Ngày giao kế hoạch": formattedDate,
         "Trạng thái": "Chờ giao hàng",
         "Ghi chú": planNotes || "",
@@ -1082,7 +1100,7 @@ export default function WorkflowView({
       batch.set(deliveryRef, cleanDeliv);
 
       // 2. Update status of the delivery plan
-      const planRef = doc(db, "delivery_plans", selectedPlan["Kế hoạch ID"] || selectedPlan.id);
+      const planRef = doc(db, "delivery_plans", selectedPlan["Kế hoạch ID"] || selectedPlan["Mã kế hoạch"] || selectedPlan.id);
       batch.update(planRef, { "Trạng thái": "Đã giao" });
 
       // 3. Update PO Line complete flag if fully met

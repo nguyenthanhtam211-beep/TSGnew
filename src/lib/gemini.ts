@@ -271,6 +271,13 @@ export async function processDocumentOCR(file: File, customApiKey?: string): Pro
    - BẮT BUỘC tìm số ĐƠN ĐẶT HÀNG (Số PO) nằm trong văn bản (ví dụ: "Theo đơn đặt hàng số...", "Căn cứ PO số...", "06/TS/26", v.v.) và điền vào trường "documentReference".
 2. Nếu là "ĐƠN ĐẶT HÀNG": Số đơn hàng là "documentNumber", trường "documentReference" để trống.
 
+QUAN TRỌNG VỀ THUẾ & MÃ SỐ THUẾ (Tax & VAT):
+- buyerTaxCode: Mã số thuế bên mua / khách hàng
+- sellerTaxCode: Mã số thuế bên bán / nhà cung cấp
+- vatRate: Thuế suất VAT (% hoặc số, ví dụ "8%", "10%", 0, 8, 10)
+- vatAmount: Tiền thuế GTGT / VAT bằng số
+- totalAmountWithVat: Tổng cộng tiền thanh toán đã bao gồm thuế VAT
+
 QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
 1. BẮT BUỘC đọc tất cả các cột trong bảng kê hàng hóa (Tên hàng hóa, Quy cách, Ký hiệu, Mã vật tư, ĐVT, Số lượng, Đơn giá, Thành tiền).
 2. Tên sản phẩm (name): Điền tên sản phẩm ĐẦY ĐỦ NGUYÊN VĂN bao gồm chủng loại, nhãn hiệu, thông số kỹ thuật.
@@ -281,15 +288,20 @@ QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
 Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
 {
   "documentType": "PO" | "PXK" | "Invoice" | "Unknown",
-  "documentTypeName": "Phiếu xuất kho" | "Đơn đặt hàng" | "Biên bản giao hàng",
+  "documentTypeName": "Phiếu xuất kho" | "Đơn đặt hàng" | "Biên bản giao hàng" | "Hóa đơn giá trị gia tăng",
   "documentNumber": string,
   "documentReference": string,
   "documentDate": "DD/MM/YYYY",
   "deliveryDate": "DD/MM/YYYY",
   "buyerName": string,
+  "buyerTaxCode": string,
   "buyerAddress": string,
   "sellerName": string,
+  "sellerTaxCode": string,
   "sellerAddress": string,
+  "vatRate": string | number,
+  "vatAmount": number,
+  "totalAmountWithVat": number,
   "items": [
     {
       "index": number,

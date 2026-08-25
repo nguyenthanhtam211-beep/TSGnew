@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
+import { parseNumber } from "../lib/business-logic";
 
 interface MasterCalendarViewProps {
   deliveryPlans: any[];
@@ -36,14 +37,6 @@ interface MasterCalendarViewProps {
   onPoClick?: (poNumber: string) => void;
   onProductClick?: (productId: string) => void;
 }
-
-const parseNumber = (val: any): number => {
-  if (val == null) return 0;
-  if (typeof val === "number") return val;
-  const cleaned = String(val).replace(/,/g, "").trim();
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
-};
 
 export default function MasterCalendarView({
   deliveryPlans = [],

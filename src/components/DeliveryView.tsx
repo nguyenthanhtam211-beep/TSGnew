@@ -28,7 +28,7 @@ import {
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
 import { ProductHoverCard } from "./ProductHoverCard";
-import { findPriceRecord, getSellPriceFromRecord, getBuyPriceFromRecord } from "../lib/business-logic";
+import { findPriceRecord, getSellPriceFromRecord, getBuyPriceFromRecord, parseNumber } from "../lib/business-logic";
 import GoogleSheetsSyncModal from "./GoogleSheetsSyncModal";
 import { generateStructuredPDFReport } from "../lib/pdf-exporter";
 import MacTrafficLights from "./MacTrafficLights";
@@ -47,14 +47,6 @@ interface DeliveryViewProps {
   onPoClick?: (val: string) => void;
   onCreateCalendarEvent?: (eventData: any) => Promise<void>;
 }
-
-const parseNumber = (val: any): number => {
-  if (val == null) return 0;
-  if (typeof val === 'number') return val;
-  const cleaned = String(val).replace(/,/g, '').trim();
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
-};
 
 export default function DeliveryView({
   deliveryData,

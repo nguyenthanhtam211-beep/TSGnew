@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import { parseNumber } from '../lib/business-logic';
 
 interface DeliveryPlanViewProps {
   deliveryPlans: any[];
@@ -27,14 +28,6 @@ interface DeliveryPlanViewProps {
   onPoClick?: (poNumber: string) => void;
   onProductClick?: (productId: string) => void;
 }
-
-const parseNumber = (val: any): number => {
-  if (val == null) return 0;
-  if (typeof val === 'number') return val;
-  const cleaned = String(val).replace(/,/g, '').trim();
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
-};
 
 export default function DeliveryPlanView({
   deliveryPlans,
