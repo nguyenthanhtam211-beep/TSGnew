@@ -27,7 +27,8 @@ import {
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, LogisticsHubView, MemoryStorageModal, 
   StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
-  ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights
+  ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights,
+  Header, Breadcrumbs, MobileBottomNav
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
@@ -614,65 +615,8 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-gray-50 text-gray-900 font-sans print:bg-white print:h-auto print:block overflow-hidden">
+    <div className="flex flex-col lg:flex-row min-h-[100dvh] h-[100dvh] bg-[#F8F9FB] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans print:bg-white print:h-auto print:block overflow-hidden">
       <Toaster position="top-right" />
-
-      {/* Mobile Top Header - Apple iOS Style */}
-      <div className="lg:hidden flex items-center justify-between pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),16px)] py-2 landscape:py-1.5 ios-glass text-[#1D1D1F] border-b border-black/[0.06] shrink-0 z-40 shadow-2xs pt-[max(env(safe-area-inset-top),8px)] select-none">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-1 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-black/[0.04] active:scale-95 transition-all"
-            aria-label="Mở menu"
-          >
-            <Menu size={20} />
-          </button>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#007AFF] shadow-[0_0_8px_rgba(0,122,255,0.4)]" />
-              <h1 className="text-sm font-bold text-[#1D1D1F] tracking-tight">TSG BUSINESS OS</h1>
-            </div>
-            <p className="text-[11px] text-slate-500 font-medium truncate max-w-[160px]">{TAB_TITLES[activeTab] || activeTab}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button 
-            onClick={() => setIsMemoryModalOpen(true)} 
-            className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl active:scale-95 transition-all flex items-center gap-1 text-xs font-semibold" 
-            title="Trung tâm bộ nhớ & lưu trữ dữ liệu"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <Database size={15} />
-          </button>
-          <button 
-            onClick={() => navItemClick("assistant")} 
-            className={clsx(
-              "p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-semibold active:scale-95",
-              activeTab === "assistant" 
-                ? "bg-[#007AFF] text-white shadow-sm shadow-blue-500/20" 
-                : "bg-black/[0.04] text-slate-700 hover:bg-black/[0.08]"
-            )}
-          >
-            <Bot size={16} />
-            <span className="font-bold">AI</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => setIsHelpModalOpen(true)} 
-            className="p-2 text-slate-600 hover:text-blue-600 rounded-xl hover:bg-black/[0.04] active:scale-95 transition-all"
-            title="Trợ Giúp & Cẩm Nang Sử Dụng"
-          >
-            <HelpCircle size={18} />
-          </button>
-          <button 
-            onClick={() => navItemClick("settings")} 
-            className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-black/[0.04] active:scale-95 transition-all"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
-      </div>
 
       {/* Mobile Navigation Drawer - Apple iOS Light Sheet */}
       {mobileMenuOpen && (
@@ -681,39 +625,39 @@ export default function App() {
             className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
             onClick={() => setMobileMenuOpen(false)} 
           />
-          <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] flex flex-col text-[#1D1D1F] shadow-2xl h-full border-r border-black/[0.08] z-10 animate-in slide-in-from-left duration-200 pl-[max(env(safe-area-inset-left),0px)] pb-safe">
-            <div className="p-4 border-b border-black/[0.06] flex items-center justify-between bg-white/70 backdrop-blur-md">
+          <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] dark:bg-slate-900 flex flex-col text-slate-900 dark:text-slate-100 shadow-2xl h-full border-r border-slate-200/80 dark:border-slate-800 z-10 animate-in slide-in-from-left duration-200 pl-[max(env(safe-area-inset-left),0px)] pb-safe">
+            <div className="p-4 border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <MacTrafficLights onClose={() => setMobileMenuOpen(false)} />
-                <div className="h-4 w-px bg-black/[0.08]" />
-                <h2 className="text-sm font-bold text-[#1D1D1F] tracking-tight">TSG BUSINESS OS</h2>
+                <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+                <h2 className="text-xs font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase">TSG BUSINESS OS</h2>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)} 
-                className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-black/[0.04]"
+                className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
               >
                 <X size={18} />
               </button>
             </div>
 
             <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 custom-scrollbar">
-              {navGroups.map(group => {
+              {navGroups.map((group, groupIdx) => {
                 const isGroupCollapsed = collapsedGroups[group.id];
                 const hasActiveItem = group.items.some(it => it.id === activeTab);
                 
                 return (
-                  <div key={group.id} className="space-y-1">
+                  <div key={group.id} className={clsx("space-y-1", groupIdx > 0 && "pt-2 border-t border-slate-200/60 dark:border-slate-800/60")}>
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.id)}
-                      className="w-full flex items-center justify-between px-2.5 py-1 text-[10.5px] font-extrabold text-slate-500 hover:text-slate-800 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03]"
+                      className="w-full flex items-center justify-between px-2.5 py-1 text-[10.5px] font-extrabold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                     >
                       <span className="flex items-center gap-1.5 truncate">
                         <span>{group.title}</span>
                       </span>
                       <div className="flex items-center gap-1">
                         {group.badge && (
-                          <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/80 text-slate-600">
+                          <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold tabular-nums">
                             {group.badge}
                           </span>
                         )}
@@ -741,7 +685,7 @@ export default function App() {
               })}
             </nav>
 
-            <div className="p-3 border-t border-black/[0.06] bg-white/50 text-center">
+            <div className="p-3 border-t border-slate-200/60 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-center">
               <p className="text-[10px] text-slate-400 font-medium">Tâm Sen Group • ERP Business OS</p>
             </div>
           </div>
@@ -749,13 +693,13 @@ export default function App() {
       )}
 
       {/* Desktop macOS Sequoia Sidebar */}
-      <div className={clsx(
-        "hidden lg:flex bg-[#F5F5F7]/95 backdrop-blur-2xl border-r border-black/[0.06] flex-col text-[#1D1D1F] shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none transition-all duration-200",
+      <aside className={clsx(
+        "hidden lg:flex bg-[#F5F5F7]/95 dark:bg-slate-900/95 backdrop-blur-2xl border-r border-slate-200/60 dark:border-slate-800/60 flex-col text-slate-900 dark:text-slate-100 shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none transition-all duration-200",
         isSidebarCollapsed ? "w-16" : "w-64"
       )}>
         
         {/* macOS Window Controls & Title */}
-        <div className="p-3.5 border-b border-black/[0.06] bg-white/40">
+        <div className="p-3.5 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40">
           {/* Functional Apple Traffic Lights */}
           <div className="flex items-center gap-2 mb-3">
             <button
@@ -799,8 +743,8 @@ export default function App() {
                 TSG
               </div>
               <div>
-                <h1 className="text-xs font-bold text-[#1D1D1F] tracking-[-0.015em] leading-tight">TSG Business OS</h1>
-                <p className="text-[10px] text-slate-500 font-medium">Tâm Sen Group • ERP 2026</p>
+                <h1 className="text-xs font-bold text-slate-900 dark:text-white tracking-[-0.015em] leading-tight">TSG Business OS</h1>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Tâm Sen Group • ERP 2026</p>
               </div>
             </div>
           )}
@@ -810,21 +754,21 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsMemoryModalOpen(true)}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-[11px] font-semibold transition active:scale-[0.98] shadow-2xs"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-emerald-50/90 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl text-[11px] font-semibold transition active:scale-[0.98] shadow-2xs cursor-pointer"
                 title="Xem trạng thái bộ nhớ lưu trữ và sao lưu dữ liệu"
               >
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>Bộ nhớ: Đã lưu an toàn</span>
                 </div>
-                <span className="text-[9.5px] font-mono font-bold bg-white/90 px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-700">13 CSDL</span>
+                <span className="text-[9.5px] font-mono font-bold bg-white/90 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 tabular-nums">13 CSDL</span>
               </button>
             </div>
           )}
         </div>
 
         {/* Apple Source List Navigation */}
-        <nav className="flex-1 overflow-y-auto py-2 space-y-3 custom-scrollbar px-2">
+        <nav className="flex-1 overflow-y-auto py-2 space-y-2.5 custom-scrollbar px-2">
           {!isSidebarCollapsed && (
             <div className="px-1 mb-1.5">
               <div className="relative">
@@ -834,12 +778,12 @@ export default function App() {
                   value={menuSearchQuery}
                   onChange={(e) => setMenuSearchQuery(e.target.value)}
                   placeholder="Tìm nhanh tính năng..."
-                  className="w-full pl-7 pr-2 py-1 bg-black/[0.03] hover:bg-black/[0.05] focus:bg-white border border-transparent focus:border-blue-400 rounded-xl text-[11px] outline-none transition"
+                  className="w-full pl-7 pr-7 py-1 bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-blue-400 rounded-xl text-[11px] outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400"
                 />
                 {menuSearchQuery && (
                   <button
                     onClick={() => setMenuSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                   >
                     <X size={12} />
                   </button>
@@ -848,7 +792,7 @@ export default function App() {
             </div>
           )}
 
-          {navGroups.map(group => {
+          {navGroups.map((group, groupIdx) => {
             const q = menuSearchQuery.toLowerCase().trim();
             const filteredItems = q 
               ? group.items.filter(it => it.label.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
@@ -861,17 +805,17 @@ export default function App() {
             const shouldShowItems = isSidebarCollapsed || (!isGroupCollapsed || hasActiveItem || Boolean(q));
 
             return (
-              <div key={group.id} className="space-y-0.5">
+              <div key={group.id} className={clsx("space-y-0.5", groupIdx > 0 && "pt-2 border-t border-slate-200/60 dark:border-slate-800/60")}>
                 {!isSidebarCollapsed && (
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.id)}
-                    className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-700 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] cursor-pointer select-none"
+                    className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.03] cursor-pointer select-none"
                   >
                     <span className="truncate">{group.title}</span>
                     <div className="flex items-center gap-1 shrink-0">
                       {group.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-500 font-semibold">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold tabular-nums">
                           {group.badge}
                         </span>
                       )}
@@ -904,10 +848,42 @@ export default function App() {
             );
           })}
         </nav>
-      </div>
+      </aside>
 
-      {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-20 lg:pb-0">
+      {/* Main Content Area with Header */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Unified Glassmorphism Header */}
+        <Header
+          activeTab={activeTab}
+          onNavigate={navItemClick}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          subTab={
+            activeTab === 'contracts' ? 'contracts' :
+            activeTab === 'commissions' ? 'commissions' :
+            activeTab === 'specs' ? 'specs' :
+            activeTab === 'polines' ? 'polines' :
+            activeTab === 'delivery_plan' ? 'plan' :
+            activeTab === 'delivery' ? 'delivery' :
+            activeTab === 'reconcile' ? 'reconcile' :
+            undefined
+          }
+          itemContext={
+            selectedPoDetails ? { label: `PO #${selectedPoDetails}`, id: selectedPoDetails, type: 'po' } :
+            selectedProductDetails ? { label: selectedProductDetails, id: selectedProductDetails, type: 'product' } :
+            targetCustomerId && activeTab === 'customers' ? { label: `Khách: ${targetCustomerId}`, id: targetCustomerId } :
+            null
+          }
+          onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
+          onOpenHelpModal={() => setIsHelpModalOpen(true)}
+          onToggleFullscreen={handleToggleFullScreen}
+          onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          dbCount={13}
+          isSyncing={false}
+        />
+
+        {/* Main Content Viewport */}
+        <main className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-24 lg:pb-6 pl-[max(env(safe-area-inset-left),0px)] pr-[max(env(safe-area-inset-right),0px)]">
         {activeTab === "dashboard" && (
           <DashboardView 
             poData={poHeaderData} 
@@ -1140,6 +1116,7 @@ export default function App() {
             <SettingsView />
           </div>
         )}
+        </main>
       </div>
 
       {/* Help Guide Modal */}
@@ -1174,77 +1151,14 @@ export default function App() {
       />
 
       {/* Mobile Floating Bottom Dock (Thumb-friendly Apple iOS Navigation) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] ios-glass border-t border-black/[0.06] pl-[max(env(safe-area-inset-left),12px)] pr-[max(env(safe-area-inset-right),12px)] py-1 landscape:py-0.5 flex items-center justify-around text-slate-500 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-4px_25px_rgba(0,0,0,0.08)] pointer-events-auto select-none">
-        <button 
-          onClick={() => navItemClick("dashboard")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "dashboard" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "dashboard" ? "bg-blue-50 text-[#007AFF]" : "")}>
-            <LayoutDashboard size={20} className={activeTab === "dashboard" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          <span className="text-[10px] tracking-tight font-medium">Tổng quan</span>
-        </button>
-
-        <button 
-          onClick={() => navItemClick("logistics")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation relative cursor-pointer", activeTab === "logistics" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "logistics" ? "bg-blue-50 text-[#007AFF]" : "")}>
-            <Truck size={20} className={activeTab === "logistics" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          {deliveryData.length > 0 && (
-            <span className="absolute top-1 right-2 px-1.5 py-0.2 bg-orange-500 text-white rounded-full text-[9px] font-bold font-mono">
-              {deliveryData.length}
-            </span>
-          )}
-          <span className="text-[10px] tracking-tight font-medium">Giao hàng</span>
-        </button>
-
-        <button 
-          onClick={() => navItemClick("po")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation relative cursor-pointer", activeTab === "po" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "po" ? "bg-blue-50 text-[#007AFF]" : "")}>
-            <FileText size={20} className={activeTab === "po" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          {poHeaderData.length > 0 && (
-            <span className="absolute top-1 right-2 px-1.5 py-0.2 bg-blue-600 text-white rounded-full text-[9px] font-bold font-mono">
-              {poHeaderData.length}
-            </span>
-          )}
-          <span className="text-[10px] tracking-tight font-medium">Đơn PO</span>
-        </button>
-
-        <button 
-          onClick={() => navItemClick("ocr")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "ocr" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "ocr" ? "bg-indigo-50 text-indigo-600" : "")}>
-            <Camera size={20} className={activeTab === "ocr" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          <span className="text-[10px] tracking-tight font-medium">Quét OCR</span>
-        </button>
-
-        <button 
-          onClick={() => navItemClick("assistant")}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", activeTab === "assistant" ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", activeTab === "assistant" ? "bg-purple-50 text-purple-600" : "")}>
-            <Bot size={20} className={activeTab === "assistant" ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          <span className="text-[10px] tracking-tight font-medium">Trợ lý AI</span>
-        </button>
-
-        <button 
-          onClick={() => setMobileMenuOpen(true)}
-          className={clsx("flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all min-w-[48px] min-h-[44px] landscape:min-h-[38px] ios-touch-active touch-manipulation cursor-pointer", mobileMenuOpen ? "text-[#007AFF] font-bold" : "text-slate-500 hover:text-slate-900")}
-        >
-          <div className={clsx("w-8 h-8 rounded-xl flex items-center justify-center transition-all", mobileMenuOpen ? "bg-blue-50 text-[#007AFF]" : "")}>
-            <Menu size={20} className={mobileMenuOpen ? "stroke-[2.5]" : "stroke-[1.75]"} />
-          </div>
-          <span className="text-[10px] tracking-tight font-medium">Thêm</span>
-        </button>
-      </div>
+      <MobileBottomNav
+        activeTab={activeTab}
+        onNavigate={navItemClick}
+        onOpenMenu={() => setMobileMenuOpen(true)}
+        isMenuOpen={mobileMenuOpen}
+        deliveryCount={deliveryData.length}
+        poCount={poHeaderData.length}
+      />
 
       {selectedProductDetails && (
         <ProductDetailModal 
@@ -1302,42 +1216,66 @@ function NavItem({
 }) {
   return (
     <motion.button
+      type="button"
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      title={isCollapsed ? label : undefined}
+      title={isCollapsed ? `${label}${badge !== undefined && badge !== null ? ` (${badge})` : ''}` : undefined}
       className={clsx(
-        "relative flex items-center rounded-xl text-xs transition-all duration-150 cursor-pointer overflow-hidden group select-none text-left",
+        "relative flex items-center rounded-xl text-xs transition-all duration-150 cursor-pointer group select-none text-left",
         isCollapsed 
-          ? "w-9 h-9 mx-auto justify-center p-0 mb-1" 
+          ? "w-10 h-10 mx-auto justify-center p-0 mb-1" 
           : "w-full gap-2.5 px-2.5 py-1.5",
         isActive 
-          ? "bg-[#007AFF] text-white shadow-xs font-semibold" 
-          : "text-[#1D1D1F] hover:bg-black/[0.04] font-medium"
+          ? "text-[#007AFF] dark:text-blue-400 font-bold" 
+          : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-medium"
       )}
     >
+      {/* Sliding Active Pill Background with Motion layoutId */}
+      {isActive && (
+        <motion.div
+          layoutId="active-sidebar-pill"
+          className="absolute inset-0 bg-blue-500/12 dark:bg-blue-500/25 border border-blue-500/25 dark:border-blue-400/30 rounded-xl shadow-2xs -z-0"
+          transition={{ type: "spring", stiffness: 450, damping: 32 }}
+        />
+      )}
+
+      {/* Icon */}
       <div className={clsx(
-        "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105",
-        isActive ? "bg-white/20 text-white" : `${iconBg} text-white shadow-2xs`
+        "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105 z-10",
+        isActive 
+          ? "bg-[#007AFF] text-white shadow-xs shadow-blue-500/30" 
+          : `${iconBg} text-white shadow-2xs`
       )}>
         {icon}
       </div>
+
+      {/* Expanded Label & Badges */}
       {!isCollapsed && (
-        <>
-          <span className="truncate flex-1 tracking-[-0.012em]">{label}</span>
+        <div className="flex-1 flex items-center justify-between min-w-0 z-10">
+          <span className="truncate tracking-[-0.012em] font-semibold">{label}</span>
           {badge !== undefined && badge !== null && (
             <span className={clsx(
-              "text-[9.5px] font-bold font-mono px-1.5 py-0.2 rounded-full",
+              "text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-full tabular-nums shrink-0 ml-1.5",
               isActive 
-                ? "bg-white/25 text-white" 
-                : badgeColor || "bg-black/[0.05] text-slate-500 group-hover:bg-black/[0.08]"
+                ? "bg-blue-600 text-white shadow-2xs" 
+                : badgeColor || "bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-slate-300/80"
             )}>
               {badge}
             </span>
           )}
-          {isActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-white/90 shrink-0" />
+        </div>
+      )}
+
+      {/* Collapsed Hover Tooltip */}
+      {isCollapsed && (
+        <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150 z-50 flex items-center gap-1.5 backdrop-blur-md">
+          <span>{label}</span>
+          {badge !== undefined && badge !== null && (
+            <span className="px-1.5 py-0.2 text-[9.5px] font-mono font-bold bg-blue-600 text-white rounded-full tabular-nums">
+              {badge}
+            </span>
           )}
-        </>
+        </div>
       )}
     </motion.button>
   );

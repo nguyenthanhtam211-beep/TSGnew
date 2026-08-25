@@ -11,6 +11,8 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import GoogleSheetsSyncModal from './GoogleSheetsSyncModal';
 import PDFExportModal from './PDFExportModal';
 import { sanitizeDocColorsForCanvas } from '../lib/pdf-exporter';
+import { CustomChartTooltip } from './CustomChartTooltip';
+import { RECHARTS_PALETTE } from '../lib/design-tokens';
 
 export default function DashboardView({ 
   poData, 
@@ -1124,78 +1126,110 @@ export default function DashboardView({
         </div>
 
         {/* Bento Grid Executive Insights & KPI Highlights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5 mb-5 sm:mb-8">
-          <div className="bg-gradient-to-br from-blue-600/90 via-blue-700 to-indigo-800 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-blue-500/15 backdrop-blur-md border border-blue-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-5 mb-5 sm:mb-8">
+          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-blue-500/10 backdrop-blur-md border border-blue-500/30 relative overflow-hidden group cockpit-card-hover">
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-blue-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
             <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <TrendingUp size={22} className="text-blue-100" />
+              <div className="p-2.5 bg-blue-500/20 backdrop-blur-md rounded-xl border border-blue-400/30 text-blue-400">
+                <TrendingUp size={20} />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">DỰ BÁO DÒNG TIỀN</span>
+              <span className="text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-blue-400/30 tracking-wider">
+                DỰ BÁO DÒNG TIỀN
+              </span>
             </div>
-            <h3 className="text-[11px] sm:text-xs font-semibold text-blue-100 uppercase tracking-wide mb-1 relative z-10">Doanh thu dự kiến (PO còn lại)</h3>
-            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.projectedRev.toLocaleString('vi-VN')} đ</div>
-            <p className="text-[11px] sm:text-xs text-blue-100/80 leading-relaxed relative z-10">Dựa trên khối lượng hàng chưa giao trong các PO hiện hành</p>
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+              Doanh thu dự kiến (PO còn lại)
+            </h3>
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-1.5 relative z-10 font-mono tabular-nums">
+              {formatter.format(executiveInsights.projectedRev)}
+            </div>
+            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
+              Dựa trên khối lượng hàng chưa xuất kho trong các PO hiện hành
+            </p>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-500/90 via-amber-600 to-orange-700 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-amber-500/15 backdrop-blur-md border border-amber-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-amber-500/10 backdrop-blur-md border border-amber-500/30 relative overflow-hidden group cockpit-card-hover">
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-amber-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
             <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <Clock size={22} className="text-amber-100" />
+              <div className="p-2.5 bg-amber-500/20 backdrop-blur-md rounded-xl border border-amber-400/30 text-amber-400">
+                <Clock size={20} />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">TIẾN ĐỘ & UY TÍN</span>
+              <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-amber-400/30 tracking-wider">
+                TIẾN ĐỘ & UY TÍN
+              </span>
             </div>
-            <h3 className="text-[11px] sm:text-xs font-semibold text-amber-100 uppercase tracking-wide mb-1 relative z-10">Đơn hàng chậm tiến độ</h3>
-            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.delayedPOs} PO Line</div>
-            <p className="text-[11px] sm:text-xs text-amber-100/80 leading-relaxed relative z-10">Cảnh báo: Đã quá hạn giao hàng nhưng chưa hoàn tất 100%</p>
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+              Đơn hàng chậm tiến độ
+            </h3>
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-amber-400 mb-1.5 relative z-10 font-mono tabular-nums">
+              {executiveInsights.delayedPOs} <span className="text-sm font-semibold text-slate-400">PO Line</span>
+            </div>
+            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
+              {executiveInsights.delayedPOs > 0 ? "Cảnh báo: Đã quá hạn giao nhưng chưa xuất kho đủ 100%" : "Tuyệt vời: Không có PO line nào bị quá hạn giao"}
+            </p>
           </div>
 
-          <div className="bg-gradient-to-br from-rose-500/90 via-rose-600 to-red-700 rounded-2xl p-4 sm:p-6 text-white shadow-xl shadow-rose-500/15 backdrop-blur-md border border-rose-400/30 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300 sm:col-span-2 md:col-span-1">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-rose-500/10 backdrop-blur-md border border-rose-500/30 relative overflow-hidden group cockpit-card-hover sm:col-span-2 md:col-span-1">
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-rose-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
             <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 sm:p-3 bg-white/15 backdrop-blur-md rounded-xl shadow-inner border border-white/20">
-                <ShieldAlert size={22} className="text-rose-100" />
+              <div className="p-2.5 bg-rose-500/20 backdrop-blur-md rounded-xl border border-rose-400/30 text-rose-400">
+                <ShieldAlert size={20} />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 tracking-wider">RỦI RO TÀI CHÍNH</span>
+              <span className="text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-rose-400/30 tracking-wider">
+                RỦI RO TÀI CHÍNH
+              </span>
             </div>
-            <h3 className="text-[11px] sm:text-xs font-semibold text-rose-100 uppercase tracking-wide mb-1 relative z-10">Mục biên lợi nhuận thấp (&lt;15%)</h3>
-            <div className="text-xl sm:text-2xl font-black tracking-tight text-white mb-1 relative z-10">{executiveInsights.lowMarginItems} SKU</div>
-            <p className="text-[11px] sm:text-xs text-rose-100/80 leading-relaxed relative z-10">Cần rà soát lại giá NCC hoặc giá bán cho Khách hàng</p>
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+              Biên lợi nhuận thấp (&lt;15%)
+            </h3>
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-rose-400 mb-1.5 relative z-10 font-mono tabular-nums">
+              {executiveInsights.lowMarginItems} <span className="text-sm font-semibold text-slate-400">SKU</span>
+            </div>
+            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
+              {executiveInsights.lowMarginItems > 0 ? "Cần rà soát lại bảng giá NCC hoặc chính sách giá bán KH" : "Biên lợi nhuận tất cả sản phẩm đều đạt &gt; 15%"}
+            </p>
           </div>
         </div>
 
-        {/* Overall Order Lifecycle Pipeline */}
-        <div className="bg-white/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/50 mb-5 sm:mb-8 hover:border-blue-400/40 transition-all duration-300">
-          <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 uppercase tracking-wider mb-5 sm:mb-8 flex items-center gap-2">
-            <Activity className="text-emerald-500" size={18} /> Phân bổ Vòng đời Đơn hàng (Toàn hệ thống)
-          </h3>
+        {/* 4-Phase PO Lifecycle Pipeline */}
+        <div className="bg-white/90 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs mb-5 sm:mb-8 hover:border-blue-400/40 transition-all duration-300">
+          <div className="flex items-center justify-between mb-5 sm:mb-7">
+            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2 font-display">
+              <Activity className="text-emerald-500" size={18} /> Phân bổ Vòng đời Đơn hàng PO (Toàn hệ thống)
+            </h3>
+            <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
+              {overallPoLifecycle.total} Tổng PO
+            </span>
+          </div>
+
           <div className="relative overflow-x-auto mobile-scroll-x py-2">
-            <div className="relative flex items-center justify-between min-w-[500px] px-4 md:px-12">
+            <div className="relative flex items-center justify-between min-w-[520px] px-4 md:px-12">
             {(() => {
               const steps = [
-                { label: 'Mới tạo', count: overallPoLifecycle.newPos, color: 'bg-slate-500', ring: 'ring-slate-100' },
-                { label: 'Đang xử lý', count: overallPoLifecycle.processing, color: 'bg-blue-600', ring: 'ring-blue-100' },
-                { label: 'Đang giao', count: overallPoLifecycle.delivering, color: 'bg-amber-500', ring: 'ring-amber-100' },
-                { label: 'Hoàn thành', count: overallPoLifecycle.completed, color: 'bg-emerald-600', ring: 'ring-emerald-100' }
+                { label: '1. Mới tạo', desc: 'Chờ xử lý', count: overallPoLifecycle.newPos, color: 'bg-slate-600', ring: 'ring-slate-100', dotColor: 'bg-slate-400' },
+                { label: '2. Đang xử lý', desc: 'Đã lập KH', count: overallPoLifecycle.processing, color: 'bg-[#007AFF]', ring: 'ring-blue-100', dotColor: 'bg-blue-400' },
+                { label: '3. Đang giao', desc: 'Giao theo đợt', count: overallPoLifecycle.delivering, color: 'bg-[#F59E0B]', ring: 'ring-amber-100', dotColor: 'bg-amber-400' },
+                { label: '4. Hoàn thành', desc: 'Khớp 100%', count: overallPoLifecycle.completed, color: 'bg-[#10B981]', ring: 'ring-emerald-100', dotColor: 'bg-emerald-400' }
               ];
               const total = overallPoLifecycle.total || 1;
 
               return (
                 <>
-                  <div className="absolute left-[8%] right-[8%] top-5 h-1.5 bg-slate-100 rounded-full z-0"></div>
+                  <div className="absolute left-[10%] right-[10%] top-5 h-1.5 bg-slate-100 rounded-full z-0"></div>
                   
                   {steps.map((step, idx) => {
                     const percent = Math.round((step.count / total) * 100);
                     return (
-                      <div key={step.label} className="relative z-10 flex flex-col items-center gap-3 w-1/4 group cursor-pointer">
-                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm text-white ring-8 shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg ${step.color} ${step.ring}`}>
+                      <div key={step.label} className="relative z-10 flex flex-col items-center gap-2.5 w-1/4 group cursor-pointer">
+                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white ring-8 shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg ${step.color} ${step.ring}`}>
                           {idx + 1}
                         </div>
-                        <div className="text-center mt-2">
-                          <div className="text-sm font-bold text-slate-800 mb-0.5">{step.label}</div>
-                          <div className="text-2xl font-black text-slate-900">{step.count} <span className="text-xs font-medium text-slate-500">đơn</span></div>
-                          <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-3 py-0.5 rounded-full inline-block mt-1.5 border border-slate-200">
+                        <div className="text-center">
+                          <div className="text-xs font-bold text-slate-800">{step.label}</div>
+                          <div className="text-xl font-extrabold text-slate-900 font-mono tabular-nums mt-0.5">
+                            {step.count} <span className="text-xs font-medium text-slate-500">đơn</span>
+                          </div>
+                          <div className="text-[10.5px] font-bold font-mono text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full inline-block mt-1 border border-slate-200">
                             {percent}%
                           </div>
                         </div>
@@ -1209,51 +1243,60 @@ export default function DashboardView({
           </div>
         </div>
 
-        {/* Bento Grid Top KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-5 sm:mb-8">
-          <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/40 relative overflow-hidden group hover:border-blue-500/50 hover:shadow-[0_10px_30px_rgba(59,130,246,0.15)] transition-all duration-300">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-15 group-hover:scale-110 transition-all duration-300">
-                <DollarSign size={80} className="text-blue-600" />
+        {/* Bento Grid Top 4 Executive KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 mb-5 sm:mb-8">
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
+             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
+                <DollarSign size={72} className="text-blue-600" />
              </div>
              <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-xs">
+               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-2xs">
                  <TrendingUp size={20} />
                </div>
-               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng Doanh thu</h3>
+               <div>
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Doanh Thu</h3>
+                 <span className="text-[10.5px] text-blue-600 font-medium">Xuất kho thực tế</span>
+               </div>
              </div>
-             <p className="text-2xl font-black text-slate-900 mb-1 relative z-10 tracking-tight">{formatter.format(totalRevenue)}</p>
+             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
+               {formatter.format(totalRevenue)}
+             </p>
              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 relative z-10">
-                <Activity size={14} /> <span>Tăng trưởng dương</span>
+                <Activity size={13} /> <span>Tăng trưởng dương • {filteredDelivery.length} chuyến</span>
              </div>
           </div>
           
-          <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/40 relative overflow-hidden group hover:border-emerald-500/50 hover:shadow-[0_10px_30px_rgba(16,185,129,0.15)] transition-all duration-300">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-15 group-hover:scale-110 transition-all duration-300">
-                <Activity size={80} className="text-emerald-600" />
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
+             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
+                <Activity size={72} className="text-emerald-600" />
              </div>
              <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-xs">
+               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs">
                  <DollarSign size={20} />
                </div>
-               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng Lợi nhuận Gộp</h3>
+               <div>
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Lợi Nhuận Gộp</h3>
+                 <span className="text-[10.5px] text-emerald-700 font-bold font-mono">
+                   Biên LN: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%
+                 </span>
+               </div>
              </div>
-             <p className="text-2xl font-black text-slate-900 mb-1 relative z-10 tracking-tight">{formatter.format(totalProfit)}</p>
-             <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 relative z-10 mb-2">
-                <span>Biên LN gộp: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%</span>
-             </div>
-
-             {/* Commission Annotation */}
+             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
+               {formatter.format(totalProfit)}
+             </p>
+             
+             {/* Commission Annotation Breakdown */}
              {(() => {
                const totalComm = (commissionData || []).reduce((acc: number, c: any) => acc + (parseFloat(String(c.commissionAmount || 0)) || 0), 0);
                const netProfit = totalProfit - totalComm;
                return (
-                 <div className="mt-2 pt-2 border-t border-slate-200/60 relative z-10 space-y-1">
+                 <div className="mt-2.5 pt-2 border-t border-slate-100 relative z-10 space-y-1">
                    <div className="flex items-center justify-between text-[11px] text-purple-700 font-semibold bg-purple-50/80 px-2 py-0.5 rounded">
-                     <span>Hoa hồng (Commission):</span>
+                     <span>Hoa hồng đã chi:</span>
                      <span className="font-mono font-bold">-{formatter.format(totalComm)}</span>
                    </div>
                    <div className="flex items-center justify-between text-[11px] text-emerald-800 font-bold bg-emerald-50/90 px-2 py-0.5 rounded">
-                     <span>LN ròng sau hoa hồng:</span>
+                     <span>LN ròng thực nhận:</span>
                      <span className="font-mono font-bold">{formatter.format(netProfit)}</span>
                    </div>
                  </div>
@@ -1261,63 +1304,215 @@ export default function DashboardView({
              })()}
           </div>
 
-          <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 shadow-lg shadow-slate-200/40 relative overflow-hidden group hover:border-amber-500/50 hover:shadow-[0_10px_30px_rgba(245,158,11,0.15)] transition-all duration-300">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-15 group-hover:scale-110 transition-all duration-300">
-                <FileText size={80} className="text-amber-500" />
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
+             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
+                <FileText size={72} className="text-amber-500" />
              </div>
              <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-xs">
+               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs">
                  <Package size={20} />
                </div>
-               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng Số Đơn Hàng</h3>
+               <div>
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Đơn Hàng PO</h3>
+                 <span className="text-[10.5px] text-amber-700 font-medium">{poLinesData.length} dòng sản phẩm</span>
+               </div>
              </div>
-             <p className="text-2xl font-black text-slate-900 mb-1 relative z-10 tracking-tight">{numFormatter.format(totalOrders)} <span className="text-base font-semibold text-slate-500">đơn</span></p>
+             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
+               {numFormatter.format(totalOrders)} <span className="text-base font-semibold text-slate-500">đơn</span>
+             </p>
              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 relative z-10">
-                <span>Từ hệ thống PO</span>
+                <span>Hệ thống PO Tâm Sen & AVP</span>
              </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Truck size={64} className="text-purple-500" />
+          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
+             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
+                <Truck size={72} className="text-purple-500" />
              </div>
              <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                 <CheckCircle size={20} className="text-purple-600" />
+               <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shadow-2xs">
+                 <CheckCircle size={20} />
                </div>
-               <h3 className="text-sm font-semibold text-gray-600">Tỷ lệ Hoàn thành</h3>
+               <div>
+                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tỷ Lệ Hoàn Thành</h3>
+                 <span className="text-[10.5px] text-purple-700 font-medium">{completedDeliveries} chuyến hoàn tất</span>
+               </div>
              </div>
-             <p className="text-2xl font-bold text-gray-900 mb-1 relative z-10">
+             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
                {filteredDelivery.length > 0 ? ((completedDeliveries / filteredDelivery.length) * 100).toFixed(1) : 0}%
              </p>
-             <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 relative z-10">
-                <span>{completedDeliveries} chuyến hoàn thành</span>
+             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 relative z-10">
+                <span>Đúng hạn & đạt chuẩn QC</span>
              </div>
           </div>
         </div>
 
-        {/* Completed Orders Revenue & Profit Chart */}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* 🌟 EXECUTIVE OPERATIONAL COCKPIT: ACTIVITY FEED & DELIVERY ALERTS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Recent Delivery Activity Feed (2 Cols) */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-slate-900 flex items-center gap-2 text-sm font-display">
+                  <Truck size={18} className="text-blue-600" /> Nhật Ký & Tiến Độ Giao Hàng Gần Nhất
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Theo dõi thời gian thực các phiếu xuất kho PXK và tiến độ hoàn thành</p>
+              </div>
+              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {filteredDelivery.length} PXK
+              </span>
+            </div>
+            <div className="p-0 overflow-auto flex-1 max-h-[380px] mobile-scroll-x print:max-h-none">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#F8F9FA] text-slate-600 sticky top-0 border-b border-slate-200/80 font-bold uppercase tracking-wider text-[10.5px]">
+                  <tr>
+                    <th className="px-4 py-3">Mã Đơn / PXK</th>
+                    <th className="px-4 py-3">Sản phẩm & Khách hàng</th>
+                    <th className="px-4 py-3 min-w-[160px]">Tiến độ (Giao / Đặt)</th>
+                    <th className="px-4 py-3 text-right">Doanh thu</th>
+                    <th className="px-4 py-3 text-center">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {filteredDelivery.slice(0, 15).map((d, i) => {
+                    const currentDelivery = parseFloat(String(d["Số lượng giao"] || "0").replace(/,/g, '')) || 0;
+                    const prevDelivered = parseFloat(String(d["Đã giao"] || "0").replace(/,/g, '')) || 0;
+                    const orderTotal = parseFloat(String(d["Số lượng đặt"] || "0").replace(/,/g, '')) || 0;
+                    const totalDelivered = currentDelivery + prevDelivered;
+                    
+                    const calculatedProgress = orderTotal > 0 ? (totalDelivered / orderTotal) * 100 : 0;
+                    const isCompleted = d["Status"] === 'Hoàn thành' || calculatedProgress >= 100;
+                    const deliveryId = d.id || d.ID || `${d["Số PXK"] || ''}-${d["Đơn hàng"] || ''}-${i}`;
+                    
+                    return (
+                    <tr key={deliveryId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 font-mono">
+                        <div className="font-bold text-slate-900">{d["Đơn hàng"]}</div>
+                        <div className="text-[11px] text-slate-500">{d["Số PXK"] || "Chưa có PXK"}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-slate-900 font-semibold truncate max-w-[200px]" title={d["Tên sản phẩm"]}>
+                          {d["Tên sản phẩm"]}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate max-w-[180px]">
+                          KH: {d["Khách hàng"]}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                         <div className="flex flex-col gap-1">
+                            <div className="flex justify-between text-[11px] font-mono">
+                               <span className={isCompleted ? 'text-emerald-700 font-bold' : 'text-blue-600 font-bold'}>
+                                 {calculatedProgress.toFixed(0)}%
+                               </span>
+                               <span className="text-slate-500 tabular-nums">
+                                 {numFormatter.format(totalDelivered)} / {numFormatter.format(orderTotal)} {d["ĐVT"] || "sp"}
+                                </span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-300 ${isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                                style={{ width: `${Math.min(calculatedProgress, 100)}%` }}
+                              />
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-bold tabular-nums text-slate-900">
+                        {formatter.format(parseNumber(d["Doanh thu"]))}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center justify-center px-2.5 py-0.5 text-[10px] font-extrabold rounded-full ${
+                          isCompleted 
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
+                          {isCompleted ? 'Hoàn thành' : d["Status"] || 'Đang giao'}
+                        </span>
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Operational Alerts & QC Section (1 Col) */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 flex items-center gap-2 text-sm font-display">
+                <AlertTriangle size={18} className="text-amber-500" /> Cảnh Báo Điều Độ & Sự Cố QC
+              </h3>
+              <span className="text-xs font-bold text-slate-500">Live</span>
+            </div>
+            <div className="p-4 flex-1 flex flex-col gap-3 overflow-y-auto max-h-[380px]">
+               {/* Delayed POs Alert */}
+               {executiveInsights.delayedPOs > 0 && (
+                 <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3">
+                   <Clock className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                   <div className="text-xs">
+                     <div className="font-bold text-amber-900">Có {executiveInsights.delayedPOs} PO Line quá hạn giao</div>
+                     <p className="text-amber-700 mt-0.5 leading-snug">Chưa hoàn tất 100% sản lượng đặt hàng. Cần đôn đốc NCC và sắp xếp lịch giao bù.</p>
+                   </div>
+                 </div>
+               )}
+
+               {/* Low Margin Items Alert */}
+               {executiveInsights.lowMarginItems > 0 && (
+                 <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-3.5 flex items-start gap-3">
+                   <ShieldAlert className="text-rose-600 shrink-0 mt-0.5" size={18} />
+                   <div className="text-xs">
+                     <div className="font-bold text-rose-900">{executiveInsights.lowMarginItems} SKU có biên lãi &lt; 15%</div>
+                     <p className="text-rose-700 mt-0.5 leading-snug">Cần kiểm tra đối chiếu lại đơn giá mua NCC An Việt Phát hoặc điều chỉnh giá bán.</p>
+                   </div>
+                 </div>
+               )}
+
+               {/* QC Incidents */}
+               {filteredDelivery.filter(d => d["Sự cố"] && d["Sự cố"] !== "0" && String(d["Sự cố"]).trim() !== "").map((incident, idx) => (
+                 <div key={idx} className="bg-red-50/80 border border-red-200 rounded-xl p-3.5 flex items-start gap-3">
+                   <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={18} />
+                   <div className="text-xs">
+                     <div className="font-bold text-red-900">Sự cố PXK: {incident["Số PXK"] || incident["Đơn hàng"]}</div>
+                     <p className="text-red-700 mt-0.5 leading-snug">{incident["Chi tiết sự cố"] || "Lỗi giao nhận phát sinh"}</p>
+                     <div className="mt-2 text-[11px] text-red-800 font-medium">KH: {incident["Khách hàng"]}</div>
+                   </div>
+                 </div>
+               ))}
+
+               {executiveInsights.delayedPOs === 0 && executiveInsights.lowMarginItems === 0 && (
+                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex flex-col items-center justify-center text-center h-full">
+                   <CheckCircle size={36} className="text-emerald-500 mb-2" />
+                   <h4 className="font-bold text-emerald-900 text-xs">Vận hành tối ưu 100%</h4>
+                   <p className="text-[11px] text-emerald-700 mt-0.5">Không có cảnh báo trễ hạn hay sự cố chất lượng nào.</p>
+                 </div>
+               )}
+            </div>
+          </div>
+        </div>
+
+        {/* 11 STANDARDIZED RECHARTS CHARTS */}
+
+        {/* Chart 1: Completed Orders Revenue & Profit Chart */}
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
               <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                  <BarChart3 size={18} className="text-blue-600 shrink-0" /> Doanh thu, Lợi nhuận & Hoa hồng (Đơn hàng Hoàn thành)
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                  <BarChart3 size={18} className="text-blue-600 shrink-0" /> 1. Doanh thu, Lợi nhuận & Hoa hồng (Đơn hàng Hoàn thành)
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">Tổng hợp doanh thu, lợi nhuận gộp, chi phí hoa hồng và LN ròng theo tháng</p>
+                <p className="text-xs text-slate-500 mt-1">Tổng hợp doanh thu, lợi nhuận gộp, chi phí hoa hồng và LN ròng theo tháng</p>
               </div>
-              <div className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg shrink-0 self-start sm:self-auto border border-blue-200/60">
+              <div className="text-xs font-mono font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg shrink-0 self-start sm:self-auto border border-blue-200/60">
                  COMPLETED ORDERS
               </div>
            </div>
            <div className="h-[280px] sm:h-[350px] w-full min-w-0">
              <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-               <ComposedChart data={completedMonthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+               <ComposedChart data={completedMonthlyTrendData} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
                  <XAxis 
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280' }} 
+                    tick={{ fontSize: 11, fill: '#64748b' }} 
                     dy={10} 
                  />
                  <YAxis 
@@ -1326,48 +1521,45 @@ export default function DashboardView({
                     tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                  />
                  <Tooltip 
-                    formatter={(value: number, name: string) => [formatter.format(value), name]}
-                    cursor={{fill: '#f1f5f9'}}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
+                    content={<CustomChartTooltip isCurrency={true} />}
+                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                  />
                  <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
-                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                 <Bar yAxisId="left" dataKey="commission" name="Chi phí hoa hồng" fill="#a855f7" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                 <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN ròng sau hoa hồng" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} />
+                 <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill={RECHARTS_PALETTE.blue} radius={[6, 6, 0, 0]} maxBarSize={45} />
+                 <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill={RECHARTS_PALETTE.emerald} radius={[6, 6, 0, 0]} maxBarSize={45} />
+                 <Bar yAxisId="left" dataKey="commission" name="Chi phí hoa hồng" fill={RECHARTS_PALETTE.purple} radius={[6, 6, 0, 0]} maxBarSize={45} />
+                 <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN ròng sau hoa hồng" stroke={RECHARTS_PALETTE.amber} strokeWidth={3} dot={{ r: 4, fill: '#fff', strokeWidth: 2 }} />
                </ComposedChart>
              </ResponsiveContainer>
            </div>
            <InsightBox content={completedTrendInsight} />
         </div>
 
-        {/* Monthly Profit Analysis Bar Chart */}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* Chart 2: Monthly Profit Analysis Bar Chart */}
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
               <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                  <BarChart3 size={18} className="text-emerald-600 shrink-0" /> Phân tích Lợi Nhuận Gộp vs Hoa Hồng & LN Ròng Hàng Tháng
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                  <BarChart3 size={18} className="text-emerald-600 shrink-0" /> 2. Phân tích Lợi Nhuận Gộp vs Hoa Hồng & LN Ròng Hàng Tháng
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">So sánh lợi nhuận gộp, chi phí hoa hồng chiết khấu và lợi nhuận ròng thực nhận</p>
+                <p className="text-xs text-slate-500 mt-1">So sánh lợi nhuận gộp, chi phí hoa hồng chiết khấu và lợi nhuận ròng thực nhận</p>
               </div>
-              <div className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg shrink-0 self-start sm:self-auto border border-emerald-200/60">
+              <div className="text-xs font-mono font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg shrink-0 self-start sm:self-auto border border-emerald-200/60">
                  NET PROFIT & COMMISSION
               </div>
            </div>
            <div className="h-[280px] sm:h-[350px] w-full min-w-0">
              <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
                  <XAxis 
                     dataKey="month" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280', fontWeight: 500 }} 
+                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} 
                     dy={12} 
                  />
                  <YAxis 
@@ -1375,35 +1567,32 @@ export default function DashboardView({
                     tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                  />
                  <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    formatter={(value: number, name: string) => [formatter.format(value), name]}
-                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                    itemStyle={{ color: '#e2e8f0' }}
-                    labelStyle={{ fontWeight: 'bold', color: '#34d399', marginBottom: '4px' }}
+                    content={<CustomChartTooltip isCurrency={true} />}
+                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                  />
                  <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
                  <Bar 
                     dataKey="grossProfit" 
                     name="Lợi nhuận gộp" 
-                    fill="#10b981" 
-                    radius={[4, 4, 0, 0]} 
+                    fill={RECHARTS_PALETTE.emerald} 
+                    radius={[6, 6, 0, 0]} 
                     maxBarSize={45}
                  />
                  <Bar 
                     dataKey="commission" 
                     name="Chi phí hoa hồng" 
-                    fill="#a855f7" 
-                    radius={[4, 4, 0, 0]} 
+                    fill={RECHARTS_PALETTE.purple} 
+                    radius={[6, 6, 0, 0]} 
                     maxBarSize={45}
                  />
                  <Bar 
                     dataKey="netProfit" 
                     name="Lợi nhuận ròng thực nhận" 
                     fill="#059669" 
-                    radius={[4, 4, 0, 0]} 
+                    radius={[6, 6, 0, 0]} 
                     maxBarSize={45}
                  />
                </BarChart>
@@ -1412,16 +1601,16 @@ export default function DashboardView({
            <InsightBox content={netProfitInsight} />
         </div>
 
-        {/* PHÂN TÍCH TÌNH HÌNH KINH DOANH THEO QUÝ */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 print:break-inside-avoid">
+        {/* Chart 3: PHÂN TÍCH TÌNH HÌNH KINH DOANH THEO QUÝ */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 print:break-inside-avoid">
            <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <BarChart3 size={18} className="text-purple-600" /> Phân tích Tình hình Kinh doanh theo Quý (Quý 1 - Quý 4)
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 font-display">
+                  <BarChart3 size={18} className="text-purple-600" /> 3. Phân tích Tình hình Kinh doanh theo Quý (Quý 1 - Quý 4)
                 </h3>
-                <p className="text-xs text-gray-500 mt-1">So sánh doanh thu, lợi nhuận gộp và sản lượng giữa các quý trong năm</p>
+                <p className="text-xs text-slate-500 mt-1">So sánh doanh thu, lợi nhuận gộp và sản lượng giữa các quý trong năm</p>
               </div>
-              <div className="text-xs font-bold px-3 py-1 bg-purple-50 text-purple-700 rounded-full border border-purple-200/60">
+              <div className="text-xs font-mono font-bold px-3 py-1 bg-purple-50 text-purple-700 rounded-full border border-purple-200/60">
                  QUARTERLY ANALYSIS
               </div>
            </div>
@@ -1429,8 +1618,8 @@ export default function DashboardView({
            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
               <div className="lg:col-span-7 h-[280px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={quarterlyTrendData} margin={{ top: 10, right: 20, left: 40, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <BarChart data={quarterlyTrendData} margin={{ top: 10, right: 20, left: 20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
                     <XAxis 
                        dataKey="quarter" 
                        axisLine={false} 
@@ -1446,22 +1635,19 @@ export default function DashboardView({
                        tick={{ fontSize: 11, fill: '#64748b' }}
                     />
                     <Tooltip 
-                       cursor={{ fill: '#f8fafc' }}
-                       formatter={(value: number, name: string) => [formatter.format(value), name]}
-                       contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                       itemStyle={{ color: '#e2e8f0' }}
-                       labelStyle={{ fontWeight: 'bold', color: '#c084fc', marginBottom: '4px' }}
+                       content={<CustomChartTooltip isCurrency={true} />}
+                       cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '16px' }} />
-                    <Bar dataKey="revenue" name="Doanh thu" fill="#8b5cf6" radius={[6, 6, 0, 0]} maxBarSize={50} />
-                    <Bar dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={50} />
+                    <Bar dataKey="revenue" name="Doanh thu" fill={RECHARTS_PALETTE.indigo} radius={[6, 6, 0, 0]} maxBarSize={50} />
+                    <Bar dataKey="profit" name="Lợi nhuận gộp" fill={RECHARTS_PALETTE.emerald} radius={[6, 6, 0, 0]} maxBarSize={50} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
               <div className="lg:col-span-5 overflow-x-auto">
                 <table className="w-full text-xs text-left border border-slate-100 rounded-xl overflow-hidden shadow-2xs">
-                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-100 font-bold uppercase tracking-wider">
+                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-100 font-bold uppercase tracking-wider text-[10.5px]">
                     <tr>
                       <th className="px-3 py-2.5">Quý</th>
                       <th className="px-3 py-2.5 text-right">Doanh thu</th>
@@ -1475,9 +1661,9 @@ export default function DashboardView({
                       return (
                         <tr key={q.quarter} className="hover:bg-purple-50/20 transition-colors">
                           <td className="px-3 py-2.5 font-bold text-slate-800">{q.name}</td>
-                          <td className="px-3 py-2.5 text-right font-medium text-slate-700">{formatter.format(q.revenue)}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-emerald-600">{formatter.format(q.profit)}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-purple-600">{marginPct}%</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-medium text-slate-700 tabular-nums">{formatter.format(q.revenue)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-600 tabular-nums">{formatter.format(q.profit)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-purple-600 tabular-nums">{marginPct}%</td>
                         </tr>
                       );
                     })}
@@ -1489,16 +1675,19 @@ export default function DashboardView({
            <InsightBox title="Phân tích tình hình kinh doanh theo Quý" content={quarterlyInsight} />
         </div>
 
-        {/* MẶT HÀNG BEST SELLER */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-8 overflow-hidden print:overflow-visible">
-           <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                <Star size={18} className="text-amber-500" /> Top 10 Mặt hàng mang lại Doanh thu & Sản lượng tốt nhất
+        {/* Section 4: MẶT HÀNG BEST SELLER */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs mb-8 overflow-hidden print:overflow-visible">
+           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 flex items-center gap-2 font-display">
+                <Star size={18} className="text-amber-500" /> 4. Top 10 Mặt hàng mang lại Doanh thu & Sản lượng tốt nhất
               </h3>
+              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                BEST SELLERS
+              </span>
            </div>
            <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-white text-gray-500 shadow-[0_1px_0_0_#f3f4f6]">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#F8F9FA] text-slate-600 border-b border-slate-200/80 font-bold uppercase tracking-wider text-[10.5px]">
                   <tr>
                     <th className="px-5 py-3 font-semibold">Tên sản phẩm</th>
                     <th className="px-5 py-3 font-semibold">Nhóm hàng</th>
@@ -1507,19 +1696,30 @@ export default function DashboardView({
                     <th className="px-5 py-3 font-semibold text-right">Lợi nhuận</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {productStats.map((p, i) => (
                     <tr key={p.name} className="hover:bg-amber-50/30 transition-colors">
-                       <td className="px-5 py-4 font-medium text-gray-900">
+                       <td className="px-5 py-3.5 font-medium text-slate-900">
                           <div className="flex items-center gap-3">
-                             <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>{i + 1}</span>
-                             {p.name}
+                             <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono ${
+                               i === 0 ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-300' :
+                               i === 1 ? 'bg-slate-200 text-slate-700 ring-2 ring-slate-300' :
+                               i === 2 ? 'bg-orange-100 text-orange-800 ring-2 ring-orange-300' :
+                               'bg-slate-100 text-slate-600'
+                             }`}>
+                               {i + 1}
+                             </span>
+                             <span className="font-semibold text-slate-900">{p.name}</span>
                           </div>
                        </td>
-                       <td className="px-5 py-4 text-gray-600">{p.category}</td>
-                       <td className="px-5 py-4 text-right font-medium text-gray-900">{numFormatter.format(p.volume)}</td>
-                       <td className="px-5 py-4 text-right font-bold text-blue-600">{formatter.format(p.revenue)}</td>
-                       <td className="px-5 py-4 text-right font-bold text-green-600">{formatter.format(p.profit)}</td>
+                       <td className="px-5 py-3.5 text-slate-600">
+                         <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">
+                           {p.category}
+                         </span>
+                       </td>
+                       <td className="px-5 py-3.5 text-right font-mono font-medium text-slate-900 tabular-nums">{numFormatter.format(p.volume)}</td>
+                       <td className="px-5 py-3.5 text-right font-mono font-bold text-blue-600 tabular-nums">{formatter.format(p.revenue)}</td>
+                       <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-600 tabular-nums">{formatter.format(p.profit)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1527,50 +1727,47 @@ export default function DashboardView({
            </div>
         </div>
 
-        {/* Charts Row 1: Trend & Category */}
+        {/* Charts Row 1: Trend & Category (Charts 5 & 6) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 5: Trend Lines */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                    <TrendingUp size={18} className="text-blue-600 shrink-0" /> Xu hướng Doanh thu, Lợi nhuận & Hoa hồng
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                    <TrendingUp size={18} className="text-blue-600 shrink-0" /> 5. Xu hướng Doanh thu, Lợi nhuận & Hoa hồng
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Theo dõi 4 chỉ số tài chính chủ chốt qua từng tháng</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Theo dõi 4 chỉ số tài chính chủ chốt qua từng tháng</p>
                 </div>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
                <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                 <LineChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} />
+                 <LineChart data={monthlyTrendData} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={10} />
                    <YAxis 
                       yAxisId="left"
                       width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
-                   <Tooltip 
-                      formatter={(value: number, name: string) => [formatter.format(value), name]}
-                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                      itemStyle={{ color: '#e2e8f0' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
-                   />
+                   <Tooltip content={<CustomChartTooltip isCurrency={true} />} />
                    <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
-                   <Line yAxisId="left" type="monotone" dataKey="revenue" name="Doanh thu" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                   <Line yAxisId="left" type="monotone" dataKey="grossProfit" name="LN Gộp" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                   <Line yAxisId="left" type="monotone" dataKey="commission" name="Hoa hồng" stroke="#a855f7" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
-                   <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN Ròng" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="revenue" name="Doanh thu" stroke={RECHARTS_PALETTE.blue} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="grossProfit" name="LN Gộp" stroke={RECHARTS_PALETTE.emerald} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="commission" name="Hoa hồng" stroke={RECHARTS_PALETTE.purple} strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
+                   <Line yAxisId="left" type="monotone" dataKey="netProfit" name="LN Ròng" stroke={RECHARTS_PALETTE.amber} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
                  </LineChart>
                </ResponsiveContainer>
              </div>
            </div>
 
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 6: Category Breakdown Donut */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                  <PieChartIcon size={18} className="text-blue-600 shrink-0" /> Cơ cấu Doanh thu theo Nhóm hàng
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                  <PieChartIcon size={18} className="text-blue-600 shrink-0" /> 6. Cơ cấu Doanh thu theo Nhóm hàng
                 </h3>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
@@ -1588,15 +1785,10 @@ export default function DashboardView({
                      labelLine={false}
                    >
                      {categoryStats.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                       <Cell key={`cell-${index}`} fill={RECHARTS_PALETTE.colors[index % RECHARTS_PALETTE.colors.length]} />
                      ))}
                    </Pie>
-                   <Tooltip 
-                      formatter={(value: number) => formatter.format(value)}
-                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                      itemStyle={{ color: '#e2e8f0' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
-                   />
+                   <Tooltip content={<CustomChartTooltip isCurrency={true} />} />
                    <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
                  </PieChart>
                </ResponsiveContainer>
@@ -1605,70 +1797,68 @@ export default function DashboardView({
            </div>
         </div>
 
-        {/* Charts Row 2: Customer & Supplier */}
+        {/* Charts Row 2: Customer & Supplier (Charts 7 & 8) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 7: Top Customers */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                  <Users size={18} className="text-blue-600 shrink-0" /> Top Khách hàng theo Doanh thu & Lợi nhuận
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                  <Users size={18} className="text-blue-600 shrink-0" /> 7. Top Khách hàng theo Doanh thu & Lợi nhuận
                 </h3>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
                <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                 <BarChart data={customerStats} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                 <BarChart data={customerStats} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} interval={0} />
                    <YAxis 
                       yAxisId="left"
                       width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
                    <Tooltip 
-                      formatter={(value: number, name: string) => [formatter.format(value), name]}
-                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                      itemStyle={{ color: '#e2e8f0' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#60a5fa', marginBottom: '4px' }}
+                      content={<CustomChartTooltip isCurrency={true} />}
+                      cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                    />
                    <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
-                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill={RECHARTS_PALETTE.blue} radius={[6, 6, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận gộp" fill={RECHARTS_PALETTE.emerald} radius={[6, 6, 0, 0]} maxBarSize={45} />
                  </BarChart>
                </ResponsiveContainer>
              </div>
              <InsightBox content={customerInsight} />
            </div>
 
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 8: Top Suppliers */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                  <Briefcase size={18} className="text-indigo-600 shrink-0" /> Top Nhà cung cấp (Giá vốn & Mua hàng)
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                  <Briefcase size={18} className="text-indigo-600 shrink-0" /> 8. Top Nhà cung cấp (Giá vốn & Mua hàng)
                 </h3>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
                <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                 <BarChart data={supplierStats} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                 <BarChart data={supplierStats} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} interval={0} />
                    <YAxis 
                       yAxisId="left"
                       width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
                    <Tooltip 
-                      formatter={(value: number, name: string) => [formatter.format(value), name]}
-                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                      itemStyle={{ color: '#e2e8f0' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#818cf8', marginBottom: '4px' }}
+                      content={<CustomChartTooltip isCurrency={true} />}
+                      cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                    />
                    <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
-                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu" fill={RECHARTS_PALETTE.indigo} radius={[6, 6, 0, 0]} maxBarSize={45} />
+                   <Bar yAxisId="left" dataKey="profit" name="Lợi nhuận" fill="#06B6D4" radius={[6, 6, 0, 0]} maxBarSize={45} />
                  </BarChart>
                </ResponsiveContainer>
              </div>
@@ -1676,47 +1866,45 @@ export default function DashboardView({
            </div>
         </div>
 
-        {/* Dedicated Commission Distribution by Customer */}
+        {/* Chart 9: Dedicated Commission Distribution by Customer */}
         {commissionCustomerStats.length > 0 && (
-          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                    <DollarSign size={18} className="text-purple-600 shrink-0" /> Cơ cấu & Phân bổ Chi phí Hoa hồng theo Khách hàng
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                    <DollarSign size={18} className="text-purple-600 shrink-0" /> 9. Cơ cấu & Phân bổ Chi phí Hoa hồng theo Khách hàng
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Thống kê chi tiết các khoản chiết khấu/hoa hồng theo từng đối tác và người thụ hưởng</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Thống kê chi tiết các khoản chiết khấu/hoa hồng theo từng đối tác và người thụ hưởng</p>
                 </div>
-                <div className="text-xs font-bold px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg shrink-0 self-start sm:self-auto border border-purple-200/60">
+                <div className="text-xs font-mono font-bold px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg shrink-0 self-start sm:self-auto border border-purple-200/60">
                    COMMISSION BREAKDOWN
                 </div>
              </div>
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                 <div className="lg:col-span-7 h-[260px] sm:h-[300px] w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%" minHeight={240}>
-                    <BarChart data={commissionCustomerStats.slice(0, 6)} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} dy={10} interval={0} />
+                    <BarChart data={commissionCustomerStats.slice(0, 6)} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} interval={0} />
                       <YAxis 
                          width={45}
                          tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                          axisLine={false} 
                          tickLine={false} 
-                         tick={{ fontSize: 11, fill: '#6b7280' }}
+                         tick={{ fontSize: 11, fill: '#64748b' }}
                       />
                       <Tooltip 
-                         formatter={(value: number) => [formatter.format(value), "Hoa hồng"]}
-                         contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                         itemStyle={{ color: '#e2e8f0' }}
-                         labelStyle={{ fontWeight: 'bold', color: '#c084fc', marginBottom: '4px' }}
+                         content={<CustomChartTooltip isCurrency={true} unit="Hoa hồng" />}
+                         cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                       />
-                      <Bar dataKey="commission" name="Tổng chi hoa hồng" fill="#a855f7" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                      <Bar dataKey="commission" name="Tổng chi hoa hồng" fill={RECHARTS_PALETTE.purple} radius={[6, 6, 0, 0]} maxBarSize={45} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="lg:col-span-5 flex flex-col gap-3">
                    <div className="bg-purple-50/60 p-4 rounded-xl border border-purple-100">
-                      <div className="text-xs font-semibold text-purple-700 uppercase tracking-wider">Tổng tiền hoa hồng đã cam kết</div>
-                      <div className="text-2xl font-black text-purple-900 mt-1">{formatter.format(totalCommission)}</div>
+                      <div className="text-xs font-bold text-purple-700 uppercase tracking-wider font-display">Tổng tiền hoa hồng đã cam kết</div>
+                      <div className="text-2xl font-extrabold text-purple-900 mt-1 font-mono tabular-nums">{formatter.format(totalCommission)}</div>
                       <div className="text-[11px] text-purple-600 mt-1">
                         Chiếm {totalProfit > 0 ? ((totalCommission / totalProfit) * 100).toFixed(1) : 0}% trên tổng lợi nhuận gộp hệ thống
                       </div>
@@ -1725,7 +1913,7 @@ export default function DashboardView({
                      {commissionCustomerStats.slice(0, 3).map((item, idx) => (
                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
                           <span className="font-semibold text-slate-800 truncate max-w-[180px]">{item.name}</span>
-                          <span className="font-mono font-bold text-purple-700">{formatter.format(item.commission)}</span>
+                          <span className="font-mono font-bold text-purple-700 tabular-nums">{formatter.format(item.commission)}</span>
                        </div>
                      ))}
                    </div>
@@ -1734,32 +1922,39 @@ export default function DashboardView({
           </div>
         )}
 
-        {/* Charts Row 3: Growth & Financial Bridge */}
+        {/* Charts Row 3: Growth & Financial Bridge (Charts 10 & 11) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 10: Cumulative Revenue Growth */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                    <Activity size={18} className="text-blue-600 shrink-0" /> Phân tích Tăng trưởng Doanh thu
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                    <Activity size={18} className="text-blue-600 shrink-0" /> 10. Phân tích Tăng trưởng Doanh thu & Tích Lũy
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Theo dõi doanh thu tích lũy và tỷ lệ tăng trưởng hàng tháng</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Theo dõi doanh thu tích lũy và tỷ lệ tăng trưởng hàng tháng</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200/60">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200/60">
                    <TrendingUp size={14} /> GROWTH
                 </div>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
                <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                 <ComposedChart data={revenueGrowthData} margin={{ top: 10, right: 15, left: 20, bottom: 0 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6b7280' }} dy={10} />
+                 <ComposedChart data={revenueGrowthData} margin={{ top: 10, right: 15, left: 15, bottom: 0 }}>
+                   <defs>
+                     <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
+                       <stop offset="5%" stopColor={RECHARTS_PALETTE.blue} stopOpacity={0.25}/>
+                       <stop offset="95%" stopColor={RECHARTS_PALETTE.blue} stopOpacity={0.0}/>
+                     </linearGradient>
+                   </defs>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={10} />
                    <YAxis 
                       yAxisId="left"
                       width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
                    <YAxis 
                       yAxisId="right"
@@ -1768,54 +1963,47 @@ export default function DashboardView({
                       tickFormatter={(value) => `${value}%`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
                    <Tooltip 
-                      formatter={(value: any, name: string) => {
-                        if (name === 'Tăng trưởng') return [`${value}%`, name];
-                        return [formatter.format(value), name];
-                      }}
-                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)' }}
-                      itemStyle={{ color: '#e2e8f0' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#fbbf24', marginBottom: '4px' }}
+                      content={<CustomChartTooltip formatter={(value, name) => name === 'Tăng trưởng' ? [`${value}%`, name] : [formatter.format(value), name]} />}
                    />
                    <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
-                   <Area yAxisId="left" type="monotone" dataKey="cumulative" name="Doanh thu tích lũy" fill="#eff6ff" stroke="#3b82f6" strokeWidth={2} />
-                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu tháng" fill="#3b82f6" opacity={0.3} radius={[4, 4, 0, 0]} maxBarSize={35} />
-                   <Line yAxisId="right" type="stepAfter" dataKey="growth" name="Tăng trưởng" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                   <Area yAxisId="left" type="monotone" dataKey="cumulative" name="Doanh thu tích lũy" fill="url(#colorCumulative)" stroke={RECHARTS_PALETTE.blue} strokeWidth={2.5} />
+                   <Bar yAxisId="left" dataKey="revenue" name="Doanh thu tháng" fill={RECHARTS_PALETTE.blue} opacity={0.35} radius={[6, 6, 0, 0]} maxBarSize={35} />
+                   <Line yAxisId="right" type="stepAfter" dataKey="growth" name="Tăng trưởng" stroke={RECHARTS_PALETTE.amber} strokeWidth={2.5} dot={{ r: 3, fill: RECHARTS_PALETTE.amber }} />
                  </ComposedChart>
                </ResponsiveContainer>
              </div>
            </div>
 
-           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-black/[0.06] shadow-2xs overflow-hidden print:break-inside-avoid">
+           {/* Chart 11: Waterfall Chart (Profit Bridge) */}
+           <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-                    <BarChart3 size={18} className="text-emerald-600 shrink-0" /> Biểu đồ Thác nước: Điểm hòa vốn & Lợi nhuận ròng
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
+                    <BarChart3 size={18} className="text-emerald-600 shrink-0" /> 11. Biểu đồ Thác nước: Điểm hòa vốn & LN Ròng
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Phân tách từ doanh thu tổng qua giá vốn, lợi nhuận gộp và hoa hồng đến LN ròng</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Phân tách từ doanh thu tổng qua giá vốn, lợi nhuận gộp và hoa hồng đến LN ròng</p>
                 </div>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">
                <ResponsiveContainer width="100%" height="100%" minHeight={250}>
-                 <BarChart data={waterfallData} margin={{ top: 20, right: 15, left: 20, bottom: 5 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
+                 <BarChart data={waterfallData} margin={{ top: 20, right: 15, left: 15, bottom: 5 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                    <YAxis 
                       width={45}
                       tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
                    />
                    <Tooltip 
-                      formatter={(value: any) => formatter.format(Math.abs(value))}
-                      labelStyle={{ fontWeight: 'bold' }}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                      content={<CustomChartTooltip formatter={(value, name, item) => [formatter.format(Math.abs(item.payload.display)), item.payload.name]} />}
                       cursor={{ fill: 'transparent' }}
                    />
-                   <Bar dataKey="range" radius={[4, 4, 4, 4]}>
+                   <Bar dataKey="range" radius={[6, 6, 6, 6]}>
                       {waterfallData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -1823,134 +2011,29 @@ export default function DashboardView({
                  </BarChart>
                </ResponsiveContainer>
              </div>
-             <div className="mt-4 flex flex-wrap justify-center gap-4 sm:gap-6">
+             <div className="mt-4 flex flex-wrap justify-center gap-3 sm:gap-5">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                  <span className="text-[11px] text-gray-600 font-medium">Doanh thu (+)</span>
+                  <span className="text-[11px] text-slate-600 font-medium font-mono">Doanh thu (+)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                  <span className="text-[11px] text-gray-600 font-medium">Giá vốn (-)</span>
+                  <span className="text-[11px] text-slate-600 font-medium font-mono">Giá vốn (-)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <span className="text-[11px] text-gray-600 font-medium">LN Gộp (=)</span>
+                  <span className="text-[11px] text-slate-600 font-medium font-mono">LN Gộp (=)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
-                  <span className="text-[11px] text-gray-600 font-medium">Hoa hồng (-)</span>
+                  <span className="text-[11px] text-slate-600 font-medium font-mono">Hoa hồng (-)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-700"></div>
-                  <span className="text-[11px] text-gray-600 font-medium">LN Ròng (=)</span>
+                  <span className="text-[11px] text-slate-600 font-medium font-mono">LN Ròng (=)</span>
                 </div>
              </div>
            </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Lô hàng (Tiến độ) - 2 cols */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
-              <div>
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                  <Truck size={18} className="text-blue-600" /> Cập nhật Tiến độ Giao hàng
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">Tính toán chính xác dựa trên Số lượng đặt & Số lượng đã giao thực tế.</p>
-              </div>
-            </div>
-            <div className="p-0 overflow-auto flex-1 max-h-[400px] print:max-h-none print:overflow-visible">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-white text-gray-500 sticky top-0 shadow-[0_1px_0_0_#f3f4f6]">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Mã Đơn / PXK</th>
-                    <th className="px-5 py-3 font-semibold">Sản phẩm</th>
-                    <th className="px-5 py-3 font-semibold w-56">Tiến độ (Đã giao / Tổng)</th>
-                    <th className="px-5 py-3 font-semibold text-right">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredDelivery.map((d, i) => {
-                    const currentDelivery = parseFloat(String(d["Số lượng giao"] || "0").replace(/,/g, '')) || 0;
-                    const prevDelivered = parseFloat(String(d["Đã giao"] || "0").replace(/,/g, '')) || 0;
-                    const orderTotal = parseFloat(String(d["Số lượng đặt"] || "0").replace(/,/g, '')) || 0;
-                    const totalDelivered = currentDelivery + prevDelivered;
-                    
-                    const calculatedProgress = orderTotal > 0 ? (totalDelivered / orderTotal) * 100 : 0;
-                    const isCompleted = d["Status"] === 'Hoàn thành' || calculatedProgress >= 100;
-                    const deliveryId = d.id || d.ID || `${d["Số PXK"] || ''}-${d["Đơn hàng"] || ''}-${d["Tên sản phẩm"] || ''}-${i}`;
-                    
-                    return (
-                    <tr key={deliveryId} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-medium text-gray-900">{d["Đơn hàng"]}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{d["Số PXK"] || "Chưa có PXK"}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="text-gray-800 font-medium truncate max-w-[200px]">{d["Tên sản phẩm"]}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">Khách hàng: {d["Khách hàng"]}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                         <div className="flex flex-col gap-1.5">
-                            <div className="flex justify-between text-xs font-medium">
-                               <span className={isCompleted ? 'text-green-600' : 'text-blue-600'}>{calculatedProgress.toFixed(1)}%</span>
-                               <span className="text-gray-500">{numFormatter.format(totalDelivered)} / {numFormatter.format(orderTotal)} {d["ĐVT"]}</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                              <div className={`h-2 rounded-full ${isCompleted ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(calculatedProgress, 100)}%` }}></div>
-                            </div>
-                         </div>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold rounded-md uppercase tracking-wider ${isCompleted ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
-                          {isCompleted ? 'Hoàn thành' : d["Status"]}
-                        </span>
-                      </td>
-                    </tr>
-                  )})}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* QC & Incidents - 1 col */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-xl">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                <AlertTriangle size={18} className="text-red-500" /> Báo cáo QC & Sự cố
-              </h3>
-            </div>
-            <div className="p-5 flex-1 flex flex-col gap-4 overflow-y-auto max-h-[400px] print:max-h-none print:overflow-visible">
-               {filteredDelivery.filter(d => d["Sự cố"] && d["Sự cố"] !== "0" && String(d["Sự cố"]).trim() !== "").length > 0 ? (
-                 filteredDelivery.filter(d => d["Sự cố"] && d["Sự cố"] !== "0" && String(d["Sự cố"]).trim() !== "").map((incident, idx) => {
-                    const incidentId = incident.id || incident.ID || `${incident["Số PXK"] || incident["Đơn hàng"]}-${idx}`;
-                    return (
-                    <div key={incidentId} className="bg-red-50/80 border border-red-100 rounded-xl p-4 flex gap-3 hover:shadow-md transition-shadow">
-                        <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
-                        <div>
-                          <h4 className="font-semibold text-red-900 text-sm">Sự cố PXK: {incident["Số PXK"] || incident["Đơn hàng"]}</h4>
-                          <p className="text-sm text-red-700 mt-1.5 leading-relaxed">{incident["Chi tiết sự cố"] || "Lỗi không xác định"}</p>
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-red-800 bg-red-100/50 p-2 rounded-lg">
-                            <div><span className="font-semibold">Khách:</span> {incident["Khách hàng"]}</div>
-                            <div><span className="font-semibold">Sản phẩm:</span> {incident["Tên sản phẩm"]}</div>
-                          </div>
-                          <div className="mt-3 flex gap-2">
-                            <button className="bg-red-600 text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-red-700 transition shadow-sm">Điều tra</button>
-                          </div>
-                        </div>
-                    </div>
-                    );
-                  })
-               ) : (
-                  <div className="bg-green-50 border border-green-100 rounded-xl p-6 flex flex-col items-center justify-center text-center h-full">
-                     <CheckCircle size={40} className="text-green-500 mb-3" />
-                     <h4 className="font-semibold text-green-900">Không có sự cố nào</h4>
-                     <p className="text-sm text-green-700 mt-1">Tất cả các lô hàng đang đạt chuẩn chất lượng QC.</p>
-                  </div>
-               )}
-            </div>
-          </div>
         </div>
       </div>
 

@@ -174,9 +174,14 @@ export default function LogisticsHubView({
       const remaining = Math.max(0, qtyOrdered - qtyDelivered);
       const progress = qtyOrdered > 0 ? Math.round((qtyDelivered / qtyOrdered) * 100) : 0;
       const planDiff = qtyPlanned - qtyOrdered;
+      const isOverDelivered = qtyDelivered > qtyOrdered && qtyOrdered > 0;
+      const isUnderPlanned = qtyPlanned < qtyOrdered && qtyDelivered < qtyOrdered;
+      const isOverPlanned = qtyPlanned > qtyOrdered && qtyOrdered > 0;
+      const isDiscrepancy = isOverDelivered || (qtyPlanned !== qtyOrdered && qtyDelivered < qtyOrdered && qtyPlanned > 0);
 
       let status = 'pending';
-      if (progress >= 100) status = 'completed';
+      if (isOverDelivered) status = 'discrepancy';
+      else if (progress >= 100) status = 'completed';
       else if (progress > 0) status = 'in_progress';
       else if (qtyPlanned > 0) status = 'planned';
 
@@ -196,6 +201,10 @@ export default function LogisticsHubView({
         revenue,
         profit,
         status,
+        isOverDelivered,
+        isUnderPlanned,
+        isOverPlanned,
+        isDiscrepancy,
         plansCount: matchedPlans.length,
         deliveriesCount: matchedDeliveries.length
       };
@@ -207,7 +216,13 @@ export default function LogisticsHubView({
         row.prodName.toLowerCase().includes(q) ||
         row.prodCode.toLowerCase().includes(q);
 
-      const matchStatus = reconcileFilterStatus === 'ALL' || row.status === reconcileFilterStatus;
+      let matchStatus = true;
+      if (reconcileFilterStatus === 'discrepancy') {
+        matchStatus = row.isDiscrepancy;
+      } else if (reconcileFilterStatus !== 'ALL') {
+        matchStatus = row.status === reconcileFilterStatus;
+      }
+
       const matchCustomer = selectedCustomerFilter === 'ALL' || row.customer.toLowerCase().includes(selectedCustomerFilter.toLowerCase());
       return matchSearch && matchStatus && matchCustomer;
     });
@@ -557,6 +572,67 @@ export default function LogisticsHubView({
 
       {activeSubTab === 'reconcile' && (
         <div className="space-y-5 animate-in fade-in duration-200">
+          {/* Reconciliation 4-Box Executive Summary */}
+          {(() => {
+            const balancedCount = reconciliationData.filter(r => r.status === 'completed').length;
+            const inProgressCount = reconciliationData.filter(r => r.status === 'in_progress').length;
+            const discrepancyCount = reconciliationData.filter(r => r.isDiscrepancy).length;
+            const pendingCount = reconciliationData.filter(r => r.status === 'pending').length;
+            const totalRecRevenue = reconciliationData.reduce((sum, r) => sum + r.revenue, 0);
+
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="bg-white rounded-2xl p-3.5 border border-emerald-200/80 bg-emerald-50/20 shadow-xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Khớp 100% Cân Bằng</div>
+                    <div className="text-xl font-bold font-mono text-emerald-800 mt-0.5 tabular-nums">
+                      {balancedCount} <span className="text-xs font-normal text-emerald-600">dòng</span>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                    {reconciliationData.length > 0 ? Math.round((balancedCount / reconciliationData.length) * 100) : 0}%
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-3.5 border border-amber-200/80 bg-amber-50/20 shadow-xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Đang Giao Theo Đợt</div>
+                    <div className="text-xl font-bold font-mono text-amber-800 mt-0.5 tabular-nums">
+                      {inProgressCount} <span className="text-xs font-normal text-amber-600">dòng</span>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
+                    {reconciliationData.length > 0 ? Math.round((inProgressCount / reconciliationData.length) * 100) : 0}%
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-3.5 border border-rose-200/80 bg-rose-50/20 shadow-xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Cảnh Báo Lệch / Cần Rà Soát</div>
+                    <div className="text-xl font-bold font-mono text-rose-800 mt-0.5 tabular-nums">
+                      {discrepancyCount} <span className="text-xs font-normal text-rose-600">dòng</span>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
+                    ⚠️
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-3.5 border border-indigo-200/80 bg-indigo-50/20 shadow-xs flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Doanh Thu Đã Xuất Giao</div>
+                    <div className="text-lg font-bold font-mono text-indigo-900 mt-0.5 tabular-nums truncate max-w-[170px]" title={`${totalRecRevenue.toLocaleString('vi-VN')} đ`}>
+                      {totalRecRevenue >= 1e9 ? `${(totalRecRevenue / 1e9).toFixed(2)} Tỷ đ` : `${(totalRecRevenue / 1e6).toFixed(1)} Tr đ`}
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                    <DollarSign size={15} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Controls Bar */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
             <div className="relative flex-1 w-full md:w-96">
@@ -597,9 +673,10 @@ export default function LogisticsHubView({
                 onChange={(e) => setReconcileFilterStatus(e.target.value)}
                 className="px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200/70 rounded-2xl text-xs font-bold text-slate-700 outline-none cursor-pointer hover:bg-slate-100 transition"
               >
-                <option value="ALL">Tất cả tiến độ</option>
-                <option value="completed">🟢 Đã giao đủ 100%</option>
+                <option value="ALL">Tất cả tiến độ ({reconciliationData.length})</option>
+                <option value="completed">🟢 Đã giao đủ 100% (Cân bằng)</option>
                 <option value="in_progress">🟡 Đang giao theo đợt</option>
+                <option value="discrepancy">🔴 Cảnh báo chênh lệch / Xuất vượt</option>
                 <option value="planned">📅 Đã lên kế hoạch</option>
                 <option value="pending">⚪ Chưa lên kế hoạch</option>
               </select>
@@ -633,7 +710,7 @@ export default function LogisticsHubView({
                     <th className="px-4 py-3.5 text-right font-bold text-emerald-700">3. Thực Giao (PXK)</th>
                     <th className="px-4 py-3.5 text-right font-bold text-amber-700">Còn Lại</th>
                     <th className="px-4 py-3.5 text-center">Tiến Độ</th>
-                    <th className="px-4 py-3.5 text-center">Trạng Thái</th>
+                    <th className="px-4 py-3.5 text-center">Cân Bằng & Trạng Thái</th>
                     <th className="px-4 py-3.5 text-right">Doanh Thu Đã Giao</th>
                     <th className="px-4 py-3.5 text-right">Lợi Nhuận Gộp</th>
                   </tr>
@@ -646,9 +723,18 @@ export default function LogisticsHubView({
                       </td>
                     </tr>
                   ) : (
-                    reconciliationData.map((row, idx) => (
-                      <tr key={row.id} className="hover:bg-slate-50/80 transition group">
-                        <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
+                    reconciliationData.map((row, idx) => {
+                      const isRowDiscrepancy = row.isOverDelivered || row.isUnderPlanned || row.isOverPlanned;
+                      
+                      return (
+                      <tr 
+                        key={row.id} 
+                        className={clsx(
+                          "transition group",
+                          row.isOverDelivered ? "bg-rose-50/30 hover:bg-rose-50/60" : "hover:bg-slate-50/80"
+                        )}
+                      >
+                        <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums font-mono">
                           {idx + 1}
                         </td>
                         <td className="px-4 py-3.5">
@@ -681,22 +767,40 @@ export default function LogisticsHubView({
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-slate-900">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums font-mono text-slate-900">
                           {row.qtyOrdered.toLocaleString("vi-VN")}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-teal-700">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums font-mono text-teal-700">
                           {row.qtyPlanned.toLocaleString("vi-VN")}
                           {row.plansCount > 0 && (
                             <span className="text-[9.5px] text-slate-400 block font-normal">({row.plansCount} đợt)</span>
                           )}
+                          {row.isUnderPlanned && (
+                            <span className="text-[9px] text-amber-600 font-bold block bg-amber-50 px-1 rounded mt-0.5 border border-amber-200/60">
+                              Thiếu KH: -{(row.qtyOrdered - row.qtyPlanned).toLocaleString("vi-VN")}
+                            </span>
+                          )}
+                          {row.isOverPlanned && (
+                            <span className="text-[9px] text-teal-600 font-bold block bg-teal-50 px-1 rounded mt-0.5 border border-teal-200/60">
+                              KH dư: +{(row.qtyPlanned - row.qtyOrdered).toLocaleString("vi-VN")}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-emerald-700">
+                        <td className={clsx(
+                          "px-4 py-3.5 text-right font-bold tabular-nums font-mono",
+                          row.isOverDelivered ? "text-rose-600 bg-rose-50/50 rounded-lg" : "text-emerald-700"
+                        )}>
                           {row.qtyDelivered.toLocaleString("vi-VN")}
                           {row.deliveriesCount > 0 && (
                             <span className="text-[9.5px] text-slate-400 block font-normal">({row.deliveriesCount} PXK)</span>
                           )}
+                          {row.isOverDelivered && (
+                            <span className="text-[9px] text-rose-700 font-extrabold block bg-rose-100 px-1 rounded mt-0.5 border border-rose-200">
+                              Vượt PO: +{(row.qtyDelivered - row.qtyOrdered).toLocaleString("vi-VN")}
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-bold tabular-nums text-amber-700">
+                        <td className="px-4 py-3.5 text-right font-bold tabular-nums font-mono text-amber-700">
                           {row.remaining.toLocaleString("vi-VN")}
                         </td>
                         <td className="px-4 py-3.5 text-center">
@@ -709,41 +813,42 @@ export default function LogisticsHubView({
                               style={{ width: `${Math.min(100, row.progress)}%` }}
                             />
                           </div>
-                          <span className="text-[10px] font-semibold tabular-nums text-slate-600 mt-1 block">
+                          <span className="text-[10px] font-semibold font-mono tabular-nums text-slate-600 mt-1 block">
                             {row.progress}%
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-center">
-                          {row.status === 'completed' && (
+                          {row.isOverDelivered ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 inline-block shadow-2xs">
+                              🔴 Xuất vượt PO
+                            </span>
+                          ) : row.status === 'completed' ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block shadow-2xs">
                               🟢 Khớp 100%
                             </span>
-                          )}
-                          {row.status === 'in_progress' && (
+                          ) : row.status === 'in_progress' ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 inline-block shadow-2xs">
                               🟡 Giao theo đợt
                             </span>
-                          )}
-                          {row.status === 'planned' && (
+                          ) : row.status === 'planned' ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-teal-50 text-teal-700 border border-teal-200 inline-block shadow-2xs">
                               📅 Đã lên lịch
                             </span>
-                          )}
-                          {row.status === 'pending' && (
+                          ) : (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200 inline-block">
                               ⚪ Chưa lên lịch
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-slate-900">
+                        <td className="px-4 py-3.5 text-right font-semibold font-mono tabular-nums text-slate-900">
                           {row.revenue > 0 ? `${row.revenue.toLocaleString("vi-VN")} đ` : "---"}
                         </td>
-                        <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-rose-700">
+                        <td className="px-4 py-3.5 text-right font-semibold font-mono tabular-nums text-rose-700">
                           {row.profit > 0 ? `${row.profit.toLocaleString("vi-VN")} đ` : "---"}
                         </td>
                       </tr>
-                    ))
-                  )}
+                    );
+                  }))}
                 </tbody>
               </table>
             </div>

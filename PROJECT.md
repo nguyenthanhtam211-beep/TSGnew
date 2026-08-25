@@ -1,57 +1,77 @@
-# Project: TSG Business OS Deep Business Architecture & Data Integrity Audit & Repair
+# Project: TSG Business OS - Enterprise Cockpit UI/UX Redesign
 
 ## Architecture
-TSG Business OS is a unified ERP/Operating System for TSG Group built with React 19, TypeScript, Tailwind CSS, Lucide icons, Vite, and Cloud Firestore with a 3-tier offline/online storage cache.
-- **Master Data Layer**: 13 interconnected entities (`CustomerData`, `SupplierData`, `ContactData`, `ContractsData`, `PricingData`, `ProductData`, `SpecsData`, `POHeaderData`, `POLinesData`, `DeliveryPlanData`, `DeliveryData`, `CommissionData`, `FileStorageData`).
-- **Financial Calculation Engine**: `src/lib/business-logic.ts` — standardized financial formulas (COGS, Revenue, Gross Profit, Margin %, Tax, Multi-tier Pricing AVP/TSG, Vietnamese currency formatting).
-- **Intelligent Document OCR**: `src/lib/gemini.ts` & `api/ocr.ts` — Gemini 2.5/Flash AI document parsing, JSON extraction, table recognition.
-- **Smart Document Naming & Storage**: `src/lib/documentNaming.ts` & `src/lib/driveSync.ts` — diacritics stripping, standard naming pattern `[LOẠI]_[SỐ_CT]_[NGÀY]_[KHÁCH_HÀNG]_[PO].ext`, hierarchical Google Drive storage, 3-tier sync (RAM / Local / Firestore).
-- **5-Step Core Business Workflow**: `src/components/WorkflowView.tsx`, `DeliveryPlanView.tsx`, `DeliveryView.tsx`, `MasterCalendarView.tsx`, `LogisticsHubView.tsx`.
+TSG Business OS is a modern enterprise web application built on React 19 + TypeScript + Vite + Tailwind CSS v4 + Lucide Icons + Recharts + Motion (Framer Motion).
+The system follows a high-density, tactile Enterprise Cockpit aesthetic adhering to `.design_skills/taste-skill` and `.design_skills/impeccable`.
+
+### Core Architectural Pillars
+1. **Design Tokens & CSS System (R1)**:
+   - Neutral ramp: OKLCH / Slate 50-950 with 4 elevation tiers (`surface-canvas`, `surface-card`, `surface-overlay`, `surface-elevated`).
+   - Semantic Vibrant Accents: Electric Blue `#007AFF`, Emerald `#10B981`, Amber `#F59E0B`, Indigo/Patina `#6366F1`, Rose `#EF4444`, Purple `#8B5CF6`.
+   - Dual-face Typography: Roboto Condensed for display headers & metric cards; Inter / Roboto tabular-nums for numeric and financial grids.
+   - Spring Physics: `cubic-bezier(0.16, 1, 0.3, 1)` and Motion spring presets (`cockpitSpring`, `cockpitBouncy`).
+   - Hairline Borders: Sub-pixel `border-slate-200/60 dark:border-slate-800/60` with frosted glass backdrops.
+2. **Shell & Navigation (R2)**:
+   - Desktop Glassmorphism Header: Unified top bar with dynamic breadcrumbs, `Cmd+K` trigger, database status indicator, quick action buttons.
+   - Active Pill Sidebar: Motion `layoutId="active-sidebar-pill"`, crisp numeric badges, collapsible state with tooltips.
+   - Thumb-zone Mobile Bottom Dock: Floating rounded-2xl glass island dock, spring touch feedback, badge indicators.
+   - Viewport & Safe-area: `min-h-[100dvh]` and landscape notch safe-area handling.
+3. **Dashboard & Logistics Hub 360° Bento Grid (R3)**:
+   - Asymmetrical Bento Grid layout for Executive KPIs and 4-phase PO lifecycle pipeline.
+   - 11 Polished Recharts charts with Glassmorphic custom tooltips and gradient fills.
+   - Logistics Hub 360° with 3-way balance reconciliation grid (PO vs Plan vs PXK).
+4. **Data Grid, Mobile Cards & Dialogs (R4)**:
+   - High-density Cockpit Data Grid: Sticky frosted header, alternate subtle rows, column filter popovers, `@dnd-kit` column ordering, 4-box financial summary metrics.
+   - Mobile Apple Inset-Grouped Cards: 4-box financial summary, status chips, SKU tags, tactile spring feedback.
+   - Adaptive Dialogs: macOS-style desktop modal & mobile slide-up bottom sheets with gesture dismiss.
+5. **Subsystems Integrity (R5)**:
+   - Complete end-to-end UI/UX polish across all 10 core subsystems: Dashboard, Purchase Orders (PO), Delivery, Delivery Plan, Pricing, OCR/AI Ingestion, Customer, Supplier, Storage, Contacts, plus ancillary modules (Contracts, Commission, Workflow, Specs).
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Standardize `parseNumber` | Vietnamese dot/comma format parser exported and used consistently | M1 | survey |
-| 2 | Direct Pricing SKU Matching | `findPriceRecord` match `Mã giá bán` / `Mã giá` (`Gsp_XXX`) & `Giao đến` | M1 | survey |
-| 3 | COGS AVP & Supplier Price Lookup | `getBuyPriceFromRecord` fallback to `Giá AVP`, `Giá vốn`, `Giá mua` | M1 | survey |
-| 4 | Safe PODetailModal calculations | Replace unsafe `isNaN(qty || price)` with robust `parseNumber` | M1 | survey |
-| 5 | Clean PO Dataset Keys | Trim leading/trailing whitespace in PO numbers (` 26/KHVT/0547`) | M1 | survey |
-| 6 | Delivery Transient Fields Fix | Prevent stripping `"Status"` column during Firestore document update in `App.tsx` | M1 | survey |
-| 7 | Serverless Custom OCR Prompt | Support `body?.prompt` in `api/ocr.ts` for contract & custom OCR | M2 | survey |
-| 8 | HTML5 Date Input Normalization | Convert OCR `DD/MM/YYYY` to `YYYY-MM-DD` for `<input type="date">` in `WorkflowView.tsx` | M2 | survey |
-| 9 | Drive Upload Metadata Return | Ensure `handleUploadToDrive` returns uploaded file metadata & links to `OCRView.tsx` | M2 | survey |
-| 10 | Firestore Collection Unification | Align `driveSync.ts` with `App.tsx`/`StorageView.tsx` on `'file_storage'` collection | M2 | survey |
-| 11 | Drive Query Quote Escaping | Fix single quote escaping in `driveSync.ts` folder search queries | M2 | survey |
-| 12 | Smart Naming Rules & Prefixes | Add "Thuốc lá Thăng Long" customer code and `'BG'` quotation prefix in `documentNaming.ts` | M2 | survey |
-| 13 | Duplicate PO Intake Protection | Add duplicate PO check with confirmation prompt in `WorkflowView` and `OCRView` | M3 | survey |
-| 14 | Delivery Plan Key Synchronization | Align `Số lượng cần giao`/`Số lượng kế hoạch` & `Ngày dự kiến`/`Ngày giao kế hoạch` | M3 | survey |
-| 15 | Signed Delivery Variance | Support true variance tracking for over-delivery quantities | M3 | survey |
-| 16 | TypeScript & Production Build Verification | Verify `npx tsc --noEmit` and `npm run build` with 0 errors | M4 | survey |
+| 1 | OKLCH/Slate 4-tier surface system | Neutral ramp with canvas, card, overlay, elevated tokens | M1 (R1) | Survey / Impeccable |
+| 2 | Semantic vibrant accent palette | #007AFF, #10B981, #F59E0B, #6366F1, #EF4444, #8B5CF6 | M1 (R1) | Survey / Taste |
+| 3 | Dual-face typography & tabular nums | Roboto Condensed + Inter/Roboto tabular-nums | M1 (R1) | Survey / Taste |
+| 4 | Spring physics & tactile interactions | Micro-interactions, spring curves, button press scale | M1 (R1) | Survey / Taste |
+| 5 | Design Tokens Module | `src/lib/design-tokens.ts` typed constants & presets | M1 (R1) | Survey 1 |
+| 6 | Sub-pixel hairline borders | Elimination of harsh 1px borders in favor of slate-200/60 | M1 (R1) | Survey 1 |
+| 7 | Unified Glassmorphism Desktop Header | Sticky blur header with breadcrumbs, Cmd+K, sync status | M2 (R2) | Survey 2 |
+| 8 | Dynamic Breadcrumbs Component | Hierarchical breadcrumb navigation in header | M2 (R2) | Survey 2 |
+| 9 | Active Pill Sidebar Navigation | Smooth pill background animation via Motion layoutId | M2 (R2) | Survey 2 |
+| 10 | Thumb-Zone Floating Mobile Bottom Dock | Floating glass dock with spring feedback & badges | M2 (R2) | Survey 2 |
+| 11 | Safe Area & 100dvh Viewport Handling | iOS Safari notch & landscape orientation gutters | M2 (R2) | Survey 2 |
+| 12 | Bento Grid Executive Dashboard | Asymmetrical 3-card executive KPI & 4-stage pipeline | M3 (R3) | Survey 3 |
+| 13 | Recharts Glassmorphic Custom Tooltips | Custom styled tooltip component with tabular values | M3 (R3) | Survey 3 |
+| 14 | Logistics Hub 360° 4-Tier Reconciliation | 3-way balance grid (PO vs Plan vs Delivery) | M3 (R3) | Survey 3 |
+| 15 | High-Density Sticky Data Grid | Frosted header, alternate rows, column filters, dnd-kit | M4 (R4) | Survey 3 |
+| 16 | Mobile Apple Inset-Grouped Cards | 4-box financial summary, status chips, SKU tags | M4 (R4) | Survey 3 |
+| 17 | Adaptive Modals & Bottom Sheets | macOS window desktop modal + mobile touch sheet | M4 (R4) | Survey 3 |
+| 18 | Subsystems Rollout & Integrity | Dashboard, PO, Delivery, Delivery Plan, Pricing, OCR, Customer, Supplier, Storage, Contacts | M5 (R5) | Survey 3 |
+| 19 | TypeScript & Build Verification | 0 errors across `npx tsc --noEmit` and `npm run build` | M6 (Verify) | Quality Gate |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | M1: Financial Calculations & Master Data Tables | Fix `business-logic.ts`, `data.ts`, `App.tsx`, `DeliveryPlanView.tsx`, `DeliveryView.tsx`, `MasterCalendarView.tsx`, `PODetailModal.tsx` | none | DONE |
-| 2 | M2: OCR & Google Drive Storage Module | Fix `api/ocr.ts`, `gemini.ts`, `documentNaming.ts`, `driveSync.ts`, `WorkflowView.tsx`, `App.tsx` | none | DONE |
-| 3 | M3: 5-Step E2E Workflow & Hubs | Fix duplicate PO protection, delivery plan key harmonization, delivery status, and UI workflow stability | M1, M2 | DONE |
-| 4 | M4: Final Review, Build & Integrity Verification | Comprehensive testing, Reviewer audit, TypeScript type check, and production build | M1, M2, M3 | DONE |
-
-## Interface Contracts
-### `src/lib/business-logic.ts` ↔ UI Components
-- `parseNumber(val: any): number`: Parses Vietnamese formatted strings (`"718.062.120,00"`, `"1.800"`, `"35.63%"`, numbers, null, undefined) into standard JS numbers.
-- `findPriceRecord(pricingData: any[], sku: string, location?: string, searchTerms?: string): any`: Searches `PRICING_DATA` checking `Mã sản phẩm`, `Mã hàng`, `Mã giá bán`, `Mã giá`, destination `Giao đến`, `Địa điểm giao hàng`.
-- `getBuyPriceFromRecord(record: any): number`: Returns highest priority cost price (`Đơn giá mua`, `Giá nhập`, `Đơn giá mua mới`, `Giá AVP`, `Giá vốn`, `Giá mua`).
-- `getSellPriceFromRecord(record: any): number`: Returns highest priority selling price (`Đơn giá bán mới`, `Đơn giá bán`, `Giá bán`).
-
-### `src/lib/documentNaming.ts` ↔ OCR & Storage
-- `generateSmartDocumentFileName(doc: DocumentNamingInfo): string`: Returns `[LOẠI]_[SỐ_CT]_[NGÀY]_[KHÁCH_HÀNG]_[PO].ext` with clean ASCII without diacritics.
-- Document types supported: `PO`, `PXK`, `HD` (Hóa đơn), `BG` (Báo giá), `BBGH` (Biên bản giao hàng), `PL` (Phụ lục), `HD_NT` (Hợp đồng nguyên tắc).
+| M1 | R1: Design Tokens, Tailwind, index.css, Fonts | Tokens, CSS variables, typography, spring physics, design-tokens.ts | none | DONE |
+| M2 | R2: Navigation, Header, Breadcrumbs, Mobile Dock | Glassmorphic Header, Breadcrumbs, Active Pill Sidebar, Mobile Dock | M1 | DONE |
+| M3 | R3: Dashboard & Logistics Hub 360° Bento Grid | Asymmetrical Bento Grid, Recharts Tooltips, Logistics 360° | M1, M2 | DONE |
+| M4 | R4: Desktop Data Grid, Inset Cards, Modals/Sheets | TableView polish, Mobile cards, Adaptive Modals/Sheets | M1, M2 | PLANNED |
+| M5 | R5: Subsystems Full Rollout & Integrity | 10 core subsystems UI consistency & polish | M1, M2, M3, M4 | PLANNED |
+| M6 | Verification: TypeScript & Build Quality Gate | `npx tsc --noEmit` and `npm run build` 100% clean | M1, M2, M3, M4, M5 | PLANNED |
 
 ## Code Layout
-- `src/lib/business-logic.ts`: Financial calculation engine & data transformation.
-- `src/lib/gemini.ts`: AI OCR service & prompt schemas.
-- `src/lib/documentNaming.ts`: Smart file naming algorithms.
-- `src/lib/driveSync.ts`: Google Drive REST API & 3-tier storage synchronization.
-- `src/data.ts`: Initial dataset fallback schemas for 13 tables.
-- `src/App.tsx`: Global application state, routing, and Firestore update handlers.
-- `src/components/`: Core view components (`WorkflowView.tsx`, `OCRView.tsx`, `DeliveryPlanView.tsx`, `DeliveryView.tsx`, `MasterCalendarView.tsx`, `StorageView.tsx`, `PODetailModal.tsx`, etc.).
+- `src/lib/design-tokens.ts`: Central design tokens, color ramps, Motion presets, chart palettes.
+- `src/index.css`: Tailwind v4 theme, surface elevation variables, hairline borders, spring utility classes.
+- `index.html`: Google Font imports and viewport meta configurations.
+- `src/components/layout/`:
+  - `Header.tsx`: Unified desktop/mobile glassmorphic header.
+  - `Breadcrumbs.tsx`: Reusable dynamic hierarchical breadcrumbs.
+  - `Sidebar.tsx`: Active pill desktop sidebar.
+  - `MobileBottomNav.tsx`: Floating thumb-zone mobile dock.
+- `src/components/dashboard/`:
+  - `BentoExecutiveCards.tsx`, `LogisticsHub360.tsx`, `CustomChartTooltip.tsx`.
+- `src/components/common/`:
+  - `TableView.tsx` (or `CockpitDataGrid.tsx`), `MobileCardList.tsx`, `AdaptiveModal.tsx`, `AdaptiveBottomSheet.tsx`.
+- `src/views/` (Subsystems):
+  - `DashboardView.tsx`, `POListView.tsx`, `DeliveryManagementView.tsx`, `DeliveryPlanView.tsx`, `PricingView.tsx`, `OCRView.tsx`, `CustomerListView.tsx`, `SupplierListView.tsx`, `StorageView.tsx`, `ContactsView.tsx`.

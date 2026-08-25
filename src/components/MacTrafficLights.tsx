@@ -9,6 +9,10 @@ interface MacTrafficLightsProps {
   disabledMinimize?: boolean;
 }
 
+/**
+ * Standard macOS Sequoia Traffic Lights Component
+ * Features tactile spring physics, pixel-perfect HIG colors, and hover glyphs.
+ */
 export default function MacTrafficLights({
   onClose,
   onMinimize,
@@ -19,19 +23,19 @@ export default function MacTrafficLights({
 }: MacTrafficLightsProps) {
   return (
     <div className={`flex items-center gap-2 select-none shrink-0 ${className}`}>
-      {/* Red: Close */}
+      {/* Red: Close (Esc) */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           if (onClose) onClose();
         }}
-        title="Đóng (Esc)"
+        title="Đóng cửa sổ (Esc)"
         aria-label="Đóng"
-        className="group relative w-3.5 h-3.5 rounded-full bg-[#FF5F56] hover:bg-[#FF3B30] active:bg-[#E0443E] border border-[#E0443E]/80 shadow-[0_0.5px_1px_rgba(0,0,0,0.12)] flex items-center justify-center transition-transform cursor-pointer hover:scale-105 active:scale-95"
+        className="group relative w-3.5 h-3.5 rounded-full bg-[#FF5F56] hover:bg-[#FF3B30] active:bg-[#E0443E] border border-[#E0443E]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_0.5px_1.5px_rgba(0,0,0,0.15)] flex items-center justify-center cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90 cockpit-spring-press"
       >
         <svg 
-          className="w-2 h-2 text-[#4D0000] opacity-0 group-hover:opacity-100 transition-opacity stroke-[2.5] stroke-current" 
+          className="w-2 h-2 text-[#4D0000] opacity-0 group-hover:opacity-100 transition-opacity duration-100 stroke-[2.5] stroke-current" 
           viewBox="0 0 24 24" 
           fill="none"
         >
@@ -39,12 +43,12 @@ export default function MacTrafficLights({
         </svg>
       </button>
 
-      {/* Gray / Yellow: Minimize (Disabled/Gray as requested when inactive) */}
+      {/* Yellow / Gray: Minimize (⌘M) */}
       {disabledMinimize || !onMinimize ? (
         <div
           title="Thu nhỏ (Không khả dụng)"
           aria-label="Thu nhỏ không khả dụng"
-          className="w-3.5 h-3.5 rounded-full bg-[#D1D5DB] border border-[#9CA3AF]/50 shadow-[0_0.5px_1px_rgba(0,0,0,0.06)] flex items-center justify-center cursor-default opacity-80"
+          className="w-3.5 h-3.5 rounded-full bg-slate-300 dark:bg-slate-700 border border-slate-400/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0.5px_1px_rgba(0,0,0,0.06)] flex items-center justify-center cursor-default opacity-70"
         />
       ) : (
         <button
@@ -53,12 +57,12 @@ export default function MacTrafficLights({
             e.stopPropagation();
             if (onMinimize) onMinimize();
           }}
-          title="Thu nhỏ"
+          title="Thu nhỏ cửa sổ (⌘M)"
           aria-label="Thu nhỏ"
-          className="group relative w-3.5 h-3.5 rounded-full bg-[#FFBD2E] hover:bg-[#FF9500] active:bg-[#DEA123] border border-[#DEA123]/80 shadow-[0_0.5px_1px_rgba(0,0,0,0.12)] flex items-center justify-center transition-transform cursor-pointer hover:scale-105 active:scale-95"
+          className="group relative w-3.5 h-3.5 rounded-full bg-[#FFBD2E] hover:bg-[#FF9500] active:bg-[#DEA123] border border-[#DEA123]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_0.5px_1.5px_rgba(0,0,0,0.15)] flex items-center justify-center cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90 cockpit-spring-press"
         >
           <svg 
-            className="w-2 h-2 text-[#5C3B00] opacity-0 group-hover:opacity-100 transition-opacity stroke-[2.5] stroke-current" 
+            className="w-2 h-2 text-[#5C3B00] opacity-0 group-hover:opacity-100 transition-opacity duration-100 stroke-[2.5] stroke-current" 
             viewBox="0 0 24 24" 
             fill="none"
           >
@@ -67,7 +71,7 @@ export default function MacTrafficLights({
         </button>
       )}
 
-      {/* Green: Maximize / Restore */}
+      {/* Green: Maximize / Fullscreen (⌘F) */}
       <button
         type="button"
         onClick={(e) => {
@@ -76,10 +80,10 @@ export default function MacTrafficLights({
         }}
         title={isMaximized ? "Thu nhỏ kích thước (⌘F)" : "Phóng to toàn màn hình (⌘F)"}
         aria-label={isMaximized ? "Thu nhỏ kích thước" : "Phóng to toàn màn hình"}
-        className="group relative w-3.5 h-3.5 rounded-full bg-[#27C93F] hover:bg-[#34C759] active:bg-[#1AAB29] border border-[#1AAB29]/80 shadow-[0_0.5px_1px_rgba(0,0,0,0.12)] flex items-center justify-center transition-transform cursor-pointer hover:scale-105 active:scale-95"
+        className="group relative w-3.5 h-3.5 rounded-full bg-[#27C93F] hover:bg-[#34C759] active:bg-[#1AAB29] border border-[#1AAB29]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_0.5px_1.5px_rgba(0,0,0,0.15)] flex items-center justify-center cursor-pointer transition-transform duration-150 ease-out hover:scale-110 active:scale-90 cockpit-spring-press"
       >
         <svg 
-          className="w-2 h-2 text-[#0D4D1A] opacity-0 group-hover:opacity-100 transition-opacity fill-current" 
+          className="w-2 h-2 text-[#0D4D1A] opacity-0 group-hover:opacity-100 transition-opacity duration-100 fill-current" 
           viewBox="0 0 24 24"
         >
           {isMaximized ? (

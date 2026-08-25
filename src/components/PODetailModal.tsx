@@ -33,6 +33,8 @@ import { PricingCombobox } from './PricingCombobox';
 import clsx from 'clsx';
 import MacTrafficLights from './MacTrafficLights';
 import { parseNumber } from '../lib/business-logic';
+import { CustomChartTooltip } from './CustomChartTooltip';
+import { RECHARTS_PALETTE } from '../lib/design-tokens';
 
 interface PODetailModalProps {
   poNumber: string;
@@ -492,29 +494,32 @@ export function PODetailModal({
 
               {/* Bar Chart Section */}
               {chartData.length > 0 && (
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="text-emerald-500" size={18} />
-                      <h3 className="font-bold text-gray-800 text-sm md:text-base">Sản lượng Giao hàng vs Đặt hàng theo từng mặt hàng</h3>
+                      <TrendingUp className="text-emerald-600" size={18} />
+                      <h3 className="font-bold text-slate-800 text-sm md:text-base">Sản lượng Giao hàng vs Đặt hàng theo từng mặt hàng</h3>
                     </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {chartData.length} SKU
+                    </span>
                   </div>
                   <div className="h-64 sm:h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={chartData}
-                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                       >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(226, 232, 240, 0.6)" />
                         <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} stroke="#64748b" />
-                        <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="#64748b" />
+                        <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="#64748b" tickFormatter={(val) => new Intl.NumberFormat('vi-VN').format(val)} />
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                          labelStyle={{ fontWeight: '600', color: '#1e293b' }}
+                          content={<CustomChartTooltip isCurrency={false} unit="sp" />}
+                          cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
                         />
-                        <Legend verticalAlign="top" height={36} iconType="circle" />
-                        <Bar dataKey="Số lượng giao" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                        <Bar dataKey="Số lượng đặt" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="Số lượng giao" name="Đã xuất giao (PXK)" fill={RECHARTS_PALETTE.emerald} radius={[6, 6, 0, 0]} barSize={22} />
+                        <Bar dataKey="Số lượng đặt" name="Tổng đặt (PO)" fill="#94A3B8" radius={[6, 6, 0, 0]} barSize={22} opacity={0.6} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

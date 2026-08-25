@@ -17,6 +17,11 @@ export { default as ContractsView } from "./ContractsView";
 export { default as CommissionView } from "./CommissionView";
 export { default as ProductsView } from "./ProductsView";
 
+// Navigation & Layout Shell (Milestone M2)
+export { default as Breadcrumbs, Breadcrumbs as BreadcrumbNav } from "./Breadcrumbs";
+export { default as Header, Header as AppHeader } from "./Header";
+export { default as MobileBottomNav } from "./MobileBottomNav";
+
 // Modals
 export { DualPODocumentModal } from "./DualPODocumentModal";
 export { default as MemoryStorageModal } from "./MemoryStorageModal";
@@ -33,7 +38,8 @@ export { default as CompanyLogo, TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLog
 export { PriceReconciliationPanel } from "./PriceReconciliationPanel";
 export { default as UnifiedCalendar } from "./UnifiedCalendar";
 export { default as MacTrafficLights } from "./MacTrafficLights";
-
 export { default as HelpGuideModal } from "./HelpGuideModal";
-
 export { default as HelpGuideView } from "./HelpGuideView";
+
+// Charts & Tooltips (Milestone M3)
+export { default as CustomChartTooltip, CustomChartTooltip as ChartTooltip, formatVND, formatCompactVND } from "./CustomChartTooltip";
