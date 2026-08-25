@@ -73,9 +73,9 @@ export default function App() {
   const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<'north' | 'all' | 'south'>(() => {
     if (typeof window !== "undefined") {
-      return (localStorage.getItem("tsg_selected_region") as any) || "north";
+      return (localStorage.getItem("tsg_selected_region") as any) || "all";
     }
-    return "north";
+    return "all";
   });
 
   const handleRegionChange = (reg: 'north' | 'all' | 'south') => {
@@ -92,20 +92,20 @@ export default function App() {
     );
   };
 
+  const normalizeText = (t: string) => {
+    return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+
   const isNorthCust = (name: string) => {
     if (!name) return false;
-    const n = name.toLowerCase();
-    return n.includes("thăng long") || n.includes("thang long") || 
-           n.includes("bắc sơn") || n.includes("bac son") || 
-           n.includes("thanh hoá") || n.includes("thanh hoa");
+    const n = normalizeText(name);
+    return n.includes("thang long") || n.includes("bac son") || n.includes("thanh hoa");
   };
 
   const isSouthCust = (name: string) => {
     if (!name) return false;
-    const n = name.toLowerCase();
-    return n.includes("sài gòn") || n.includes("sai gon") || 
-           n.includes("bến tre") || n.includes("ben tre") || 
-           n.includes("quốc đại") || n.includes("quoc dai");
+    const n = normalizeText(name);
+    return n.includes("sai gon") || n.includes("ben tre") || n.includes("quoc dai");
   };
 
   const matchesRegion = (item: any) => {
