@@ -34,7 +34,7 @@ export type CollectionName =
   | 'activities'
   | 'commissions';
 
-export const TSG_DATASET_VERSION = '2026_08_27_ACC_GOLD_V2';
+export const TSG_DATASET_VERSION = '2026_08_27_ACC_GOLD_V5';
 
 class TSGDataEngine {
   private memoryCache: Map<string, Map<string, any>> = new Map();
@@ -47,14 +47,12 @@ class TSGDataEngine {
         const storedVersion = localStorage.getItem('tsg_system_dataset_version');
         if (storedVersion !== TSG_DATASET_VERSION) {
           // Purge all legacy caches to guarantee zero duplication of accounting figures
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && (k.startsWith('tsg_cache_') || k.startsWith('tsg_user_mod_deliveries'))) {
-              keysToRemove.push(k);
+          const allKeys = Object.keys(localStorage);
+          allKeys.forEach(k => {
+            if (k.startsWith('tsg_cache_') || k.startsWith('tsg_user_mod_deliveries') || k.startsWith('tsg_dataset_')) {
+              localStorage.removeItem(k);
             }
-          }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
+          });
           localStorage.setItem('tsg_system_dataset_version', TSG_DATASET_VERSION);
         }
       } catch (e) {
@@ -84,7 +82,7 @@ class TSGDataEngine {
    * Get Storage Key for a collection
    */
   private getStorageKey(colName: string): string {
-    return `tsg_cache_v4_${colName}`;
+    return `tsg_cache_v5_${colName}`;
   }
 
   /**
