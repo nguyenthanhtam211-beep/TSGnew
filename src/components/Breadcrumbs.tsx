@@ -28,6 +28,7 @@ const TAB_METADATA: Record<string, { label: string; group: string; groupTitle: s
   dashboard: { label: 'Bàn Làm Việc & Báo Cáo', group: 'executive', groupTitle: 'Tổng Quan & Điều Hành', icon: <LayoutDashboard size={13} className="text-blue-500" /> },
   workflow: { label: 'Quy Trình Nghiệp Vụ 5 Bước', group: 'executive', groupTitle: 'Tổng Quan & Điều Hành', icon: <TrendingUp size={13} className="text-indigo-500" /> },
   po: { label: 'Quản Lý Đơn Hàng PO', group: 'logistics', groupTitle: 'Kinh Doanh & Logistics', icon: <FileText size={13} className="text-teal-500" /> },
+  factory: { label: 'Nhà Máy & Sản Xuất LGT', group: 'logistics', groupTitle: 'Kinh Doanh & Logistics', icon: <Package size={13} className="text-amber-500" /> },
   polines: { label: 'Chi Tiết Đơn Hàng PO', group: 'logistics', groupTitle: 'Kinh Doanh & Logistics', icon: <FileText size={13} className="text-teal-500" /> },
   logistics: { label: 'Kế Hoạch & Giao Hàng 360°', group: 'logistics', groupTitle: 'Kinh Doanh & Logistics', icon: <Truck size={13} className="text-orange-500" /> },
   delivery_plan: { label: 'Kế Hoạch Giao Hàng', group: 'logistics', groupTitle: 'Kinh Doanh & Logistics', icon: <Truck size={13} className="text-orange-500" /> },

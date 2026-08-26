@@ -187,15 +187,61 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Center / Right Section: Cmd+K Search, DB Pulse, AI Sparkle, Actions, Avatar */}
+        {/* Center / Right Section: Region Switcher, Cmd+K Search, DB Pulse, AI Sparkle, Actions, Avatar */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Regional Switcher Pill */}
+          <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => onRegionChange && onRegionChange('north')}
+              className={clsx(
+                "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1",
+                selectedRegion === 'north'
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+              title="Lọc 3 khách hàng Miền Bắc (Thăng Long, Bắc Sơn, Thanh Hóa)"
+            >
+              <span>🌟 Miền Bắc</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRegionChange && onRegionChange('south')}
+              className={clsx(
+                "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1",
+                selectedRegion === 'south'
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+              title="Lọc khách hàng Miền Nam (Bến Tre, Sài Gòn)"
+            >
+              <span>Miền Nam</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRegionChange && onRegionChange('all')}
+              className={clsx(
+                "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1",
+                selectedRegion === 'all'
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+              title="Toàn bộ công ty (Dành cho Kế toán)"
+            >
+              <span className="hidden sm:inline">Toàn công ty</span>
+              <span className="sm:hidden">Tất cả</span>
+            </button>
+          </div>
+
           {/* Quick Search Cmd+K Trigger Pill */}
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
             transition={SPRING_PRESETS.cockpitSpring}
             onClick={() => setIsSearchPaletteOpen(true)}
-            className="hidden md:flex items-center gap-2.5 px-3 py-1.5 bg-slate-100/90 hover:bg-slate-200/80 dark:bg-slate-800/70 dark:hover:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/60 rounded-xl text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition shadow-2xs group cursor-pointer"
+            className="hidden xl:flex items-center gap-2.5 px-3 py-1.5 bg-slate-100/90 hover:bg-slate-200/80 dark:bg-slate-800/70 dark:hover:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/60 rounded-xl text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition shadow-2xs group cursor-pointer"
             title="Tìm kiếm nhanh toàn hệ thống (⌘K)"
           >
             <Search size={13} className="text-slate-400 group-hover:text-blue-500 transition-colors" />

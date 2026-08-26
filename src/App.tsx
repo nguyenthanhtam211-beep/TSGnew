@@ -3,7 +3,7 @@ import HelpGuideModal from "./components/HelpGuideModal";
 import HelpGuideView from "./components/HelpGuideView";
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2 } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2, Factory } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -28,7 +28,7 @@ import {
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, LogisticsHubView, MemoryStorageModal, 
   StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights,
-  Header, Breadcrumbs, MobileBottomNav
+  Header, Breadcrumbs, MobileBottomNav, FactoryManagementView
 } from "./components";
 import { exportGenericTableToPDF } from './lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
@@ -608,9 +608,10 @@ export default function App() {
     {
       id: "logistics",
       title: "Kinh Doanh & Logistics",
-      badge: "2",
+      badge: "3",
       items: [
         { id: "po", label: "Quản Lý Đơn Hàng PO", icon: <FileText size={15} />, iconBg: "bg-teal-500", badge: poHeaderData.length },
+        { id: "factory", label: "Nhà Máy & Sản Xuất LGT", icon: <Factory size={15} />, iconBg: "bg-amber-500", badge: "Mới" },
         { id: "logistics", label: "Kế Hoạch & Giao Hàng 360°", icon: <Truck size={15} />, iconBg: "bg-orange-500", badge: deliveryData.length },
       ]
     },
@@ -651,6 +652,7 @@ export default function App() {
     customers: "Quản Lý Khách Hàng",
     pricing: "Bảng Giá 2026",
     po: "Đơn Hàng (PO)",
+    factory: "Nhà Máy & Sản Xuất LGT",
     polines: "Chi Tiết Đơn Hàng",
     delivery_plan: "Kế Hoạch Giao",
     delivery: "Giao Hàng (PXK)",
@@ -1055,6 +1057,12 @@ export default function App() {
             customers={customerData}
             poLines={poLinesData}
            
+          />
+        )}
+        {activeTab === "factory" && (
+          <FactoryManagementView 
+            selectedRegion={selectedRegion}
+            onNavigateTab={(tab) => setActiveTab(tab)}
           />
         )}
         {activeTab === "polines" && (
