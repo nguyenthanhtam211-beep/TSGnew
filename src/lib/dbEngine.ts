@@ -64,7 +64,7 @@ class TSGDataEngine {
    * Get Storage Key for a collection
    */
   private getStorageKey(colName: string): string {
-    return `tsg_cache_${colName}`;
+    return `tsg_cache_v3_${colName}`;
   }
 
   /**

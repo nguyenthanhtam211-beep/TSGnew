@@ -110,11 +110,15 @@ export default function App() {
 
   const matchesRegion = (item: any) => {
     if (selectedRegion === "all") return true;
+    const regionField = String(item["Vùng miền"] || item.region || "").toLowerCase();
     const cust = String(item["Khách hàng"] || item["RP_Khách hàng"] || item["Tên khách hàng"] || item["Công ty"] || item.customer || item.partnerName || "");
+    
     if (selectedRegion === "north") {
-      return isNorthCust(cust) || (!cust && !isSouthCust(cust));
+      if (regionField.includes("bắc") || regionField.includes("north") || regionField.includes("bac")) return true;
+      return isNorthCust(cust);
     }
     if (selectedRegion === "south") {
+      if (regionField.includes("nam") || regionField.includes("south")) return true;
       return isSouthCust(cust);
     }
     return true;

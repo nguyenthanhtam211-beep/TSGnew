@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { Package, Truck, FileText, CheckCircle, Clock, AlertTriangle, ArrowUpRight, TrendingUp, DollarSign, ShieldAlert, BarChart3, Activity, Filter, PieChart as PieChartIcon, ShoppingCart, Users, Briefcase, Star, TrendingDown, Download, RefreshCw, Printer, Sparkles, Presentation, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Package, Truck, FileText, CheckCircle, Clock, AlertTriangle, ArrowUpRight, TrendingUp, DollarSign, ShieldAlert, BarChart3, Activity, Filter, PieChart as PieChartIcon, ShoppingCart, Users, Briefcase, Star, TrendingDown, Download, RefreshCw, Printer, Sparkles, Presentation, FileSpreadsheet, ChevronDown, Factory } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart, Area, AreaChart } from 'recharts';
 import { parseNumber } from '../lib/business-logic';
 import * as XLSX from 'xlsx';
@@ -624,18 +624,20 @@ export default function DashboardView({
 
   const categoryStats = useMemo(() => categoryStatsAll, [categoryStatsAll]);
 
-  // --- STATS BY SUPPLIER (ALL & TOP) ---
+  // --- STATS BY SUPPLY SOURCE (TỰ SẢN XUẤT TÂM SEN & NCC NGOÀI) ---
   const supplierStatsAll = useMemo(() => {
-    const map = new Map<string, {name: string, revenue: number, profit: number, volume: number, incidents: number}>();
+    const map = new Map<string, {name: string, rawName: string, revenue: number, profit: number, volume: number, incidents: number, isSelfManufactured: boolean}>();
     filteredDelivery.forEach(d => {
-       const supplier = d["Nhà cung cấp"] || "Khác";
+       const supplierRaw = d["Nhà cung cấp"] || "Khác";
+       const isTS = supplierRaw.toLowerCase().includes("tâm sen") || supplierRaw.toLowerCase().includes("tam sen") || supplierRaw.toLowerCase() === "tsg";
+       const displayName = isTS ? "Tâm Sen (Tự SX)" : (supplierRaw === "Khác" ? "Khác" : `${supplierRaw} (NCC)`);
        const rev = parseNumber(d["Doanh thu"]);
        const prof = parseNumber(d["Lợi nhuận gộp"] || d["Lợi nhuận dòng"]);
        const vol = parseNumber(d["Số lượng giao"]);
        const hasIncident = d["Sự cố"] === "1" || d["Sự cố"] === 1 || (d["Chi tiết sự cố"] && String(d["Chi tiết sự cố"]).trim() !== "" && String(d["Chi tiết sự cố"]).trim() !== "0");
        
-       if (!map.has(supplier)) map.set(supplier, { name: supplier, revenue: 0, profit: 0, volume: 0, incidents: 0 });
-       const item = map.get(supplier)!;
+       if (!map.has(displayName)) map.set(displayName, { name: displayName, rawName: supplierRaw, revenue: 0, profit: 0, volume: 0, incidents: 0, isSelfManufactured: isTS });
+       const item = map.get(displayName)!;
        item.revenue += rev;
        item.profit += prof;
        item.volume += vol;
@@ -971,10 +973,19 @@ export default function DashboardView({
   const supplierInsight = useMemo(() => {
     if (!supplierStats || supplierStats.length === 0) return "Chưa có đủ dữ liệu.";
     const topSup = supplierStats[0];
+    const isTS = topSup.isSelfManufactured || topSup.name.toLowerCase().includes("tâm sen");
+    
+    if (isTS) {
+      const share = totalRevenue > 0 ? ((topSup.revenue / totalRevenue) * 100).toFixed(1) : '0';
+      return (
+        <>Hàng tự sản xuất tại <strong>Nhà máy Tâm Sen (Nội bộ)</strong> chiếm tỷ trọng lớn nhất với <strong>{formatter.format(topSup.revenue)}</strong> ({share}% doanh số). Cần tập trung tối ưu công suất cắt cuộn, duy trì định mức hao hụt NVL giấy mẹ.</>
+      );
+    }
+    
     return (
-      <>Nhà cung cấp <strong>{topSup.name}</strong> đang chiếm tỷ trọng mua hàng lớn nhất. Cần thương lượng lại chính sách giá hoặc điều khoản thanh toán để cải thiện dòng tiền.</>
+      <>Nhà cung cấp đối tác <strong>{topSup.name}</strong> đang chiếm tỷ trọng cung ứng lớn nhất ({formatter.format(topSup.revenue)}). Cần theo dõi tiến độ giao hàng và kiểm soát chặt chẽ giá vốn đầu vào.</>
     );
-  }, [supplierStats]);
+  }, [supplierStats, totalRevenue]);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -1321,7 +1332,7 @@ export default function DashboardView({
                {numFormatter.format(totalOrders)} <span className="text-base font-semibold text-slate-500">đơn</span>
              </p>
              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 relative z-10">
-                <span>Hệ thống PO Tâm Sen & AVP</span>
+                <span>Nhà máy Tâm Sen & Đối tác</span>
              </div>
           </div>
 
@@ -1832,11 +1843,11 @@ export default function DashboardView({
              <InsightBox content={customerInsight} />
            </div>
 
-           {/* Chart 8: Top Suppliers */}
+           {/* Chart 8: Top Suppliers / Sources */}
            <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden print:break-inside-avoid">
              <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm sm:text-base font-display">
-                  <Briefcase size={18} className="text-indigo-600 shrink-0" /> 8. Top Nhà cung cấp (Giá vốn & Mua hàng)
+                  <Factory size={18} className="text-indigo-600 shrink-0" /> 8. Cơ Cấu Nguồn Hàng (Tự Sản Xuất & NCC Đối Tác)
                 </h3>
              </div>
              <div className="h-[280px] sm:h-[350px] w-full min-w-0">

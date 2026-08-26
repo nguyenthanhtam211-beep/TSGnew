@@ -315,10 +315,33 @@ export const calculateDeliveryFinances = (
   pricingData: any[], 
   poLinesData: any[]
 ) => {
+  const explicitRev = parseNumber(delivery["Doanh thu"] || delivery["Thành tiền"]);
+  const explicitProf = parseNumber(delivery["Lợi nhuận gộp"] || delivery["Lợi nhuận dòng"]);
+  const explicitSell = parseNumber(delivery["Đơn giá bán"] || delivery["Đơn giá"]);
+  const explicitBuy = parseNumber(delivery["Đơn giá nhập"] || delivery["Đơn giá mua"] || delivery["Đơn giá COGS"]);
+  const qty = parseNumber(delivery["Số lượng giao"] ?? delivery["Số lượng"]);
+
+  // If explicit revenue is already recorded (e.g. from invoices / actual sales ledger), prioritize it!
+  if (explicitRev > 0) {
+    const sellPrice = explicitSell > 0 ? explicitSell : (qty > 0 ? explicitRev / qty : 0);
+    const buyPrice = explicitBuy > 0 ? explicitBuy : (qty > 0 && explicitProf > 0 ? Math.max(0, explicitRev - explicitProf) / qty : 0);
+    const profit = explicitProf > 0 ? explicitProf : Math.max(0, explicitRev - (buyPrice * qty));
+    const margin = explicitRev > 0 ? (profit / explicitRev) * 100 : 0;
+
+    return {
+      sellPrice: isNaN(sellPrice) ? 0 : sellPrice,
+      buyPrice: isNaN(buyPrice) ? 0 : buyPrice,
+      revenue: explicitRev,
+      profit: isNaN(profit) ? 0 : profit,
+      margin: isNaN(margin) ? 0 : margin,
+      priceCode: delivery["Mã giá bán"] || delivery["Mã giá"] || delivery["Mã sản phẩm"] || "N/A",
+      isDiscrepancy: false
+    };
+  }
+
   const sku = delivery["Mã sản phẩm"] || delivery["Mã hàng"] || delivery["Mã giá"] || delivery["Mã giá bán"] || delivery["Tên sản phẩm"];
   const customer = delivery["Khách hàng"] || delivery["Tên khách hàng"];
   const location = delivery["Địa điểm giao hàng"] || delivery["Địa chỉ giao hàng"] || delivery["Giao đến"];
-  const qty = parseNumber(delivery["Số lượng giao"] ?? delivery["Số lượng"]);
 
   // Lookup source prices
   const priceRecord = findPriceRecord(pricingData, { sku, name: delivery["Tên sản phẩm"], customer, location });
@@ -346,24 +369,12 @@ export const calculateDeliveryFinances = (
   if (sellPrice <= 0 && poLine && parseNumber(poLine['Thành tiền dòng'] || poLine['Thành tiền']) > 0 && parseNumber(poLine['Số lượng']) > 0) {
     sellPrice = parseNumber(poLine['Thành tiền dòng'] || poLine['Thành tiền']) / parseNumber(poLine['Số lượng']);
   }
-  if (sellPrice <= 0 && qty > 0) {
-    const delRevenue = parseNumber(delivery['Doanh thu'] || delivery['Thành tiền']);
-    if (delRevenue > 0) {
-      sellPrice = delRevenue / qty;
-    }
-  }
 
   let buyPrice = priceRecBuy > 0 ? priceRecBuy : 
                  (poLine && parseNumber(poLine['Đơn giá nhập'] || poLine['Đơn giá mua']) > 0 ? parseNumber(poLine['Đơn giá nhập'] || poLine['Đơn giá mua']) : parseNumber(delivery['Đơn giá nhập'] || delivery['Đơn giá mua'] || delivery['Giá vốn']));
 
   if (buyPrice <= 0 && poLine && parseNumber(poLine['Thành tiền mua'] || poLine['Giá trị vốn']) > 0 && parseNumber(poLine['Số lượng']) > 0) {
     buyPrice = parseNumber(poLine['Thành tiền mua'] || poLine['Giá trị vốn']) / parseNumber(poLine['Số lượng']);
-  }
-  if (buyPrice <= 0 && qty > 0) {
-    const delCost = parseNumber(delivery['Giá trị vốn'] || delivery['Thành tiền mua'] || delivery['Giá vốn']);
-    if (delCost > 0) {
-      buyPrice = delCost / qty;
-    }
   }
 
   const revenue = sellPrice * qty;
@@ -377,7 +388,7 @@ export const calculateDeliveryFinances = (
     profit: isNaN(profit) ? 0 : profit,
     margin: isNaN(margin) ? 0 : margin,
     priceCode: priceRecord ? (priceRecord['Mã giá bán'] || priceRecord['Mã giá'] || priceRecord['Mã sản phẩm']) : (poLine?.['Mã giá bán'] || 'N/A'),
-    isDiscrepancy: parseNumber(delivery["Doanh thu"]) !== revenue || parseNumber(delivery["Lợi nhuận gộp"]) !== profit
+    isDiscrepancy: false
   };
 };
 
