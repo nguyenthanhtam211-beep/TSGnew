@@ -34,7 +34,7 @@ export type CollectionName =
   | 'activities'
   | 'commissions';
 
-export const TSG_DATASET_VERSION = '2026_08_27_ACC_GOLD_V5';
+export const TSG_DATASET_VERSION = '2026_08_27_ACC_GOLD_V6';
 
 class TSGDataEngine {
   private memoryCache: Map<string, Map<string, any>> = new Map();

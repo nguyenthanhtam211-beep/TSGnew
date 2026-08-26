@@ -212,14 +212,14 @@ export default function App() {
   useEffect(() => {
     try {
       const currentVersion = localStorage.getItem('tsg_system_dataset_version');
-      if (currentVersion !== '2026_08_27_ACC_GOLD_V5') {
+      if (currentVersion !== '2026_08_27_ACC_GOLD_V6') {
         const allKeys = Object.keys(localStorage);
         allKeys.forEach(k => {
           if (k.startsWith('tsg_cache_') || k.startsWith('tsg_user_mod_deliveries') || k.startsWith('tsg_dataset_')) {
             localStorage.removeItem(k);
           }
         });
-        localStorage.setItem('tsg_system_dataset_version', '2026_08_27_ACC_GOLD_V5');
+        localStorage.setItem('tsg_system_dataset_version', '2026_08_27_ACC_GOLD_V6');
       }
     } catch (e) {
       // ignore
