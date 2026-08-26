@@ -34,17 +34,37 @@ export type CollectionName =
   | 'activities'
   | 'commissions';
 
+export const TSG_DATASET_VERSION = '2026_08_27_ACC_GOLD_V2';
+
 class TSGDataEngine {
   private memoryCache: Map<string, Map<string, any>> = new Map();
   private fallbackStore: Map<string, any[]> = new Map();
   private listeners: Map<string, Set<(data: any[]) => void>> = new Map();
 
   constructor() {
-    // Listen for storage events across browser tabs
     if (typeof window !== 'undefined') {
+      try {
+        const storedVersion = localStorage.getItem('tsg_system_dataset_version');
+        if (storedVersion !== TSG_DATASET_VERSION) {
+          // Purge all legacy caches to guarantee zero duplication of accounting figures
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('tsg_cache_') || k.startsWith('tsg_user_mod_deliveries'))) {
+              keysToRemove.push(k);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+          localStorage.setItem('tsg_system_dataset_version', TSG_DATASET_VERSION);
+        }
+      } catch (e) {
+        console.warn('Dataset version check error:', e);
+      }
+
+      // Listen for storage events across browser tabs
       window.addEventListener('storage', (e) => {
         if (e.key && e.key.startsWith('tsg_cache_')) {
-          const colName = e.key.replace('tsg_cache_', '');
+          const colName = e.key.replace(/tsg_cache_.*_/, '');
           this.notifySubscribers(colName as CollectionName);
         }
       });
@@ -64,7 +84,7 @@ class TSGDataEngine {
    * Get Storage Key for a collection
    */
   private getStorageKey(colName: string): string {
-    return `tsg_cache_v3_${colName}`;
+    return `tsg_cache_v4_${colName}`;
   }
 
   /**
@@ -132,16 +152,17 @@ class TSGDataEngine {
         });
       }
 
-      // 2. Load cached persistent data
+      // 2. Load cached persistent data (Only allow records that match fallback keys or are explicit user modifications)
       try {
         const cached = localStorage.getItem(this.getStorageKey(colName));
         if (cached) {
           const parsed = JSON.parse(cached);
+          const userMods = this.getUserModifiedMap(colName);
           if (Array.isArray(parsed) && parsed.length > 0) {
             parsed.forEach(item => {
               if (item && typeof item === 'object') {
                 const key = getItemKey(item, colName);
-                if (key) {
+                if (key && (colMap.has(key) || userMods.has(key))) {
                   if (item.isDeleted === true) {
                     colMap.delete(key);
                   } else {
@@ -190,9 +211,6 @@ class TSGDataEngine {
   }
 
   /**
-   * Get all items of a collection
-   */
-  /**
    * Merge remote Firestore snapshot into local memory and cache
    * Preserves local user-modifications if they haven't been synced yet
    */
@@ -209,9 +227,12 @@ class TSGDataEngine {
           if (key) {
             const sanitizedKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
             
-            // If the user has a local uncommitted modification, keep user mod; otherwise update from cloud
-            if (!userMods.has(sanitizedKey)) {
-              colMap.set(sanitizedKey, { ...(colMap.get(sanitizedKey) || {}), ...doc });
+            // Only update if key exists in master collection or is an explicit user mod
+            if (colMap.has(sanitizedKey) || colMap.has(key) || userMods.has(sanitizedKey)) {
+              if (!userMods.has(sanitizedKey)) {
+                const targetKey = colMap.has(sanitizedKey) ? sanitizedKey : key;
+                colMap.set(targetKey, { ...(colMap.get(targetKey) || {}), ...doc });
+              }
             }
           }
         }

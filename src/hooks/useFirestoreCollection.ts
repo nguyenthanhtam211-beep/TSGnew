@@ -21,18 +21,8 @@ export function getItemKey(item: any, collectionName?: string): string {
     const stt = item["STT"] || item["Chi tiết đơn hàng"] || '';
     rawKey = stt ? `${parent}_${stt}` : parent;
   } else if (collectionName === 'deliveries') {
-    const pxk = item["Số PXK"] || '';
-    const stt = item["STT"] || item["id"] || '';
-    const lineId = item["Chi tiết đơn hàng"] || '';
-    if (pxk && stt) {
-      rawKey = `${pxk}_${stt}`;
-    } else if (stt) {
-      rawKey = String(stt);
-    } else if (pxk && lineId) {
-      rawKey = `${pxk}_${lineId}`;
-    } else {
-      rawKey = pxk || lineId || (item.id ? String(item.id) : '');
-    }
+    const lineId = item["Chi tiết đơn hàng"] || item["id"] || item["STT"] || '';
+    rawKey = String(lineId);
   } else if (item["STT"] && (item["Đơn hàng"] || item["Số đơn hàng"] || item["Số PXK"])) {
     const parentId = item["Số PXK"] || item["Đơn hàng"] || item["Số đơn hàng"];
     const sku = item["Mã hàng"] || item["Tên sản phẩm"] || "";
