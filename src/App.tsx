@@ -1443,6 +1443,9 @@ function TableView({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const isPOHeaderTable = useMemo(() => title.includes("Đơn hàng (PO_Header)"), [title]);
   const isPOLineTable = useMemo(() => title.includes("Chi tiết đơn (PO_Lines)") || title.includes("Báo cáo Lợi nhuận"), [title]);
@@ -2256,7 +2259,11 @@ function TableView({
 
           {showAddButton && (
             <button 
-              onClick={() => setIsModalOpen(true)} 
+              onClick={() => {
+                setUploadedFile(null);
+                setFormData({});
+                setIsModalOpen(true);
+              }} 
               className="flex items-center gap-1.5 bg-[#007AFF] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] active:bg-[#0051A8] transition-all shadow-xs"
             >
               <PlusCircle size={15} />
@@ -2405,6 +2412,7 @@ function TableView({
                   <tr 
                     key={rowId} 
                     onClick={() => {
+                      setUploadedFile(null);
                       setEditingRow(row);
                       setFormData({ ...row });
                       setIsEditModalOpen(true);
@@ -2895,22 +2903,107 @@ function TableView({
                     );
                   }
 
-                  if (h === 'Tệp đơn hàng') {
+                  if (h === 'Tệp đơn hàng' || h === 'Tệp đính kèm' || h === 'File') {
+                    const currentVal = formData[h] || '';
                     return (
-                      <div key={h} className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium text-gray-700">{h}</label>
-                        <div className="relative group">
-                          <input 
-                            type="text" 
-                            placeholder="Tên tệp đính kèm..."
-                            className="border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all w-full"
-                            value={formData[h] || ''}
-                            onChange={(e) => handleTextChange(e, h)}
-                          />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-                             <Upload size={16} />
+                      <div key={h} className="flex flex-col gap-1.5 col-span-1 sm:col-span-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center justify-between">
+                          <span>{h}</span>
+                          {uploadedFile && (
+                            <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle size={13} /> Sẵn sàng đính kèm
+                            </span>
+                          )}
+                        </label>
+                        
+                        <input
+                          type="file"
+                          ref={addFileInputRef}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setUploadedFile(file);
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                [h]: file.name
+                              }));
+                              toast.success(`Đã chọn tệp: ${file.name}`);
+                            }
+                          }}
+                        />
+
+                        {uploadedFile || currentVal ? (
+                          <div className="flex items-center justify-between p-3 bg-blue-50/80 border border-blue-200 rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <FileText size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-blue-950 truncate" title={uploadedFile ? uploadedFile.name : currentVal}>
+                                  {uploadedFile ? uploadedFile.name : currentVal}
+                                </p>
+                                <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                  {uploadedFile ? `${(uploadedFile.size / 1024).toFixed(1)} KB • Tệp tải lên` : 'Tệp chứng từ đính kèm'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => addFileInputRef.current?.click()}
+                                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                              >
+                                <Upload size={13} />
+                                Đổi tệp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadedFile(null);
+                                  setFormData((prev: any) => ({ ...prev, [h]: '' }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Xóa tệp"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div
+                            onClick={() => addFileInputRef.current?.click()}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                const file = e.dataTransfer.files[0];
+                                setUploadedFile(file);
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  [h]: file.name
+                                }));
+                                toast.success(`Đã chọn tệp: ${file.name}`);
+                              }
+                            }}
+                            className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50/70 hover:bg-blue-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:border-blue-300 transition-all">
+                              <Upload size={18} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700">
+                                Nhấp để chọn tệp hoặc kéo thả vào đây
+                              </p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">
+                                Hỗ trợ PDF, Word (.docx), Excel (.xlsx), Hình ảnh scan (.png, .jpg)
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -3203,6 +3296,111 @@ function TableView({
                           className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm cursor-not-allowed"
                           value={formData[h] || ""}
                         />
+                      </div>
+                    );
+                  }
+
+                  if (h === 'Tệp đơn hàng' || h === 'Tệp đính kèm' || h === 'File') {
+                    const currentVal = formData[h] || '';
+                    return (
+                      <div key={h} className="space-y-1.5 col-span-1 sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center justify-between">
+                          <span>{h}</span>
+                          {uploadedFile && (
+                            <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle size={13} /> Sẵn sàng đính kèm
+                            </span>
+                          )}
+                        </label>
+                        
+                        <input
+                          type="file"
+                          ref={editFileInputRef}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setUploadedFile(file);
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                [h]: file.name
+                              }));
+                              toast.success(`Đã chọn tệp: ${file.name}`);
+                            }
+                          }}
+                        />
+
+                        {uploadedFile || currentVal ? (
+                          <div className="flex items-center justify-between p-3 bg-blue-50/80 border border-blue-200 rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <FileText size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-blue-950 truncate" title={uploadedFile ? uploadedFile.name : currentVal}>
+                                  {uploadedFile ? uploadedFile.name : currentVal}
+                                </p>
+                                <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                  {uploadedFile ? `${(uploadedFile.size / 1024).toFixed(1)} KB • Tệp tải lên` : 'Tệp chứng từ đính kèm'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => editFileInputRef.current?.click()}
+                                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                              >
+                                <Upload size={13} />
+                                Đổi tệp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadedFile(null);
+                                  setFormData((prev: any) => ({ ...prev, [h]: '' }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Xóa tệp"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => editFileInputRef.current?.click()}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                const file = e.dataTransfer.files[0];
+                                setUploadedFile(file);
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  [h]: file.name
+                                }));
+                                toast.success(`Đã chọn tệp: ${file.name}`);
+                              }
+                            }}
+                            className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50/70 hover:bg-blue-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:border-blue-300 transition-all">
+                              <Upload size={18} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700">
+                                Nhấp để chọn tệp hoặc kéo thả vào đây
+                              </p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">
+                                Hỗ trợ PDF, Word (.docx), Excel (.xlsx), Hình ảnh scan (.png, .jpg)
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
