@@ -637,11 +637,12 @@ export default function App() {
     {
       id: "commercial",
       title: "Thương Mại & Danh Mục",
-      badge: "3",
+      badge: "4",
       items: [
         { id: "customers", label: "Khách Hàng & Đối Tác", icon: <Users size={15} />, iconBg: "bg-sky-500", badge: customerData.length },
-        { id: "pricing", label: "Bảng Giá, Hợp Đồng & Hoa Hồng", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
-        { id: "products", label: "Sản Phẩm & Tiêu Chuẩn Specs", icon: <Package size={15} />, iconBg: "bg-purple-500", badge: productData.length },
+        { id: "pricing", label: "Bảng Giá & Hợp Đồng", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
+        { id: "commissions", label: "Quản Lý Hoa Hồng (3 Cách)", icon: <Percent size={15} />, iconBg: "bg-purple-600", badge: commissionData.length || "Mới" },
+        { id: "products", label: "Sản Phẩm & Tiêu Chuẩn Specs", icon: <Package size={15} />, iconBg: "bg-indigo-500", badge: productData.length },
       ]
     },
     {
@@ -663,13 +664,15 @@ export default function App() {
         { id: "settings", label: "Cài Đặt Hệ Thống", icon: <Settings size={15} />, iconBg: "bg-slate-600" }
       ]
     }
-  ], [poHeaderData.length, deliveryData.length, customerData.length, pricingData.length, productData.length, fileStorageData.length]);
+  ], [poHeaderData.length, deliveryData.length, customerData.length, pricingData.length, commissionData.length, productData.length, fileStorageData.length]);
 
   const TAB_TITLES: Record<string, string> = {
     dashboard: "Bảng Điều Hành",
     workflow: "Quy Trình Nghiệp Vụ",
     customers: "Quản Lý Khách Hàng",
     pricing: "Bảng Giá 2026",
+    commissions: "Quản Lý Hoa Hồng (3 Phương Thức)",
+    contracts: "Hợp Đồng Mua / Bán",
     po: "Đơn Hàng (PO)",
     factory: "Nhà Máy & Sản Xuất LGT",
     polines: "Chi Tiết Đơn Hàng",
@@ -1409,7 +1412,7 @@ function TableView({
   onProductClick, 
   onPoClick,
   customers = [],
-  categories = ["Nội địa", "Xuất khẩu", "Gia công", "FOC", "Khác"],
+  categories = ["Xuất khẩu", "Nội địa", "Đặt hàng mẫu", "Đơn hàng bù"],
   poLines = [],
   pricingData = [],
   specsData = [],
@@ -2261,7 +2264,12 @@ function TableView({
             <button 
               onClick={() => {
                 setUploadedFile(null);
-                setFormData({});
+                setFormData({
+                  'Phân loại': categories[0] || 'Xuất khẩu',
+                  'Khách hàng': customerList[0] || 'Thăng Long',
+                  'Trạng Thái': 'Mới',
+                  'Tổng giá trị đơn hàng': 0
+                });
                 setIsModalOpen(true);
               }} 
               className="flex items-center gap-1.5 bg-[#007AFF] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] active:bg-[#0051A8] transition-all shadow-xs"
