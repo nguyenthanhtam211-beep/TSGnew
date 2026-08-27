@@ -21,8 +21,8 @@ export function getItemKey(item: any, collectionName?: string): string {
     const stt = item["STT"] || item["Chi tiết đơn hàng"] || '';
     rawKey = stt ? `${parent}_${stt}` : parent;
   } else if (collectionName === 'deliveries') {
-    const lineId = item["Chi tiết đơn hàng"] || item["id"] || item["STT"] || '';
-    rawKey = String(lineId);
+    const rawDeliveryId = item.id || (item["STT"] !== undefined && item["STT"] !== '' ? `DEL_${item["STT"]}` : (item["Số PXK"] ? `${item["Số PXK"]}_${item["Mã sản phẩm"] || item["Tên sản phẩm"]}` : ''));
+    rawKey = String(rawDeliveryId);
   } else if (item["STT"] && (item["Đơn hàng"] || item["Số đơn hàng"] || item["Số PXK"])) {
     const parentId = item["Số PXK"] || item["Đơn hàng"] || item["Số đơn hàng"];
     const sku = item["Mã hàng"] || item["Tên sản phẩm"] || "";
