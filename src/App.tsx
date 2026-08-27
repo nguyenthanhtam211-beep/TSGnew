@@ -1067,7 +1067,23 @@ export default function App() {
             onNavigateToSupplier={handleNavigateToSupplier}
           />
         )}
-        {activeTab === "pricing" && <TableView pricingData={pricingData} contractsData={contractsData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026 (Đối chiếu từ Hợp đồng)" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
+        {activeTab === "pricing" && (
+          <TableView 
+            pricingData={pricingData} 
+            contractsData={contractsData} 
+            products={productData} 
+            suppliers={supplierData} 
+            poHeaders={poHeaderData} 
+            title="Bảng giá 2026 (Phân loại theo Khách hàng & Nhóm hàng)" 
+            data={pricingData} 
+            onEdit={(row) => handleUpdateToFirestore("pricing", row)} 
+            onDelete={(row) => handleDeleteFromFirestore("pricing", row)} 
+            onProductClick={(val) => setSelectedProductDetails(val)} 
+            onPoClick={(val) => setSelectedPoDetails(val)} 
+            specsData={specsData} 
+            onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        )}
         {activeTab === "po" && (
           <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
             title="Đơn hàng (PO_Header)" 
@@ -1419,7 +1435,8 @@ function TableView({
   poHeaders = [],
   suppliers = [],
   products = [],
-  contractsData = []
+  contractsData = [],
+  onNavigateTab
 }: { 
   title: string, 
   data: any[], 
@@ -1437,7 +1454,8 @@ function TableView({
   poHeaders?: any[],
   suppliers?: any[],
   products?: any[],
-  contractsData?: any[]
+  contractsData?: any[],
+  onNavigateTab?: (tabId: string) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1449,6 +1467,9 @@ function TableView({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const addFileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedPricingCustomer, setSelectedPricingCustomer] = useState<string>('all');
+  const [selectedPricingGroup, setSelectedPricingGroup] = useState<string>('all');
 
   const isPOHeaderTable = useMemo(() => title.includes("Đơn hàng (PO_Header)"), [title]);
   const isPOLineTable = useMemo(() => title.includes("Chi tiết đơn (PO_Lines)") || title.includes("Báo cáo Lợi nhuận"), [title]);
@@ -1841,8 +1862,40 @@ function TableView({
     return columnOrder.filter(col => !hiddenColumns.has(col) && headers.includes(col));
   }, [columnOrder, hiddenColumns, headers]);
 
+  const pricingCustomers = useMemo(() => {
+    if (!isPricingTable) return [];
+    const custs = new Set<string>();
+    data.forEach(r => {
+      const c = r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng'];
+      if (c) custs.add(String(c).trim());
+    });
+    return Array.from(custs).sort();
+  }, [isPricingTable, data]);
+
+  const pricingGroups = useMemo(() => {
+    if (!isPricingTable) return [];
+    const groups = new Set<string>();
+    data.forEach(r => {
+      const g = r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại'];
+      if (g) groups.add(String(g).trim());
+    });
+    return Array.from(groups).sort();
+  }, [isPricingTable, data]);
+
   const filteredData = useMemo(() => {
     return data.filter(row => {
+      // Pricing Table Specific Filters (By Customer & Product Group)
+      if (isPricingTable) {
+        if (selectedPricingCustomer !== 'all') {
+          const cust = String(row['Giao đến'] || row['RP_Khách hàng'] || row['Khách hàng'] || '').trim();
+          if (cust !== selectedPricingCustomer) return false;
+        }
+        if (selectedPricingGroup !== 'all') {
+          const grp = String(row['Nhóm sản phẩm'] || row['Nhóm hàng'] || row['Phân loại'] || '').trim();
+          if (grp !== selectedPricingGroup) return false;
+        }
+      }
+
       // Column Filters match
       for (const [col, activeFilters] of Object.entries(columnFilters)) {
         if (activeFilters && activeFilters.size > 0) {
@@ -1873,7 +1926,7 @@ function TableView({
       }
       return false;
     });
-  }, [data, searchTerm, columnFilters]);
+  }, [data, searchTerm, columnFilters, isPricingTable, selectedPricingCustomer, selectedPricingGroup, products]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1906,6 +1959,43 @@ function TableView({
   const summaries = useMemo(() => {
     if (!data || data.length === 0) return null;
     
+    // Custom KPIs for Pricing Catalog (No total profit summing)
+    if (isPricingTable) {
+      const uniqueProducts = new Set<string>();
+      const currentCusts = new Set<string>();
+      const currentGroups = new Set<string>();
+
+      filteredData.forEach(r => {
+        const prod = r['Tên sản phẩm'] || r['Sản phẩm'] || r['Mã sản phẩm'];
+        if (prod) uniqueProducts.add(String(prod));
+        const cust = r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng'];
+        if (cust) currentCusts.add(String(cust));
+        const grp = r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại'];
+        if (grp) currentGroups.add(String(grp));
+      });
+
+      return [
+        { 
+          label: 'Tổng số sản phẩm / Đơn giá', 
+          value: `${filteredData.length} đơn giá (${uniqueProducts.size} SKU)`,
+          color: 'bg-blue-600',
+          icon: <Package size={15} />
+        },
+        { 
+          label: 'Phân loại nhóm hàng', 
+          value: `${currentGroups.size > 0 ? currentGroups.size : pricingGroups.length} nhóm sản phẩm`,
+          color: 'bg-indigo-600',
+          icon: <Layers size={15} />
+        },
+        { 
+          label: 'Khách hàng áp dụng', 
+          value: `${currentCusts.size > 0 ? currentCusts.size : pricingCustomers.length} khách hàng`,
+          color: 'bg-emerald-600',
+          icon: <Users size={15} />
+        }
+      ];
+    }
+
     const moneyCols = headers.filter(h => h.includes('Tổng giá trị') || h.includes('Doanh thu') || h.includes('Thành tiền') || h.includes('Lợi nhuận'));
     const statusCols = headers.filter(h => h === 'Trạng Thái' || h === 'Status' || h === 'Trạng thái');
 
@@ -1957,7 +2047,7 @@ function TableView({
     });
 
     return metrics.slice(0, 4);
-  }, [data, headers, filteredData]);
+  }, [data, headers, filteredData, isPricingTable, pricingGroups.length, pricingCustomers.length]);
 
 
 
@@ -2319,6 +2409,113 @@ function TableView({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pricing Table Custom Filter Section (By Customer & By Product Group) */}
+        {isPricingTable && (
+          <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/60">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package size={14} className="text-blue-600" /> Phân Loại Danh Mục Đơn Giá & Khách Hàng
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Lọc nhanh theo Khách hàng và Nhóm sản phẩm để tra cứu đơn giá mua/bán chính xác
+                </p>
+              </div>
+
+              {onNavigateTab && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('commissions')}
+                  className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <Percent size={13} />
+                  <span>Sang Bảng Quản Lý Hoa Hồng (3 Cách) ↗</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {/* Filter By Customer */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                  <Users size={12} className="text-sky-600" /> Theo Khách hàng ({pricingCustomers.length}):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPricingCustomer('all')}
+                    className={clsx(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                      selectedPricingCustomer === 'all'
+                        ? "bg-blue-600 text-white shadow-2xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    Tất cả ({data.length})
+                  </button>
+                  {pricingCustomers.map(c => {
+                    const count = data.filter(r => (r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng']) === c).length;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSelectedPricingCustomer(c)}
+                        className={clsx(
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                          selectedPricingCustomer === c
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {c} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Filter By Product Group */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                  <Layers size={12} className="text-indigo-600" /> Theo Nhóm hàng ({pricingGroups.length}):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPricingGroup('all')}
+                    className={clsx(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                      selectedPricingGroup === 'all'
+                        ? "bg-indigo-600 text-white shadow-2xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    Tất cả nhóm ({data.length})
+                  </button>
+                  {pricingGroups.map(g => {
+                    const count = data.filter(r => (r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại']) === g).length;
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setSelectedPricingGroup(g)}
+                        className={clsx(
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                          selectedPricingGroup === g
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {g} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
