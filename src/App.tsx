@@ -991,6 +991,8 @@ export default function App() {
             customerData={customerData}
             contactData={contactData}
             poHeaderData={poHeaderData}
+            poLinesData={enrichedPoLinesData}
+            deliveryData={enrichedDeliveryData}
             onAddCommission={async (c) => await handleAddToFirestore("commissions", c)}
             onUpdateCommission={async (c) => await handleUpdateToFirestore("commissions", c)}
             onDeleteCommission={async (c) => await handleDeleteFromFirestore("commissions", c)}
