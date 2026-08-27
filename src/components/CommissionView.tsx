@@ -14,24 +14,29 @@ import CompanyLogo from './CompanyLogo';
 
 export type CommissionMethod = 'profit_percent' | 'weight_rate' | 'monthly_lump_sum';
 
+// Trọng lượng riêng tiêu chuẩn đối với cuộn lưỡi gà trắng 71 x 800mm = 11,92 kg / cuộn
+export const LGT_ROLL_WEIGHT_KG = 11.92;
+
 export interface CommissionItem {
   id?: string;
   type: 'Chia % Lợi nhuận' | 'Theo trọng lượng (kg)' | 'Chi khoán theo tháng' | 'Theo đơn hàng' | 'Theo tháng';
   calculationMethod?: CommissionMethod;
   customerName: string;
-  beneficiaryName: string; // Tên người nhận hoa hồng (từ danh bạ/khách hàng)
+  beneficiaryName: string; // Tên người nhận hoa hồng (người đặt đơn sản xuất)
   beneficiaryPhone?: string;
   beneficiaryBank?: string; // STK & Ngân hàng nhận
   poNumber?: string; // Số PO nếu chi theo PO
   period?: string; // Tháng/Kỳ (YYYY-MM) nếu chi theo tháng
-  productName?: string; // Tên sản phẩm áp dụng (e.g. Lưỡi gà trắng)
+  productName?: string; // Tên sản phẩm áp dụng (e.g. Cuộn lưỡi gà trắng 71 x 800mm)
   
   // 1. Chia % Lợi nhuận
   baseProfit?: number; // Lợi nhuận gộp cơ sở
   profitPercent?: number; // % Lợi nhuận chia (e.g. 10%, 15%)
   
   // 2. Theo trọng lượng kg
-  weightKg?: number; // Số lượng trọng lượng (kg)
+  rollsCount?: number; // Số cuộn đặt hàng (nếu tính theo cuộn LGT)
+  weightPerRoll?: number; // Trọng lượng mỗi cuộn (mặc định 11.92 kg)
+  weightKg?: number; // Tổng số lượng trọng lượng (kg)
   ratePerKg?: number; // Định mức hưởng (₫/kg, e.g. 1000 ₫/kg)
   
   // 3. Doanh thu & Tổng tiền hoa hồng
@@ -43,6 +48,26 @@ export interface CommissionItem {
   paidBy?: string;
   notes?: string;
   createdAt?: string;
+}
+
+export interface POCommissionAnalysis {
+  poNumber: string;
+  customerName: string;
+  orderDate?: string;
+  lgtLinesCount: number;
+  totalRolls: number;
+  weightKg: number;
+  hasLGT: boolean;
+  productNames: string[];
+  totalPoValue: number;
+  totalProfit: number;
+  beneficiaryName: string;
+  beneficiaryPhone: string;
+  beneficiaryBank: string;
+  beneficiaryRole: string;
+  ratePerKg: number;
+  commissionAmount: number;
+  isExistingCommission: boolean;
 }
 
 interface CommissionViewProps {
@@ -68,7 +93,7 @@ export default function CommissionView({
   onUpdateCommission,
   onDeleteCommission
 }: CommissionViewProps) {
-  const [activeTab, setActiveTab] = useState<'all' | 'profit_percent' | 'weight_rate' | 'monthly_lump_sum' | 'paid' | 'pending'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'auto_po' | 'profit_percent' | 'weight_rate' | 'monthly_lump_sum' | 'paid' | 'pending'>('auto_po');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCommission, setSelectedCommission] = useState<CommissionItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,25 +110,112 @@ export default function CommissionView({
     beneficiaryBank: '',
     poNumber: '',
     period: new Date().toISOString().substring(0, 7), // YYYY-MM
-    productName: 'Lưỡi gà trắng',
+    productName: 'Cuộn lưỡi gà trắng 71 x 800mm',
     baseProfit: 0,
     profitPercent: 10,
-    weightKg: 5000,
+    rollsCount: 500,
+    weightPerRoll: LGT_ROLL_WEIGHT_KG,
+    weightKg: Math.round(500 * LGT_ROLL_WEIGHT_KG),
     ratePerKg: 1000,
     baseRevenue: 0,
-    commissionAmount: 0,
+    commissionAmount: Math.round(500 * LGT_ROLL_WEIGHT_KG * 1000),
     paymentStatus: 'Chờ duyệt',
     paymentDate: new Date().toISOString().split('T')[0],
     notes: ''
   });
 
   // Normalize item method for legacy compatibility
-  const getItemMethod = (c: CommissionItem): CommissionMethod => {
-    if (c.calculationMethod) return c.calculationMethod;
-    if (c.type === 'Theo trọng lượng (kg)' || (c.weightKg && c.weightKg > 0)) return 'weight_rate';
-    if (c.type === 'Chi khoán theo tháng' || c.type === 'Theo tháng') return 'monthly_lump_sum';
+  const getItemMethod = (item: CommissionItem): CommissionMethod => {
+    if (item.calculationMethod) return item.calculationMethod;
+    if (item.type === 'Theo trọng lượng (kg)' || item.ratePerKg || item.weightKg) return 'weight_rate';
+    if (item.type === 'Chi khoán theo tháng' || item.type === 'Theo tháng') return 'monthly_lump_sum';
     return 'profit_percent';
   };
+
+  // Analyze POs for Commission (Specifically for LGT 71x800mm with 11.92 kg/roll)
+  const poCommissionAnalysisList: POCommissionAnalysis[] = useMemo(() => {
+    return poHeaderData.map(po => {
+      const poNum = String(po['Đơn hàng'] || po['Số đơn hàng'] || '').trim();
+      const customerName = String(po['Khách hàng'] || '').trim();
+      const orderDate = po['Ngày đặt hàng'] || po['Ngày đặt'] || '';
+      
+      const lines = poLinesData.filter(l => {
+        const linePO = String(l['Số đơn hàng'] || l['Đơn hàng'] || '').trim();
+        return linePO === poNum;
+      });
+
+      const lgtLines = lines.filter(l => {
+        const pName = String(l['Tên sản phẩm'] || l['Sản phẩm'] || '').toLowerCase();
+        const code = String(l['Mã của khách'] || l['Mã sản phẩm'] || l['Mã giá bán'] || '').toLowerCase();
+        return pName.includes('lưỡi gà') || pName.includes('lgt') || pName.includes('71x800') || pName.includes('71 x 800') || code.includes('lgt');
+      });
+
+      const hasLGT = lgtLines.length > 0;
+      const productNames = lines.map(l => l['Tên sản phẩm'] || l['Sản phẩm'] || 'Sản phẩm');
+
+      // Calculate rolls and weight
+      let totalRolls = 0;
+      let weightKg = 0;
+
+      if (hasLGT) {
+        totalRolls = lgtLines.reduce((sum, l) => sum + parseNumber(l['Số lượng']), 0);
+        // Trọng lượng riêng tiêu chuẩn cuộn lưỡi gà trắng 71 x 800mm = 11,92 kg / cuộn
+        weightKg = Math.round(totalRolls * LGT_ROLL_WEIGHT_KG);
+      } else {
+        const totalQty = lines.reduce((sum, l) => sum + parseNumber(l['Số lượng']), 0);
+        totalRolls = totalQty;
+        weightKg = totalQty;
+      }
+
+      // Financials
+      const poDeliveries = deliveryData.filter(d => String(d['Đơn hàng'] || '').trim() === poNum);
+      const totalPoValue = parseNumber(po['Tổng giá trị đơn hàng']) || lines.reduce((sum, l) => sum + parseNumber(l['Doanh thu']), 0);
+      const totalProfit = poDeliveries.reduce((sum, d) => sum + parseNumber(d['Lợi nhuận gộp'] || d['Lợi nhuận dòng']), 0) || Math.round(totalPoValue * 0.25);
+
+      // Find Contact (Người đặt đơn sản xuất / Người phụ trách)
+      const matchingContacts = contactData.filter(c => {
+        const comp = String(c['Công ty'] || c['Khách hàng'] || '').toLowerCase().trim();
+        return comp.includes(customerName.toLowerCase()) || customerName.toLowerCase().includes(comp);
+      });
+
+      const orderContact = matchingContacts.find(c => {
+        const role = String(c['Chức vụ'] || c['Bộ phận'] || c['Ghi chú'] || '').toLowerCase();
+        return role.includes('đặt') || role.includes('mua') || role.includes('sản xuất') || role.includes('phụ trách');
+      }) || matchingContacts[0];
+
+      const beneficiaryName = orderContact ? (orderContact['Họ và tên'] || orderContact['Tên'] || '') : (po['Người đặt hàng'] || `Người đặt đơn ${customerName}`);
+      const beneficiaryPhone = orderContact ? (orderContact['Số điện thoại'] || orderContact['Điện thoại'] || '') : '';
+      const beneficiaryBank = orderContact ? (orderContact['STK'] || orderContact['Ngân hàng'] || '') : '';
+      const beneficiaryRole = orderContact ? (orderContact['Chức vụ'] || 'Người đặt đơn sản xuất') : 'Người đặt đơn sản xuất';
+
+      const ratePerKg = 1000;
+      const commissionAmount = hasLGT 
+        ? weightKg * ratePerKg 
+        : (weightKg > 0 ? weightKg * ratePerKg : Math.round(totalProfit * 0.1));
+
+      const isExistingCommission = commissionData.some(c => String(c.poNumber || '').trim() === poNum);
+
+      return {
+        poNumber: poNum,
+        customerName,
+        orderDate,
+        lgtLinesCount: lgtLines.length,
+        totalRolls,
+        weightKg,
+        hasLGT,
+        productNames,
+        totalPoValue,
+        totalProfit,
+        beneficiaryName,
+        beneficiaryPhone,
+        beneficiaryBank,
+        beneficiaryRole,
+        ratePerKg,
+        commissionAmount,
+        isExistingCommission
+      };
+    });
+  }, [poHeaderData, poLinesData, deliveryData, contactData, commissionData]);
 
   // Filtered List
   const filteredCommissions = useMemo(() => {
@@ -126,6 +238,17 @@ export default function CommissionView({
       );
     });
   }, [commissionData, activeTab, searchQuery]);
+
+  // Filtered PO Analysis List
+  const filteredPOAnalysisList = useMemo(() => {
+    if (!searchQuery) return poCommissionAnalysisList;
+    const query = searchQuery.toLowerCase();
+    return poCommissionAnalysisList.filter(a => 
+      a.poNumber.toLowerCase().includes(query) ||
+      a.customerName.toLowerCase().includes(query) ||
+      a.beneficiaryName.toLowerCase().includes(query)
+    );
+  }, [poCommissionAnalysisList, searchQuery]);
 
   // Financial Stats
   const stats = useMemo(() => {
@@ -152,7 +275,7 @@ export default function CommissionView({
   }, [commissionData]);
 
   // Open Create Modal with default method
-  const handleOpenAdd = (method: CommissionMethod = 'profit_percent') => {
+  const handleOpenAdd = (method: CommissionMethod = 'weight_rate') => {
     setEditingCommission(null);
     const firstCust = customerData[0]?.['Tên khách hàng'] || customerData[0]?.['Khách hàng'] || 'Thăng Long';
     const firstPO = poHeaderData[0]?.['Đơn hàng'] || poHeaderData[0]?.['Số đơn hàng'] || '26/KHVT/0082';
@@ -163,14 +286,14 @@ export default function CommissionView({
     const defaultRev = poDeliveries.reduce((sum, d) => sum + parseNumber(d['Doanh thu']), 0) || 150000000;
 
     let initAmount = 0;
-    let typeName: CommissionItem['type'] = 'Chia % Lợi nhuận';
+    let typeName: CommissionItem['type'] = 'Theo trọng lượng (kg)';
 
     if (method === 'profit_percent') {
       typeName = 'Chia % Lợi nhuận';
       initAmount = Math.round(defaultProfit * 0.1); // 10% profit
     } else if (method === 'weight_rate') {
       typeName = 'Theo trọng lượng (kg)';
-      initAmount = 5000 * 1000; // 5,000 kg * 1,000đ
+      initAmount = Math.round(500 * LGT_ROLL_WEIGHT_KG * 1000); // 500 cuộn * 11.92 * 1,000đ = 5.960.000đ
     } else {
       typeName = 'Chi khoán theo tháng';
       initAmount = 10000000; // 10M default lump sum
@@ -185,10 +308,12 @@ export default function CommissionView({
       beneficiaryBank: '',
       poNumber: firstPO,
       period: new Date().toISOString().substring(0, 7),
-      productName: 'Lưỡi gà trắng 95mm x 800m x 230gsm',
+      productName: 'Cuộn lưỡi gà trắng 71 x 800mm (11,92 kg/cuộn)',
       baseProfit: defaultProfit,
       profitPercent: 10,
-      weightKg: 5000,
+      rollsCount: 500,
+      weightPerRoll: LGT_ROLL_WEIGHT_KG,
+      weightKg: Math.round(500 * LGT_ROLL_WEIGHT_KG),
       ratePerKg: 1000,
       baseRevenue: defaultRev,
       commissionAmount: initAmount,
@@ -197,7 +322,7 @@ export default function CommissionView({
       notes: method === 'profit_percent' 
         ? 'Chia 10% lợi nhuận gộp theo thỏa thuận' 
         : method === 'weight_rate' 
-        ? 'Hoa hồng theo định mức 1.000 ₫/kg Lưỡi gà trắng' 
+        ? `Tự động tính theo định mức 1.000 ₫/kg (Quy cách 11,92 kg/cuộn LGT 71x800mm)` 
         : 'Chi khoán hoa hồng phát triển thị trường theo tháng'
     });
     setIsModalOpen(true);
@@ -227,8 +352,13 @@ export default function CommissionView({
       comm = Math.round((profit * percent) / 100);
       next.type = 'Chia % Lợi nhuận';
     } else if (method === 'weight_rate') {
-      const kg = parseNumber(next.weightKg);
-      const rate = parseNumber(next.ratePerKg);
+      let kg = parseNumber(next.weightKg);
+      if (next.rollsCount && next.rollsCount > 0) {
+        const perRoll = next.weightPerRoll || LGT_ROLL_WEIGHT_KG;
+        kg = Math.round(next.rollsCount * perRoll);
+        next.weightKg = kg;
+      }
+      const rate = parseNumber(next.ratePerKg) || 1000;
       comm = Math.round(kg * rate);
       next.type = 'Theo trọng lượng (kg)';
     } else if (method === 'monthly_lump_sum') {
@@ -244,14 +374,14 @@ export default function CommissionView({
 
   // Switch Method in Modal
   const handleSwitchMethod = (method: CommissionMethod) => {
-    let typeName: CommissionItem['type'] = 'Chia % Lợi nhuận';
+    let typeName: CommissionItem['type'] = 'Theo trọng lượng (kg)';
     let defaultNotes = '';
     if (method === 'profit_percent') {
       typeName = 'Chia % Lợi nhuận';
       defaultNotes = 'Chia 10% lợi nhuận gộp đơn hàng';
     } else if (method === 'weight_rate') {
       typeName = 'Theo trọng lượng (kg)';
-      defaultNotes = 'Hoa hồng định mức 1.000 ₫/kg Lưỡi gà trắng';
+      defaultNotes = 'Hoa hồng định mức 1.000 ₫/kg Lưỡi gà trắng (11,92 kg/cuộn)';
     } else {
       typeName = 'Chi khoán theo tháng';
       defaultNotes = 'Chi khoán theo tháng (nhập thủ công)';
@@ -264,31 +394,80 @@ export default function CommissionView({
     });
   };
 
-  // Select PO to auto-populate revenue & profit
+  // Select PO to auto-populate revenue, profit, roll count, 11.92 kg/roll & beneficiary
   const handleSelectPO = (poNum: string) => {
-    const matchedPO = poHeaderData.find(p => p['Đơn hàng'] === poNum || p['Số đơn hàng'] === poNum);
-    const poDeliveries = deliveryData.filter(d => d['Đơn hàng'] === poNum);
-    
-    const profit = poDeliveries.reduce((sum, d) => sum + parseNumber(d['Lợi nhuận gộp'] || d['Lợi nhuận dòng']), 0) || 
-                   (matchedPO ? parseNumber(matchedPO['Tổng giá trị đơn hàng']) * 0.25 : parseNumber(formData.baseProfit));
-    
-    const rev = poDeliveries.reduce((sum, d) => sum + parseNumber(d['Doanh thu']), 0) || 
-                (matchedPO ? parseNumber(matchedPO['Tổng giá trị đơn hàng']) : parseNumber(formData.baseRevenue));
+    const analysis = poCommissionAnalysisList.find(a => a.poNumber === poNum);
+    if (analysis) {
+      if (analysis.hasLGT) {
+        handleRecalculate({
+          poNumber: poNum,
+          customerName: analysis.customerName,
+          beneficiaryName: analysis.beneficiaryName,
+          beneficiaryPhone: analysis.beneficiaryPhone,
+          beneficiaryBank: analysis.beneficiaryBank,
+          calculationMethod: 'weight_rate',
+          type: 'Theo trọng lượng (kg)',
+          productName: 'Cuộn lưỡi gà trắng 71 x 800mm (11,92 kg/cuộn)',
+          rollsCount: analysis.totalRolls,
+          weightPerRoll: LGT_ROLL_WEIGHT_KG,
+          weightKg: analysis.weightKg,
+          ratePerKg: 1000,
+          baseRevenue: analysis.totalPoValue,
+          baseProfit: analysis.totalProfit,
+          commissionAmount: analysis.commissionAmount,
+          notes: `Tự động tính theo PO ${poNum}: ${analysis.totalRolls.toLocaleString()} cuộn LGT × 11,92 kg/cuộn = ${analysis.weightKg.toLocaleString()} kg × 1.000 ₫/kg cho người đặt đơn sản xuất.`
+        });
+      } else {
+        handleRecalculate({
+          poNumber: poNum,
+          customerName: analysis.customerName,
+          beneficiaryName: analysis.beneficiaryName,
+          beneficiaryPhone: analysis.beneficiaryPhone,
+          beneficiaryBank: analysis.beneficiaryBank,
+          calculationMethod: 'profit_percent',
+          type: 'Chia % Lợi nhuận',
+          baseRevenue: analysis.totalPoValue,
+          baseProfit: analysis.totalProfit,
+          profitPercent: 10,
+          commissionAmount: Math.round(analysis.totalProfit * 0.1),
+          notes: `Tự động tính theo PO ${poNum}: Chia 10% Lợi nhuận gộp đơn hàng (${formatVND(analysis.totalProfit)}) cho người đặt đơn.`
+        });
+      }
+    }
+  };
 
-    const cust = matchedPO ? (matchedPO['Khách hàng'] || formData.customerName) : formData.customerName;
+  // 1-Click Quick Create PO Commission
+  const handleQuickCreatePOCommission = async (analysis: POCommissionAnalysis) => {
+    const payload: CommissionItem = {
+      id: `comm_po_${Date.now()}`,
+      type: analysis.hasLGT ? 'Theo trọng lượng (kg)' : 'Chia % Lợi nhuận',
+      calculationMethod: analysis.hasLGT ? 'weight_rate' : 'profit_percent',
+      customerName: analysis.customerName,
+      beneficiaryName: analysis.beneficiaryName || `Người đặt đơn ${analysis.customerName}`,
+      beneficiaryPhone: analysis.beneficiaryPhone,
+      beneficiaryBank: analysis.beneficiaryBank,
+      poNumber: analysis.poNumber,
+      productName: analysis.hasLGT ? 'Cuộn lưỡi gà trắng 71 x 800mm (11,92 kg/cuộn)' : 'Sản phẩm theo đơn hàng',
+      rollsCount: analysis.totalRolls,
+      weightPerRoll: LGT_ROLL_WEIGHT_KG,
+      weightKg: analysis.weightKg,
+      ratePerKg: analysis.ratePerKg,
+      baseRevenue: analysis.totalPoValue,
+      baseProfit: analysis.totalProfit,
+      profitPercent: 10,
+      commissionAmount: analysis.commissionAmount,
+      paymentStatus: 'Chờ duyệt',
+      paymentDate: new Date().toISOString().split('T')[0],
+      notes: analysis.hasLGT
+        ? `Tự động tính theo PO ${analysis.poNumber}: ${analysis.totalRolls.toLocaleString()} cuộn LGT × 11,92 kg/cuộn = ${analysis.weightKg.toLocaleString()} kg × 1.000 ₫/kg cho người đặt đơn sản xuất.`
+        : `Tự động tính theo PO ${analysis.poNumber}: Chia 10% lợi nhuận gộp cho người đặt đơn.`,
+      createdAt: new Date().toISOString()
+    };
 
-    // Estimate kg if lưỡi gà
-    const totalKg = poDeliveries
-      .filter(d => String(d['Tên sản phẩm'] || '').toLowerCase().includes('lưỡi gà') || String(d['Tên sản phẩm'] || '').toLowerCase().includes('lgt'))
-      .reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0) || 5000;
-
-    handleRecalculate({
-      poNumber: poNum,
-      customerName: cust,
-      baseProfit: profit,
-      baseRevenue: rev,
-      weightKg: totalKg > 0 ? totalKg : formData.weightKg
-    });
+    if (onAddCommission) {
+      await onAddCommission(payload);
+      toast.success(`Đã tự động lập Phiếu Hoa Hồng cho PO ${analysis.poNumber} (${formatVND(analysis.commissionAmount)})!`);
+    }
   };
 
   // Select beneficiary from contacts
@@ -527,20 +706,32 @@ export default function CommissionView({
             {/* Filter Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               <button
+                onClick={() => setActiveTab('auto_po')}
+                className={clsx(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
+                  activeTab === 'auto_po'
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs"
+                    : "bg-white text-purple-700 hover:bg-purple-50 border border-purple-200"
+                )}
+              >
+                <Sparkles size={12} className="text-amber-300" />
+                ⚡ Tự Động Tính Theo PO ({filteredPOAnalysisList.length})
+              </button>
+              <button
                 onClick={() => setActiveTab('all')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
                   activeTab === 'all'
                     ? "bg-slate-900 text-white shadow-2xs"
                     : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                 )}
               >
-                Tất cả ({commissionData.length})
+                Tất cả phiếu ({commissionData.length})
               </button>
               <button
                 onClick={() => setActiveTab('profit_percent')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
                   activeTab === 'profit_percent'
                     ? "bg-blue-600 text-white shadow-2xs"
                     : "bg-white text-blue-700 hover:bg-blue-50 border border-blue-200"
@@ -552,7 +743,7 @@ export default function CommissionView({
               <button
                 onClick={() => setActiveTab('weight_rate')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
                   activeTab === 'weight_rate'
                     ? "bg-emerald-600 text-white shadow-2xs"
                     : "bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
@@ -564,7 +755,7 @@ export default function CommissionView({
               <button
                 onClick={() => setActiveTab('monthly_lump_sum')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
                   activeTab === 'monthly_lump_sum'
                     ? "bg-amber-600 text-white shadow-2xs"
                     : "bg-white text-amber-700 hover:bg-amber-50 border border-amber-200"
@@ -576,7 +767,7 @@ export default function CommissionView({
               <button
                 onClick={() => setActiveTab('pending')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
                   activeTab === 'pending'
                     ? "bg-purple-600 text-white shadow-2xs"
                     : "bg-white text-purple-700 hover:bg-purple-50 border border-purple-200"
@@ -587,7 +778,7 @@ export default function CommissionView({
               <button
                 onClick={() => setActiveTab('paid')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
                   activeTab === 'paid'
                     ? "bg-teal-600 text-white shadow-2xs"
                     : "bg-white text-teal-700 hover:bg-teal-50 border border-teal-200"
@@ -612,7 +803,141 @@ export default function CommissionView({
 
           {/* Table Container */}
           <div className="flex-1 overflow-x-auto min-h-0">
-            {filteredCommissions.length === 0 ? (
+            {activeTab === 'auto_po' ? (
+              <div>
+                <div className="bg-purple-50/80 border-b border-purple-100 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                      <Sparkles size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-purple-950">
+                        Bảng Tính Hoa Hồng Tự Động Theo Từng Đơn Hàng PO (Lưỡi Gà Trắng)
+                      </h3>
+                      <p className="text-[11px] text-purple-700 mt-0.5">
+                        Quy cách chuẩn: <strong>Cuộn lưỡi gà trắng 71 x 800mm (11,92 kg / cuộn)</strong>. Định mức hưởng: <strong>1.000 ₫/kg</strong>. Người thụ hưởng là <strong>Người đặt đơn sản xuất</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-purple-200 text-[11px] font-bold text-purple-800 shadow-2xs">
+                      {filteredPOAnalysisList.length} Đơn hàng PO
+                    </span>
+                  </div>
+                </div>
+
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-black/[0.06] bg-[#F5F5F7] text-slate-500 font-bold">
+                      <th className="py-3 px-4">Đơn Hàng (PO) & KH</th>
+                      <th className="py-3 px-4">Người Đặt Đơn Sản Xuất</th>
+                      <th className="py-3 px-4">Sản Phẩm & Số Cuộn</th>
+                      <th className="py-3 px-4 text-right">Quy Đổi Trọng Lượng (11,92 kg/cuộn)</th>
+                      <th className="py-3 px-4 text-right">Định Mức</th>
+                      <th className="py-3 px-4 text-right">Hoa Hồng Tự Động</th>
+                      <th className="py-3 px-4 text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04]">
+                    {filteredPOAnalysisList.map((analysis, index) => (
+                      <tr key={analysis.poNumber || index} className="hover:bg-purple-50/40 transition-colors">
+                        {/* PO Number & Customer */}
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <CompanyLogo name={analysis.customerName} size="sm" />
+                            <div>
+                              <span className="font-mono text-purple-700 font-bold block">{analysis.poNumber}</span>
+                              <span className="text-[11px] text-slate-600 truncate block max-w-[130px]">{analysis.customerName}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Order Placer Beneficiary */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <UserCheck size={14} className="text-purple-600 shrink-0" />
+                            <div>
+                              <p className="font-bold text-purple-950">{analysis.beneficiaryName}</p>
+                              <span className="text-[10px] text-slate-500 block">{analysis.beneficiaryRole} {analysis.beneficiaryPhone ? `• ${analysis.beneficiaryPhone}` : ''}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Product & Quantity */}
+                        <td className="py-3 px-4">
+                          {analysis.hasLGT ? (
+                            <div>
+                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                <Scale size={11} /> LGT 71 x 800mm
+                              </span>
+                              <p className="text-xs font-bold text-slate-800 mt-1">
+                                {analysis.totalRolls.toLocaleString()} cuộn
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                <Percent size={11} /> Sản phẩm khác
+                              </span>
+                              <p className="text-xs font-bold text-slate-800 mt-1">
+                                Giá trị PO: {formatVND(analysis.totalPoValue)}
+                              </p>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Weight Conversion */}
+                        <td className="py-3 px-4 text-right font-mono">
+                          {analysis.hasLGT ? (
+                            <div>
+                              <span className="text-xs font-black text-emerald-700">
+                                {analysis.weightKg.toLocaleString()} kg
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                ({analysis.totalRolls} × 11,92 kg)
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">LN: {formatVND(analysis.totalProfit)}</span>
+                          )}
+                        </td>
+
+                        {/* Rate */}
+                        <td className="py-3 px-4 text-right font-bold text-slate-700 font-mono">
+                          {analysis.hasLGT ? '1.000 ₫/kg' : '10% LN'}
+                        </td>
+
+                        {/* Commission Amount */}
+                        <td className="py-3 px-4 text-right">
+                          <span className="text-sm font-black text-purple-900 font-mono block">
+                            {formatVND(analysis.commissionAmount)}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold">Tự động</span>
+                        </td>
+
+                        {/* Action */}
+                        <td className="py-3 px-4 text-center">
+                          {analysis.isExistingCommission ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1">
+                              <CheckCircle2 size={12} /> Đã lập phiếu
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickCreatePOCommission(analysis)}
+                              className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Sparkles size={11} className="text-amber-300" />
+                              Lập Phiếu
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : filteredCommissions.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center text-center p-6">
                 <Receipt size={40} className="text-slate-300 stroke-[1.5] mb-2" />
                 <p className="text-sm font-bold text-slate-700">Chưa có phiếu hoa hồng nào</p>
@@ -1113,22 +1438,71 @@ export default function CommissionView({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-900 flex items-center gap-1">
                       <Scale size={14} className="text-emerald-600" />
-                      Công Thức: Theo Trọng Lượng (Kg) × Định Mức
+                      Công Thức: Cuộn LGT (11,92 kg/cuộn) × Định Mức
                     </span>
-                    <span className="text-[11px] text-emerald-700 font-mono">
-                      {(parseNumber(formData.weightKg)).toLocaleString()} kg × {formatVND(parseNumber(formData.ratePerKg))}/kg
+                    <span className="text-[11px] text-emerald-700 font-mono font-bold">
+                      {(parseNumber(formData.weightKg)).toLocaleString()} kg × {formatVND(parseNumber(formData.ratePerKg || 1000))}/kg
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Auto conversion from rolls */}
+                  <div className="grid grid-cols-3 gap-2.5 bg-white/90 p-3 rounded-xl border border-emerald-200/80">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-emerald-800">Tổng Trọng Lượng (Kg)</label>
+                      <label className="text-[10px] font-bold text-emerald-900 uppercase">1. Số Cuộn Đặt</label>
+                      <input
+                        type="number"
+                        value={formData.rollsCount || ''}
+                        onChange={e => {
+                          const rolls = parseFloat(e.target.value) || 0;
+                          handleRecalculate({ 
+                            rollsCount: rolls, 
+                            weightKg: Math.round(rolls * (formData.weightPerRoll || LGT_ROLL_WEIGHT_KG))
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-emerald-50/50 border border-emerald-300 rounded-lg text-xs font-black text-emerald-900 text-right font-mono outline-none"
+                        placeholder="500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase">2. Trọng Lượng (kg/cuộn)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.weightPerRoll || LGT_ROLL_WEIGHT_KG}
+                        onChange={e => {
+                          const w = parseFloat(e.target.value) || LGT_ROLL_WEIGHT_KG;
+                          handleRecalculate({ 
+                            weightPerRoll: w,
+                            weightKg: Math.round((formData.rollsCount || 0) * w)
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 text-right font-mono outline-none"
+                        placeholder="11.92"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-emerald-900 uppercase">3. Tổng Khối Lượng (Kg)</label>
                       <input
                         type="number"
                         value={formData.weightKg || ''}
                         onChange={e => handleRecalculate({ weightKg: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-bold outline-none text-right font-mono"
-                        placeholder="5,000"
+                        className="w-full px-2.5 py-1.5 bg-emerald-100/60 border border-emerald-300 rounded-lg text-xs font-black text-emerald-950 text-right font-mono outline-none"
+                        placeholder="5,960"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-emerald-800">Sản Phẩm Áp Dụng</label>
+                      <input
+                        type="text"
+                        value={formData.productName || 'Cuộn lưỡi gà trắng 71 x 800mm'}
+                        onChange={e => setFormData({ ...formData, productName: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-medium outline-none"
+                        placeholder="Cuộn lưỡi gà trắng 71 x 800mm"
                       />
                     </div>
 
@@ -1147,16 +1521,16 @@ export default function CommissionView({
 
                   {/* Quick rate buttons */}
                   <div className="flex items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-emerald-600 font-medium">Định mức mẫu:</span>
-                    {[500, 1000, 1500, 2000, 3000].map(rate => (
+                    <span className="text-[10px] text-emerald-600 font-medium">Định mức nhanh:</span>
+                    {[500, 1000, 1200, 1500, 2000].map(rate => (
                       <button
                         key={rate}
                         type="button"
                         onClick={() => handleRecalculate({ ratePerKg: rate })}
                         className={clsx(
-                          "px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all",
+                          "px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer",
                           formData.ratePerKg === rate
-                            ? "bg-emerald-600 text-white border-emerald-600"
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
                             : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                         )}
                       >
