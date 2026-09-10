@@ -3,7 +3,7 @@ import HelpGuideModal from "./components/HelpGuideModal";
 import HelpGuideView from "./components/HelpGuideView";
 import { Toaster, toast } from 'react-hot-toast';
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2, Factory } from "lucide-react";
+import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2, Factory, UploadCloud, Share2, Copy, RefreshCw, ExternalLink, Image as ImageIcon } from "lucide-react";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -26,7 +26,7 @@ import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DA
 import { 
   DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
   OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, LogisticsHubView, MemoryStorageModal, 
-  StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
+  StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, POFileUploadModal, 
   ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights,
   Header, Breadcrumbs, MobileBottomNav, FactoryManagementView
 } from "./components";
@@ -1096,7 +1096,7 @@ export default function App() {
             onPoClick={(val) => setSelectedPoDetails(val)} 
             customers={customerData}
             poLines={poLinesData}
-           
+            fileStorageData={fileStorageData}
           />
         )}
         {activeTab === "factory" && (
@@ -1297,6 +1297,8 @@ export default function App() {
             pricingData={pricingData}
             onProductClick={(val) => setSelectedProductDetails(val)}
             onAddPOLine={(row) => handleAddToFirestore("po_lines", row)}
+            onUpdatePOHeader={(row) => handleUpdateToFirestore("po_headers", row)}
+            fileStorageData={fileStorageData}
         />
       )}
     </div>
@@ -1436,6 +1438,7 @@ function TableView({
   suppliers = [],
   products = [],
   contractsData = [],
+  fileStorageData = [],
   onNavigateTab
 }: { 
   title: string, 
@@ -1455,6 +1458,7 @@ function TableView({
   suppliers?: any[],
   products?: any[],
   contractsData?: any[],
+  fileStorageData?: any[],
   onNavigateTab?: (tabId: string) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1465,6 +1469,8 @@ function TableView({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileUploadModalPO, setFileUploadModalPO] = useState<any>(null);
+  const [showPOFileUploadModal, setShowPOFileUploadModal] = useState(false);
   const addFileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -2125,13 +2131,89 @@ function TableView({
       }
     }
 
-    // Files
+    // Files (PDF / Images / Google Drive Documents)
     if (header === 'Tệp đơn hàng' || header.includes('Tệp') || strVal.endsWith('.pdf') || strVal.endsWith('.jpg') || strVal.endsWith('.png')) {
+      const directDriveUrl = row['Drive_File_Url'] || row['File_Link'] || '';
+      const storageMatch = (fileStorageData || []).find((f: any) => 
+        (row['Đơn hàng'] && f.documentNumber === row['Đơn hàng']) ||
+        (strVal && f.fileName === strVal)
+      );
+      const driveUrl = directDriveUrl || storageMatch?.driveLink || '';
+      const isPdf = strVal.toLowerCase().endsWith('.pdf');
+      const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(strVal);
+
       return (
-         <div className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 cursor-pointer w-max">
-           <FileText size={14} />
-           <span className="truncate max-w-[150px] font-medium" title={strVal}>{strVal}</span>
-         </div>
+        <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+          {strVal ? (
+            <div className="flex items-center gap-1.5 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/70 px-2 py-1 rounded-lg transition-all">
+              {isPdf ? (
+                <FileText size={14} className="text-rose-600 shrink-0" />
+              ) : (
+                <ImageIcon size={14} className="text-blue-600 shrink-0" />
+              )}
+              <span className="truncate max-w-[130px] font-bold text-xs text-blue-900" title={strVal}>
+                {strVal}
+              </span>
+
+              {driveUrl && (
+                <>
+                  <a
+                    href={driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-blue-200/70 text-blue-700 rounded transition-colors"
+                    title="Mở file trên Google Drive"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(driveUrl);
+                        toast.success('Đã sao chép link chia sẻ Google Drive!');
+                      } catch {
+                        toast.error('Không thể tự động chép link');
+                      }
+                    }}
+                    className="p-1 hover:bg-blue-200/70 text-blue-700 rounded transition-colors cursor-pointer"
+                    title="Sao chép link chia sẻ Google Drive"
+                  >
+                    <Share2 size={12} />
+                  </button>
+                </>
+              )}
+
+              {isPOHeaderTable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFileUploadModalPO(row);
+                    setShowPOFileUploadModal(true);
+                  }}
+                  className="p-1 hover:bg-blue-200/70 text-blue-600 rounded transition-colors cursor-pointer"
+                  title="Cập nhật hoặc đổi file mới (PDF/Ảnh)"
+                >
+                  <RefreshCw size={11} />
+                </button>
+              )}
+            </div>
+          ) : isPOHeaderTable ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFileUploadModalPO(row);
+                setShowPOFileUploadModal(true);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-dashed border-blue-300 px-2 py-1 rounded-lg transition-all cursor-pointer"
+            >
+              <UploadCloud size={12} />
+              <span>+ Đính kèm PDF/Ảnh</span>
+            </button>
+          ) : (
+            <span className="text-gray-400 italic text-xs">-</span>
+          )}
+        </div>
       );
     }
 
@@ -2194,15 +2276,55 @@ function TableView({
       // Proceed without confirmation since window.confirm is blocked in iframes
     }
 
+    let finalData = { ...formData };
+
+    // Tự động tải tệp lên Google Drive & tạo link chia sẻ nếu có tệp đính kèm
+    if (uploadedFile && isPOHeaderTable) {
+      const uploadToast = toast.loading('Đang tải tệp lên Google Drive & tạo link chia sẻ...');
+      try {
+        const now = new Date();
+        const year = now.getFullYear().toString();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const fileExt = uploadedFile.name.substring(uploadedFile.name.lastIndexOf('.'));
+        const poNum = String(finalData['Đơn hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
+        const cust = String(finalData['Khách hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
+        const standardizedName = `PO_${poNum}_${cust}${fileExt}`;
+
+        const uploadRes = await uploadFileDirectToGoogleDrive({
+          file: uploadedFile,
+          fileName: standardizedName,
+          documentType: 'Don_Hang_PO',
+          documentNumber: String(finalData['Đơn hàng'] || ''),
+          year,
+          month
+        });
+
+        const driveLink = uploadRes.shareLink || uploadRes.driveLink;
+        finalData['Tệp đơn hàng'] = standardizedName;
+        finalData['Drive_File_Url'] = driveLink;
+        finalData['File_Link'] = driveLink;
+        finalData['Drive_File_Id'] = uploadRes.driveFileId;
+        finalData['File_Type'] = uploadedFile.type;
+        finalData['File_Size'] = uploadedFile.size;
+        finalData['File_Updated_At'] = now.toISOString();
+
+        toast.success('🎉 Đã lưu trữ tệp lên Google Drive & tạo link chia sẻ!', { id: uploadToast });
+      } catch (driveErr: any) {
+        console.warn('Drive upload error:', driveErr);
+        toast.error(driveErr.message || 'Lỗi tải lên Drive, đang lưu dữ liệu...', { id: uploadToast });
+      }
+    }
+
     if (editingRow) {
       if (onEdit) {
         const toastId = toast.loading('Đang cập nhật...');
         try {
-          await onEdit(formData);
+          await onEdit(finalData);
           toast.success('Đã cập nhật dữ liệu!', { id: toastId });
           setIsEditModalOpen(false);
           setEditingRow(null);
           setFormData({});
+          setUploadedFile(null);
         } catch (err) {
           toast.error('Có lỗi xảy ra khi cập nhật!', { id: toastId });
         }
@@ -2211,10 +2333,11 @@ function TableView({
       if (onAdd) {
         const toastId = toast.loading('Đang thêm mới...');
         try {
-          await onAdd(formData);
+          await onAdd(finalData);
           toast.success('Đã thêm mới dữ liệu!', { id: toastId });
           setIsModalOpen(false);
           setFormData({});
+          setUploadedFile(null);
         } catch (err) {
           toast.error('Có lỗi xảy ra khi thêm mới!', { id: toastId });
         }
@@ -2366,6 +2489,20 @@ function TableView({
             >
               <PlusCircle size={15} />
               <span>Thêm mới</span>
+            </button>
+          )}
+
+          {isPOHeaderTable && (
+            <button
+              onClick={() => {
+                setFileUploadModalPO(data[0] || null);
+                setShowPOFileUploadModal(true);
+              }}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              title="Cập nhật chứng từ PO bằng file PDF hoặc Hình ảnh lên Google Drive (kèm link chia sẻ)"
+            >
+              <UploadCloud size={15} />
+              <span>⚡ Cập nhật file PO (PDF/Ảnh)</span>
             </button>
           )}
         </div>
@@ -3665,7 +3802,7 @@ function TableView({
                 </button>
                 <button 
                   onClick={() => { setIsEditModalOpen(false); setEditingRow(null); }}
-                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -3673,6 +3810,25 @@ function TableView({
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* PO File Upload & Drive Sync Modal */}
+      {isPOHeaderTable && (
+        <POFileUploadModal
+          isOpen={showPOFileUploadModal}
+          onClose={() => {
+            setShowPOFileUploadModal(false);
+            setFileUploadModalPO(null);
+          }}
+          poHeader={fileUploadModalPO || data[0] || null}
+          allPOHeaders={data}
+          onSelectPO={(po) => setFileUploadModalPO(po)}
+          onUpdatePOHeader={async (updated) => {
+            if (onEdit) {
+              await onEdit(updated);
+            }
+          }}
+        />
       )}
     </div>
   );

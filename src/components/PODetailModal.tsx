@@ -14,9 +14,18 @@ import {
   AlertTriangle,
   Clock,
   PlusCircle,
-  Layers
+  Layers,
+  ExternalLink,
+  Share2,
+  Copy,
+  UploadCloud,
+  RefreshCw,
+  Image as ImageIcon,
+  Check
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { DualPODocumentModal } from './DualPODocumentModal';
+import { POFileUploadModal } from './POFileUploadModal';
 import { 
   BarChart, 
   Bar, 
@@ -48,6 +57,8 @@ interface PODetailModalProps {
   supplierData?: any[];
   onProductClick?: (productNameOrId: string) => void;
   onAddPOLine?: (row: any) => void;
+  onUpdatePOHeader?: (updatedHeader: any) => Promise<void> | void;
+  fileStorageData?: any[];
 }
 
 export function PODetailModal({ 
@@ -61,12 +72,16 @@ export function PODetailModal({
   pricingData = [],
   supplierData = [],
   onProductClick,
-  onAddPOLine
+  onAddPOLine,
+  onUpdatePOHeader,
+  fileStorageData = []
 }: PODetailModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
   const [isMaximized, setIsMaximized] = useState(false);
   const [showAddLineForm, setShowAddLineForm] = useState(false);
   const [showDualPOModal, setShowDualPOModal] = useState(false);
+  const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [newLineData, setNewLineData] = useState<any>({
     'Tên sản phẩm': '',
     'Mã giá bán': '',
@@ -83,6 +98,31 @@ export function PODetailModal({
       return currentPO.toLowerCase() === cleanPoNumber.toLowerCase();
     }) || { 'Đơn hàng': cleanPoNumber };
   }, [cleanPoNumber, poHeaderData]);
+
+  // Lookup Google Drive file for this PO
+  const driveFileInfo = useMemo(() => {
+    // 1. Check direct on poHeader
+    if (poHeader?.['Drive_File_Url'] || poHeader?.['File_Link']) {
+      return {
+        fileName: poHeader['Tệp đơn hàng'] || 'Don_Hang_PO.pdf',
+        driveLink: poHeader['Drive_File_Url'] || poHeader['File_Link'],
+        driveFileId: poHeader['Drive_File_Id']
+      };
+    }
+    // 2. Lookup in fileStorageData
+    const match = (fileStorageData || []).find((f: any) => 
+      f.documentNumber === cleanPoNumber || 
+      (f.fileName && f.fileName.includes(cleanPoNumber.replace(/[/\\#?%[\]\s.]+/g, '_')))
+    );
+    if (match) {
+      return {
+        fileName: match.fileName || poHeader?.['Tệp đơn hàng'] || 'Don_Hang_PO.pdf',
+        driveLink: match.driveLink || `https://drive.google.com/file/d/${match.driveFileId}/view?usp=sharing`,
+        driveFileId: match.driveFileId
+      };
+    }
+    return null;
+  }, [poHeader, fileStorageData, cleanPoNumber]);
 
   // Set default date when poHeader is loaded
   React.useEffect(() => {
@@ -467,27 +507,119 @@ export function PODetailModal({
 
                 <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1.5">
-                      <FileText className="text-blue-500" size={16} /> Tài liệu đính kèm
-                    </h4>
-                    {poHeader['Tệp đơn hàng'] ? (
-                      <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <FileText size={18} className="text-blue-600 shrink-0" />
-                          <span className="text-xs font-semibold text-blue-900 truncate" title={poHeader['Tệp đơn hàng']}>
-                            {poHeader['Tệp đơn hàng']}
-                          </span>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                        <FileText className="text-blue-500" size={16} /> Chứng từ PO đính kèm
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowFileUploadModal(true)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200/60 transition-all flex items-center gap-1 cursor-pointer"
+                        title="Cập nhật tệp PDF hoặc ảnh cho PO này"
+                      >
+                        <UploadCloud size={12} />
+                        <span>{driveFileInfo || poHeader['Tệp đơn hàng'] ? 'Đổi tệp' : '+ Tải tệp'}</span>
+                      </button>
+                    </div>
+
+                    {driveFileInfo || poHeader['Tệp đơn hàng'] ? (
+                      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                              {String(driveFileInfo?.fileName || poHeader['Tệp đơn hàng']).toLowerCase().endsWith('.pdf') ? (
+                                <FileText size={15} />
+                              ) : (
+                                <ImageIcon size={15} />
+                              )}
+                            </div>
+                            <div className="overflow-hidden">
+                              <span className="text-xs font-bold text-blue-950 truncate block" title={driveFileInfo?.fileName || poHeader['Tệp đơn hàng']}>
+                                {driveFileInfo?.fileName || poHeader['Tệp đơn hàng']}
+                              </span>
+                              <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                                <CheckCircle size={10} /> Google Drive • Sẵn sàng chia sẻ
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[10px] font-medium text-blue-500 hover:underline cursor-pointer shrink-0">Tải xuống</span>
+
+                        {/* Quick action buttons */}
+                        <div className="flex items-center gap-1.5 pt-1 border-t border-blue-100/80">
+                          {driveFileInfo?.driveLink ? (
+                            <>
+                              <a
+                                href={driveFileInfo.driveLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold text-center flex items-center justify-center gap-1 shadow-2xs transition-all"
+                              >
+                                <ExternalLink size={12} />
+                                <span>Mở Drive</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(driveFileInfo.driveLink);
+                                    setCopiedLink(true);
+                                    toast.success('Đã sao chép link chia sẻ Google Drive!');
+                                    setTimeout(() => setCopiedLink(false), 2500);
+                                  } catch {
+                                    toast.error('Không thể tự động chép link');
+                                  }
+                                }}
+                                className={`px-2 py-1 border rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                  copiedLink
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                                }`}
+                                title="Sao chép link chia sẻ Google Drive"
+                              >
+                                {copiedLink ? <Check size={12} /> : <Share2 size={12} />}
+                                <span>{copiedLink ? 'Đã chép' : 'Chia sẻ'}</span>
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowFileUploadModal(true)}
+                              className="flex-1 py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold text-center flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                            >
+                              <UploadCloud size={12} />
+                              <span>Lưu lên Google Drive</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowFileUploadModal(true)}
+                            className="p-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-600 transition-all cursor-pointer"
+                            title="Tải lên tệp mới thay thế"
+                          >
+                            <RefreshCw size={13} />
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 flex items-center justify-center text-xs text-gray-400">
-                        Chưa tải lên file đơn hàng (PDF/Ảnh)
+                      <div 
+                        onClick={() => setShowFileUploadModal(true)}
+                        className="p-4 bg-slate-50 hover:bg-blue-50/50 rounded-xl border border-dashed border-slate-300 hover:border-blue-400 flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
+                      >
+                        <UploadCloud size={20} className="text-slate-400 group-hover:text-blue-600 transition-colors mb-1" />
+                        <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">
+                          + Tải file PDF hoặc Hình ảnh
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Tự động lưu Google Drive & tạo link chia sẻ
+                        </span>
                       </div>
                     )}
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-2">
-                    Ngày đặt: {poHeader['Ngày đặt hàng'] || 'Chưa rõ'}
+                  <div className="text-[11px] text-gray-400 mt-2 flex items-center justify-between">
+                    <span>Ngày đặt: <strong>{poHeader['Ngày đặt hàng'] || 'Chưa rõ'}</strong></span>
+                    {driveFileInfo && (
+                      <span className="text-[10px] text-blue-600 font-mono">Drive: Đã đồng bộ</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -872,6 +1004,19 @@ export function PODetailModal({
         productData={productData}
         pricingData={pricingData}
       />
+
+      {/* PO File Upload & Drive Sync Modal */}
+      <POFileUploadModal
+        isOpen={showFileUploadModal}
+        onClose={() => setShowFileUploadModal(false)}
+        poHeader={poHeader}
+        onUpdatePOHeader={async (updated) => {
+          if (onUpdatePOHeader) {
+            await onUpdatePOHeader(updated);
+          }
+        }}
+      />
     </div>
   );
 }
+

@@ -29,6 +29,7 @@ export { default as MemoryStorageModal } from "./MemoryStorageModal";
 export { default as GoogleSheetsSyncModal } from "./GoogleSheetsSyncModal";
 export { default as PDFExportModal } from "./PDFExportModal";
 export { PODetailModal } from "./PODetailModal";
+export { POFileUploadModal } from "./POFileUploadModal";
 export { ProductDetailModal } from "./ProductDetailModal";
 
 // UI Components & Comboboxes

@@ -888,6 +888,7 @@ export async function uploadFileDirectToGoogleDrive(params: {
 }): Promise<{
   driveFileId: string;
   driveLink: string;
+  shareLink?: string;
   downloadLink?: string;
   folderId?: string;
   folderLink?: string;
@@ -977,16 +978,48 @@ export async function uploadFileDirectToGoogleDrive(params: {
 
   const resultData = await response.json();
   const driveFileId = resultData.id;
-  const driveLink = resultData.webViewLink || ("https://drive.google.com/file/d/" + driveFileId + "/view");
-  const downloadLink = resultData.webContentLink;
+
+  // Tự động bật quyền chia sẻ công khai (anyone with link can view)
+  const shareLink = await makeGoogleDriveFileShareable(driveFileId, currentToken);
+  const driveLink = shareLink || resultData.webViewLink || ("https://drive.google.com/file/d/" + driveFileId + "/view?usp=sharing");
+  const downloadLink = resultData.webContentLink || `https://drive.google.com/uc?export=download&id=${driveFileId}`;
 
   return {
     driveFileId,
     driveLink,
+    shareLink: driveLink,
     downloadLink,
     folderId: targetFolderId,
     folderLink: targetFolderId ? `https://drive.google.com/drive/folders/${targetFolderId}` : "https://drive.google.com/drive/search?q=TSG_Business_Documents",
     folderPath: `TSG_Business_Documents / ${yearStr} / ${typeFolderClean} / Thang_${monthNum}`,
     fileName: nameToSave,
   };
+}
+
+/**
+ * Bật quyền chia sẻ công khai cho tệp trên Google Drive (anyone with link can view)
+ */
+export async function makeGoogleDriveFileShareable(fileId: string, token?: string): Promise<string> {
+  const currentToken = token || getStoredGoogleToken() || localStorage.getItem("google_access_token") || "";
+  if (!currentToken || !fileId) return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+
+  try {
+    const permUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`;
+    const permRes = await callGoogleApi(permUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "reader",
+        type: "anyone",
+      }),
+    }, currentToken);
+
+    if (!permRes.ok) {
+      console.warn("Could not set anyone-reader permission on Drive file:", await permRes.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.warn("Permission setting error on Google Drive:", err);
+  }
+
+  return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 }
