@@ -1705,12 +1705,21 @@ function TableView({
       'Số lượng', 'Số lượng đặt', 'Số lượng giao', 'Thành tiền dòng', 'Thành tiền'
     ];
     
-    const excludeCols = ['id', 'isDeleted', 'createdAt', 'updatedAt', 'deletedAt', 'Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 'Lợi nhuận (1)', 'Bản sao Kích thước'];
+    const excludeCols = [
+      'id', 'isDeleted', 'createdAt', 'updatedAt', 'deletedAt', 
+      'Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 
+      'Lợi nhuận (1)', 'Bản sao Kích thước',
+      '_userModified', 'Drive_File_Id', 'File_Size', 'File_Type', 'File_Updated_At'
+    ];
     if (isPOLineTable && title.includes("Chi tiết đơn")) {
       excludeCols.push('Đơn giá nhập', 'Lợi nhuận', 'Lợi nhuận dòng');
     }
     
-    const validKeys = Array.from(allKeysSet).filter(h => !excludeCols.includes(h));
+    const validKeys = Array.from(allKeysSet).filter(h => {
+      if (excludeCols.includes(h)) return false;
+      if (h.startsWith('_')) return false; // Filter any internal system properties
+      return true;
+    });
     
     // Sort so priority keys come first in logical order
     validKeys.sort((a, b) => {
@@ -3087,7 +3096,15 @@ function TableView({
             <div className="p-6 overflow-y-auto flex-1">
               <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {headers.filter(h => {
-                  if (h === 'STT' || h === 'id') return false;
+                  if (h === 'STT' || h === 'id' || h === 'isDeleted' || h.startsWith('_')) return false;
+
+                  // Technical metadata fields that are handled automatically in the background
+                  const technicalFields = [
+                    '_userModified', 'Drive_File_Id', 'Drive_File_Url', 'File_Link', 
+                    'File_Size', 'File_Type', 'File_Updated_At', 'Drive_Folder_Id', 'Chi tiết đơn hàng'
+                  ];
+                  if (technicalFields.includes(h)) return false;
+
                   if (isPOLineTable) {
                     const allowedFields = [
                       'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
@@ -3095,7 +3112,24 @@ function TableView({
                     ];
                     return allowedFields.includes(h);
                   }
+
+                  if (isPOHeaderTable) {
+                    const allowedHeaderFields = [
+                      'Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng',
+                      'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'
+                    ];
+                    return allowedHeaderFields.includes(h);
+                  }
+
                   return true;
+                }).sort((a, b) => {
+                  if (isPOHeaderTable) {
+                    const order = ['Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng', 'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'];
+                    const ia = order.indexOf(a);
+                    const ib = order.indexOf(b);
+                    if (ia !== -1 && ib !== -1) return ia - ib;
+                  }
+                  return 0;
                 }).map(h => {
                   // Common inputs based on field names
                   if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {
@@ -3468,7 +3502,15 @@ function TableView({
             <div className="flex-1 overflow-auto p-6 space-y-4">
               <form id="edit-form-side" onSubmit={handleSubmit} className="space-y-4">
                 {headers.filter(h => {
-                  if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT') return false;
+                  if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT' || h.startsWith('_')) return false;
+
+                  // Technical metadata fields that are handled automatically in the background
+                  const technicalFields = [
+                    '_userModified', 'Drive_File_Id', 'Drive_File_Url', 'File_Link', 
+                    'File_Size', 'File_Type', 'File_Updated_At', 'Drive_Folder_Id', 'Chi tiết đơn hàng'
+                  ];
+                  if (technicalFields.includes(h)) return false;
+
                   if (isPOLineTable) {
                     const allowedFields = [
                       'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
@@ -3476,7 +3518,24 @@ function TableView({
                     ];
                     return allowedFields.includes(h);
                   }
+
+                  if (isPOHeaderTable) {
+                    const allowedHeaderFields = [
+                      'Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng',
+                      'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'
+                    ];
+                    return allowedHeaderFields.includes(h);
+                  }
+
                   return true;
+                }).sort((a, b) => {
+                  if (isPOHeaderTable) {
+                    const order = ['Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng', 'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'];
+                    const ia = order.indexOf(a);
+                    const ib = order.indexOf(b);
+                    if (ia !== -1 && ib !== -1) return ia - ib;
+                  }
+                  return 0;
                 }).map(h => {
                   // Reuse logic for edit form
                   if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {

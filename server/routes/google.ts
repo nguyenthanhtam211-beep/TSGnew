@@ -122,15 +122,100 @@ googleRouter.post("/drive/upload", upload.single("file"), async (req: any, res: 
       fields: "id, webViewLink, webContentLink",
     });
 
+    // Make file accessible so other admins can download/view without permission block
+    try {
+      await drive.permissions.create({
+        fileId: file.data.id,
+        requestBody: {
+          role: "reader",
+          type: "anyone",
+        },
+      });
+    } catch (permErr) {
+      console.warn("Could not set public permission on uploaded file:", permErr);
+    }
+
     res.json({ 
       driveFileId: file.data.id, 
       driveLink: file.data.webViewLink,
-      downloadLink: file.data.webContentLink
+      downloadLink: file.data.webContentLink || `https://drive.google.com/uc?export=download&id=${file.data.id}`
     });
   } catch (error: any) {
     console.error("Drive upload error:", error);
     const statusCode = isGoogleAuthError(error) ? 401 : 500;
     res.status(statusCode).json({ error: error.message || "Failed to upload to Drive" });
+  }
+});
+
+// Drive Direct Download Proxy Endpoint for 1-click download by any admin
+googleRouter.get("/drive/download/:fileId", async (req: any, res: any) => {
+  try {
+    const { fileId } = req.params;
+    const requestedFileName = req.query.fileName as string;
+
+    let token = "";
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (req.query.token) {
+      token = req.query.token as string;
+    }
+
+    const oauth2Client = new google.auth.OAuth2();
+    if (token) {
+      oauth2Client.setCredentials({ access_token: token });
+    }
+
+    const drive = google.drive({ version: "v3", auth: token ? oauth2Client : undefined });
+
+    let fileName = requestedFileName || "";
+    let mimeType = "application/octet-stream";
+
+    try {
+      const meta = await drive.files.get({
+        fileId: fileId,
+        fields: "id, name, mimeType, size",
+      });
+      if (meta.data) {
+        if (!fileName && meta.data.name) fileName = meta.data.name;
+        if (meta.data.mimeType) mimeType = meta.data.mimeType;
+      }
+    } catch (metaErr) {
+      console.warn("Could not read Drive file metadata:", metaErr);
+    }
+
+    if (!fileName) {
+      fileName = `TSG_Document_${fileId}.pdf`;
+    }
+
+    const responseStream = await drive.files.get(
+      { fileId: fileId, alt: "media" },
+      { responseType: "stream" }
+    );
+
+    res.setHeader("Content-Type", mimeType);
+    const encodedName = encodeURIComponent(fileName);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName.replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodedName}`
+    );
+
+    responseStream.data
+      .on("error", (streamErr: any) => {
+        console.error("Error streaming Drive file:", streamErr);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Lỗi trong quá trình truyền file" });
+        }
+      })
+      .pipe(res);
+  } catch (error: any) {
+    console.error("Drive download proxy error:", error);
+    // Fallback: If proxy streaming fails, redirect to Google Drive direct export download
+    if (req.params.fileId) {
+      return res.redirect(`https://drive.google.com/uc?export=download&id=${req.params.fileId}`);
+    }
+    const statusCode = isGoogleAuthError(error) ? 401 : 500;
+    res.status(statusCode).json({ error: error.message || "Failed to download file" });
   }
 });
 

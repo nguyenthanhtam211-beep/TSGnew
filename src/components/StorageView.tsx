@@ -39,10 +39,12 @@ import { toast } from 'react-hot-toast';
 export interface StorageFile {
   id?: string;
   fileId: string;
+  driveFileId?: string;
   fileName: string;
   fileSize?: number | string;
   mimeType?: string;
   driveLink?: string;
+  downloadLink?: string;
   folderLink?: string;
   folderPath?: string;
   uploadDate?: string;
@@ -101,6 +103,7 @@ export default function StorageView({
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSavingMemory, setIsSavingMemory] = useState(false);
+  const [previewFile, setPreviewFile] = useState<StorageFile | null>(null);
 
   // Upload Modal State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -112,6 +115,19 @@ export default function StorageView({
   // Editing Note State
   const [editingNoteFileId, setEditingNoteFileId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState<string>('');
+
+  // Category counts
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: files.length, PO: 0, PXK: 0, INVOICE: 0, HD: 0 };
+    files.forEach(f => {
+      const dt = (f.documentType || '').toUpperCase();
+      if (dt.includes('PO') || dt.includes('ORDER') || dt.includes('ĐƠN')) counts.PO = (counts.PO || 0) + 1;
+      else if (dt.includes('PXK') || dt.includes('XUẤT') || dt.includes('GIAO')) counts.PXK = (counts.PXK || 0) + 1;
+      else if (dt.includes('INV') || dt.includes('HÓA') || dt.includes('HOA')) counts.INVOICE = (counts.INVOICE || 0) + 1;
+      else if (dt.includes('HD') || dt.includes('HỢP') || dt.includes('HOP')) counts.HD = (counts.HD || 0) + 1;
+    });
+    return counts;
+  }, [files]);
 
   // Double Check Stats
   const checkStats = useMemo(() => {
@@ -255,7 +271,14 @@ export default function StorageView({
   const filteredFiles = useMemo(() => {
     return files.filter(f => {
       const docType = (f.documentType || '').toUpperCase();
-      const matchType = selectedType === 'ALL' || docType.includes(selectedType);
+      let matchType = selectedType === 'ALL';
+      if (!matchType) {
+        if (selectedType === 'PO') matchType = docType.includes('PO') || docType.includes('ORDER') || docType.includes('ĐƠN');
+        else if (selectedType === 'PXK') matchType = docType.includes('PXK') || docType.includes('XUẤT') || docType.includes('GIAO');
+        else if (selectedType === 'INVOICE') matchType = docType.includes('INV') || docType.includes('HÓA') || docType.includes('HOA');
+        else if (selectedType === 'HD') matchType = docType.includes('HD') || docType.includes('HỢP') || docType.includes('HOP');
+        else matchType = docType.includes(selectedType);
+      }
       
       const status = f.doubleCheckStatus || 'pending';
       const matchStatus = selectedCheckStatus === 'ALL' || status === selectedCheckStatus;
@@ -273,6 +296,45 @@ export default function StorageView({
       return matchType && matchStatus && matchSearch;
     });
   }, [files, selectedType, selectedCheckStatus, searchQuery]);
+
+  // Direct Download Handler (1-Click for any Admin)
+  const handleDownloadFile = (file: StorageFile) => {
+    const fileId = file.driveFileId || file.fileId || file.id;
+    const fileName = file.fileName || `${file.documentType || 'TSG_Document'}_${file.documentNumber || fileId}.pdf`;
+
+    toast.loading(`Đang tải xuống: ${fileName}...`, { id: `dl-${fileId}`, duration: 2500 });
+
+    try {
+      const token = localStorage.getItem('google_access_token') || '';
+      const proxyUrl = fileId && !fileId.startsWith('local_') 
+        ? `/api/drive/download/${fileId}?fileName=${encodeURIComponent(fileName)}${token ? `&token=${encodeURIComponent(token)}` : ''}` 
+        : '';
+      const directGoogleUrl = fileId && !fileId.startsWith('local_') 
+        ? `https://drive.google.com/uc?export=download&id=${fileId}` 
+        : '';
+
+      const targetUrl = proxyUrl || file.downloadLink || directGoogleUrl || file.driveLink;
+
+      if (!targetUrl) {
+        toast.error("Không tìm thấy liên kết tải về cho tệp này.", { id: `dl-${fileId}` });
+        return;
+      }
+
+      const a = document.createElement('a');
+      a.href = targetUrl;
+      a.download = fileName;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      toast.success(`Đã bắt đầu tải xuống: ${fileName}`, { id: `dl-${fileId}` });
+    } catch (err: any) {
+      console.error('Download error:', err);
+      if (file.driveLink) window.open(file.driveLink, '_blank');
+      toast.error('Lỗi khi tải xuống, đã mở tab Google Drive.', { id: `dl-${fileId}` });
+    }
+  };
 
   const getFileIcon = (mimeType?: string) => {
     const m = (mimeType || '').toLowerCase();
@@ -520,6 +582,89 @@ export default function StorageView({
             </div>
           </div>
 
+          {/* Quick Document Category Tabs for Admin */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setSelectedType('ALL')}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer active:scale-95",
+                selectedType === 'ALL'
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50"
+              )}
+            >
+              <span>Tất Cả Chứng Từ</span>
+              <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full", selectedType === 'ALL' ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
+                {typeCounts.ALL}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType('PO')}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer active:scale-95",
+                selectedType === 'PO'
+                  ? "bg-blue-600 text-white shadow-xs shadow-blue-500/20"
+                  : "bg-white text-blue-700 border border-blue-200/80 hover:bg-blue-50/60"
+              )}
+            >
+              <span>📦 Đơn Hàng & PO</span>
+              <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full", selectedType === 'PO' ? "bg-white/20 text-white" : "bg-blue-100 text-blue-700")}>
+                {typeCounts.PO}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType('PXK')}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer active:scale-95",
+                selectedType === 'PXK'
+                  ? "bg-emerald-600 text-white shadow-xs shadow-emerald-500/20"
+                  : "bg-white text-emerald-700 border border-emerald-200/80 hover:bg-emerald-50/60"
+              )}
+            >
+              <span>🚚 Phiếu Xuất Kho (PXK)</span>
+              <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full", selectedType === 'PXK' ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700")}>
+                {typeCounts.PXK}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType('INVOICE')}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer active:scale-95",
+                selectedType === 'INVOICE'
+                  ? "bg-purple-600 text-white shadow-xs shadow-purple-500/20"
+                  : "bg-white text-purple-700 border border-purple-200/80 hover:bg-purple-50/60"
+              )}
+            >
+              <span>🧾 Hóa Đơn VAT</span>
+              <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full", selectedType === 'INVOICE' ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700")}>
+                {typeCounts.INVOICE}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedType('HD')}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer active:scale-95",
+                selectedType === 'HD'
+                  ? "bg-amber-600 text-white shadow-xs shadow-amber-500/20"
+                  : "bg-white text-amber-700 border border-amber-200/80 hover:bg-amber-50/60"
+              )}
+            >
+              <span>📑 Hợp Đồng & Khác</span>
+              <span className={clsx("text-[10px] px-1.5 py-0.5 rounded-full", selectedType === 'HD' ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700")}>
+                {typeCounts.HD}
+              </span>
+            </button>
+          </div>
+
           {/* Search and Filters */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="relative flex-1 w-full md:w-80">
@@ -707,6 +852,27 @@ export default function StorageView({
                           </td>
                           <td className="px-3.5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Nút Tải Về 1-Click dành cho bất kỳ Admin nào */}
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadFile(file)}
+                                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl transition shadow-xs flex items-center gap-1 font-bold text-[11px] cursor-pointer"
+                                title="Tải tệp này về máy tính (1-Click Direct Download)"
+                              >
+                                <Download size={13} />
+                                <span>Tải về</span>
+                              </button>
+
+                              {/* Nút Xem Trước */}
+                              <button
+                                type="button"
+                                onClick={() => setPreviewFile(file)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1 font-medium text-[11px] cursor-pointer"
+                                title="Xem trước tài liệu"
+                              >
+                                <Eye size={14} />
+                              </button>
+
                               {file.driveLink && (
                                 <a
                                   href={file.driveLink}
@@ -799,25 +965,34 @@ export default function StorageView({
                           {file.uploadDate ? new Date(file.uploadDate).toLocaleDateString("vi-VN") : "---"}
                         </span>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadFile(file)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded-xl shadow-xs active:scale-95 cursor-pointer"
+                          >
+                            <Download size={12} />
+                            <span>Tải về</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewFile(file)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-xl cursor-pointer"
+                          >
+                            <Eye size={12} />
+                            <span>Xem</span>
+                          </button>
                           {file.driveLink && (
                             <a
                               href={file.driveLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200"
+                              className="p-1 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition"
+                              title="Mở Drive"
                             >
                               <ExternalLink size={12} />
-                              <span>Mở Drive</span>
                             </a>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => file.driveLink && window.open(file.driveLink, "_blank")}
-                            className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-xl"
-                          >
-                            Chi tiết
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -1053,6 +1228,113 @@ export default function StorageView({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL XEM TRƯỚC VÀ TẢI TỆP (DOCUMENT PREVIEW & DIRECT DOWNLOAD MODAL) */}
+      {/* ========================================================================= */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-[#FBFBFD]">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
+                  {getFileIcon(previewFile.mimeType)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-mono">
+                      {previewFile.documentType || 'Chứng từ'}
+                    </span>
+                    {(previewFile.documentNumber || previewFile.docNumber) && (
+                      <span className="text-xs font-bold text-slate-800 font-mono">
+                        #{previewFile.documentNumber || previewFile.docNumber}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate max-w-md mt-0.5" title={previewFile.fileName}>
+                    {previewFile.fileName}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewFile(null)}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-2xl transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body / Viewer */}
+            <div className="flex-1 bg-slate-900 p-2 sm:p-4 overflow-hidden flex flex-col items-center justify-center min-h-[460px]">
+              {(previewFile.driveFileId || previewFile.fileId) && !String(previewFile.driveFileId || previewFile.fileId).startsWith('local_') ? (
+                <iframe
+                  src={`https://drive.google.com/file/d/${previewFile.driveFileId || previewFile.fileId}/preview`}
+                  className="w-full h-full min-h-[460px] rounded-xl border border-slate-800 bg-white"
+                  title={previewFile.fileName}
+                  allow="autoplay"
+                />
+              ) : (
+                <div className="text-center p-8 space-y-4 text-white">
+                  <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center mx-auto text-blue-400">
+                    <FileText size={32} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-bold text-lg">{previewFile.fileName}</p>
+                    <p className="text-sm text-slate-400">
+                      Tệp chứng từ được lưu trữ an toàn trong kho dữ liệu TSG Business OS
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadFile(previewFile)}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download size={16} />
+                    <span>Tải Về Máy Tính Ngay</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer with Actions */}
+            <div className="p-4 sm:p-5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                <span>📁 {previewFile.folderPath || 'TSG_Business_Documents'}</span>
+                {(previewFile.customer || previewFile.partnerName) && (
+                  <>
+                    <span>•</span>
+                    <span>Đối tác: <strong>{previewFile.customer || previewFile.partnerName}</strong></span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                {previewFile.driveLink && (
+                  <a
+                    href={previewFile.driveLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5"
+                  >
+                    <ExternalLink size={14} />
+                    <span>Mở Trên Google Drive</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFile(previewFile)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Download size={15} />
+                  <span>⬇ Tải Tệp Về Máy Tính</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

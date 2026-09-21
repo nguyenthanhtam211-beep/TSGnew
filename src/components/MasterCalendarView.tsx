@@ -21,7 +21,12 @@ import {
   FileSpreadsheet,
   Layers,
   Sparkles,
-  Filter
+  Filter,
+  Plus,
+  X,
+  CalendarPlus,
+  Check,
+  ClipboardList
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
@@ -34,6 +39,7 @@ interface MasterCalendarViewProps {
   poHeaders?: any[];
   customers?: any[];
   products?: any[];
+  onAddPlan?: (plan: any) => Promise<void>;
   onPoClick?: (poNumber: string) => void;
   onProductClick?: (productId: string) => void;
 }
@@ -45,6 +51,7 @@ export default function MasterCalendarView({
   poHeaders = [],
   customers = [],
   products = [],
+  onAddPlan,
   onPoClick,
   onProductClick
 }: MasterCalendarViewProps) {
@@ -58,7 +65,152 @@ export default function MasterCalendarView({
   const [statusFilter, setStatusFilter] = useState("all"); // all, delivered, pending
 
   // Selected Day Detail Modal
-  const [selectedDayDetail, setSelectedDayDetail] = useState<{ dateSlash: string; dateObj: Date; plans: any[] } | null>(null);
+  const [selectedDayDetail, setSelectedDayDetail] = useState<{ dateSlash: string; dateIso?: string; dateObj: Date; plans: any[] } | null>(null);
+
+  // Manual Delivery Schedule Creation State
+  const [isAddPlanModalOpen, setIsAddPlanModalOpen] = useState(false);
+  const [newPlanForm, setNewPlanForm] = useState({
+    poNumber: "",
+    customer: "",
+    product: "",
+    quantity: "",
+    unit: "bao",
+    date: new Date().toISOString().split("T")[0],
+    shift: "Sáng (07:30 - 11:30)",
+    vehicle: "",
+    driverPhone: "",
+    notes: "",
+    status: "Chờ giao"
+  });
+
+  const availablePOs = useMemo(() => {
+    const list: { poNumber: string; customer: string }[] = [];
+    const seen = new Set<string>();
+    poHeaders.forEach(h => {
+      const num = h["Số PO"] || h["Đơn hàng"] || h.poNumber || h.id;
+      if (num && !seen.has(String(num))) {
+        seen.add(String(num));
+        list.push({ poNumber: String(num), customer: String(h["Khách hàng"] || h.customer || "") });
+      }
+    });
+    poLines.forEach(l => {
+      const num = l["Số đơn hàng"] || l["Số PO"] || l["Đơn hàng"] || l.poNumber;
+      if (num && !seen.has(String(num))) {
+        seen.add(String(num));
+        list.push({ poNumber: String(num), customer: String(l["Khách hàng"] || l.customer || "") });
+      }
+    });
+    return list;
+  }, [poHeaders, poLines]);
+
+  const handleOpenAddPlan = (prefillDate?: string) => {
+    let isoDate = new Date().toISOString().split("T")[0];
+    if (prefillDate) {
+      if (prefillDate.includes("/")) {
+        const parts = prefillDate.split("/");
+        if (parts.length === 3) {
+          const [d, m, y] = parts;
+          isoDate = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+        }
+      } else if (prefillDate.includes("-")) {
+        isoDate = prefillDate;
+      }
+    }
+    setNewPlanForm(prev => ({
+      ...prev,
+      date: isoDate
+    }));
+    setIsAddPlanModalOpen(true);
+  };
+
+  const handleSaveNewPlan = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newPlanForm.product || !newPlanForm.quantity || !newPlanForm.date) {
+      toast.error("Vui lòng nhập đầy đủ Sản phẩm, Số lượng và Ngày giao!");
+      return;
+    }
+
+    const [y, m, d] = newPlanForm.date.split("-");
+    const dateSlash = `${d}/${m}/${y}`;
+    const planId = `KH_${Date.now()}`;
+
+    const planPayload = {
+      id: planId,
+      "Kế hoạch ID": planId,
+      "Đơn hàng": newPlanForm.poNumber || "Đơn lẻ / Bổ sung",
+      "Khách hàng": newPlanForm.customer || "Khách trực tiếp",
+      "Sản phẩm": newPlanForm.product,
+      "Số lượng": parseNumber(newPlanForm.quantity),
+      "Số lượng kế hoạch": parseNumber(newPlanForm.quantity),
+      "Số lượng cần giao": parseNumber(newPlanForm.quantity),
+      "ĐVT": newPlanForm.unit || "bao",
+      "Ngày giao kế hoạch": dateSlash,
+      "Ngày dự kiến": newPlanForm.date,
+      "Ngày giao": dateSlash,
+      "Ca giao": newPlanForm.shift,
+      "Xe vận chuyển": newPlanForm.vehicle,
+      "Số điện thoại tài xế": newPlanForm.driverPhone,
+      "Ghi chú": newPlanForm.notes,
+      "Trạng thái": newPlanForm.status || "Chờ giao",
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      if (onAddPlan) {
+        await onAddPlan(planPayload);
+      }
+      toast.success(`Đã bổ sung lịch giao ngày ${dateSlash} thành công!`);
+      setIsAddPlanModalOpen(false);
+      setSelectedDayDetail(null);
+      setNewPlanForm({
+        poNumber: "",
+        customer: "",
+        product: "",
+        quantity: "",
+        unit: "bao",
+        date: new Date().toISOString().split("T")[0],
+        shift: "Sáng (07:30 - 11:30)",
+        vehicle: "",
+        driverPhone: "",
+        notes: "",
+        status: "Chờ giao"
+      });
+    } catch (err: any) {
+      toast.error("Lỗi khi thêm lịch giao: " + (err?.message || err));
+    }
+  };
+
+  // Filter products matching selected PO
+  const availableProductsForPO = useMemo(() => {
+    if (!newPlanForm.poNumber || newPlanForm.poNumber === "Đơn lẻ / Bổ sung") {
+      return products.map(p => p.name || p["Tên sản phẩm"] || p.id).filter(Boolean);
+    }
+    const matchingLines = poLines.filter(l => (l["Đơn hàng"] || l["Số PO"] || l.poNumber) === newPlanForm.poNumber);
+    if (matchingLines.length > 0) {
+      return Array.from(new Set(matchingLines.map(l => l["Sản phẩm"] || l["Tên sản phẩm"] || l.productName).filter(Boolean)));
+    }
+    return products.map(p => p.name || p["Tên sản phẩm"] || p.id).filter(Boolean);
+  }, [newPlanForm.poNumber, poLines, products]);
+
+  const handleSelectPO = (poNum: string) => {
+    if (!poNum) {
+      setNewPlanForm(prev => ({ ...prev, poNumber: "" }));
+      return;
+    }
+    const poHeader = poHeaders.find(h => (h["Số PO"] || h["Đơn hàng"] || h.poNumber) === poNum);
+    const poLine = poLines.find(l => (l["Đơn hàng"] || l["Số PO"] || l.poNumber) === poNum);
+    const matchedCustomer = poHeader?.["Khách hàng"] || poHeader?.customer || poLine?.["Khách hàng"] || "";
+    const matchedProduct = poLine?.["Sản phẩm"] || poLine?.productName || "";
+    const matchedUnit = poLine?.["ĐVT"] || poLine?.unit || "sp";
+
+    setNewPlanForm(prev => ({
+      ...prev,
+      poNumber: poNum,
+      customer: matchedCustomer || prev.customer,
+      product: matchedProduct || prev.product,
+      unit: matchedUnit || prev.unit
+    }));
+  };
 
   // Unify all delivery schedule items (Combines Delivery Plans + Executed Deliveries)
   const allEvents = useMemo(() => {
@@ -70,7 +222,14 @@ export default function MasterCalendarView({
       const planId = String(plan["Kế hoạch ID"] || plan.id || "");
       if (planId) seenPlanIds.add(planId);
 
-      const rawDate = String(plan["Ngày giao kế hoạch"] || plan["Ngày giao"] || "");
+      const rawDate = String(
+        plan["Ngày giao kế hoạch"] || 
+        plan["Ngày dự kiến"] || 
+        plan["Ngày giao"] || 
+        plan["Thời gian bắt đầu"] || 
+        plan["date"] || 
+        ""
+      );
       let dateSlash = "";
       let dateIso = "";
       if (rawDate.includes("/")) {
@@ -506,124 +665,126 @@ export default function MasterCalendarView({
   }, [viewScale, currentDate, dayViewDateSlash, weekDays]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header & View Scale Switcher */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-6 space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[10.5px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
-                Logistics & Supply Schedule Master
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-xs text-slate-500 font-medium">{filteredEvents.length} chuyến giao nhận</span>
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-              <CalendarIcon className="text-[#007AFF]" size={26} />
-              <span>Bảng Lịch Giao Nhận Tổng Thể</span>
-            </h2>
-          </div>
-
-          {/* Quick Actions (Sync Google Calendar / Export ICS / Excel) */}
+    <div className="space-y-5">
+      {/* Top Controls & Navigation Bar */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 space-y-4">
+        {/* Row 1: Scale Selector, Date Navigator, Title, and Action Buttons */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          {/* Left Controls: 4 Scales + Navigator + Date Badge */}
           <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={handleExportICS}
-              className="bg-[#007AFF] hover:bg-[#0066D6] text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
-              title="Tải file .ics để đồng bộ hàng loạt vào Apple Calendar hoặc Google Calendar"
-            >
-              <CalendarDays size={15} />
-              <span>Đồng Bộ File Lịch (.ics)</span>
-            </button>
+            {/* 4 Scale Buttons */}
+            <div className="bg-[#F5F5F7] p-1 rounded-xl flex items-center border border-slate-200/60 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewScale("day")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewScale === "day" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScale("week")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewScale === "week" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Tuần
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScale("month")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewScale === "month" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Tháng
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScale("year")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewScale === "year" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Năm
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-2xs active:scale-[0.98]"
-              title="Xuất bảng đối chiếu lịch trình ra file Excel"
-            >
-              <FileSpreadsheet size={15} className="text-emerald-600" />
-              <span>Xuất Excel</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Scale Switcher Tabs & Navigator Bar */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          {/* 4 Scale Buttons: Ngày, Tuần, Tháng, Năm */}
-          <div className="bg-[#F5F5F7] p-1 rounded-xl flex items-center border border-slate-200/60 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setViewScale("day")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewScale === "day" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Ngày
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewScale("week")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewScale === "week" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Tuần
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewScale("month")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewScale === "month" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Tháng
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewScale("year")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewScale === "year" ? "bg-white text-[#007AFF] shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Năm
-            </button>
-          </div>
-
-          {/* Date Navigator */}
-          <div className="flex items-center gap-3">
+            {/* Date Navigator */}
             <div className="flex items-center bg-[#F5F5F7] rounded-xl p-1 border border-slate-200/60 text-xs">
               <button
                 type="button"
                 onClick={handlePrev}
-                className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                title="Lùi lại"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 type="button"
                 onClick={handleToday}
-                className="px-3 py-1 rounded-lg font-semibold text-slate-700 hover:bg-white transition"
+                className="px-2.5 py-1 rounded-lg font-bold text-slate-700 hover:bg-white transition cursor-pointer"
               >
                 Hôm nay
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition"
+                className="p-1.5 hover:bg-white rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                title="Tiến tới"
               >
                 <ChevronRight size={16} />
               </button>
             </div>
 
-            <div className="text-sm font-bold text-slate-900 font-mono tracking-tight bg-[#FBFBFD] px-3.5 py-1.5 rounded-xl border border-slate-200/60">
-              {headerTitle}
+            {/* Current View Title badge */}
+            <div className="text-xs font-bold text-slate-900 font-mono tracking-tight bg-blue-50/70 text-blue-800 px-3 py-1.5 rounded-xl border border-blue-100">
+              📅 {headerTitle}
             </div>
+
+            <span className="text-xs text-slate-400 font-medium hidden md:inline">
+              ({filteredEvents.length} chuyến)
+            </span>
+          </div>
+
+          {/* Right Controls: + Thêm Lịch Giao Thủ Công, Sync .ics, Export Excel */}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => handleOpenAddPlan()}
+              className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-500 hover:to-teal-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-sm shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Tự bổ sung lịch giao hàng thủ công"
+            >
+              <Plus size={15} />
+              <span>+ Bổ Sung Lịch Giao Thủ Công</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportICS}
+              className="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Tải file .ics để đồng bộ vào Google/Apple Calendar"
+            >
+              <CalendarDays size={14} className="text-blue-600" />
+              <span className="hidden sm:inline">File Lịch (.ics)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Xuất bảng đối chiếu lịch trình ra file Excel"
+            >
+              <FileSpreadsheet size={14} className="text-emerald-600" />
+              <span className="hidden sm:inline">Xuất Excel</span>
+            </button>
           </div>
         </div>
 
-        {/* Global Filters Toolbar */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 text-xs">
+        {/* Row 2: Search & Filters */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row items-center gap-3 text-xs">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -640,7 +801,7 @@ export default function MasterCalendarView({
           <select
             value={selectedCustomer}
             onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-700 w-full sm:w-auto"
+            className="px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-700 w-full md:w-auto"
           >
             <option value="all">Tất cả khách hàng ({customerList.length})</option>
             {customerList.map(c => (
@@ -652,7 +813,7 @@ export default function MasterCalendarView({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-700 w-full sm:w-auto"
+            className="px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-700 w-full md:w-auto"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="delivered">✅ Đã giao thực tế</option>
@@ -803,9 +964,26 @@ export default function MasterCalendarView({
                     <span className={`text-[11px] font-bold uppercase tracking-wider ${day.isToday ? "text-white" : "text-slate-500"}`}>
                       {day.dayName}
                     </span>
-                    {day.isToday && (
-                      <span className="text-[9px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded">HÔM NAY</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {day.isToday && (
+                        <span className="text-[9px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded">HÔM NAY</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAddPlan(day.dateSlash);
+                        }}
+                        title={`Lên lịch giao ngày ${day.dateSlash}`}
+                        className={`p-1 rounded-md transition ${
+                          day.isToday
+                            ? "hover:bg-white/20 text-white"
+                            : "hover:bg-blue-50 text-slate-400 hover:text-[#007AFF]"
+                        }`}
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
                   </div>
                   <div className={`text-sm font-bold mt-0.5 tabular-nums ${day.isToday ? "text-white" : "text-slate-900"}`}>
                     {day.dateSlash.slice(0, 5)}
@@ -820,8 +998,16 @@ export default function MasterCalendarView({
                 {/* Day Cards */}
                 <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[460px]">
                   {day.events.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-3 text-slate-300 text-[11px]">
+                    <div className="h-full flex flex-col items-center justify-center text-center p-3 text-slate-300 text-[11px] gap-2">
                       <span>Trống lịch</span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddPlan(day.dateSlash)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#007AFF] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition"
+                      >
+                        <Plus size={12} />
+                        Thêm chuyến
+                      </button>
                     </div>
                   ) : (
                     day.events.map((ev, eIdx) => {
@@ -920,12 +1106,10 @@ export default function MasterCalendarView({
               {monthGridDays.map((cell, idx) => (
                 <div
                   key={idx}
-                  onClick={() => cell.events.length > 0 && setSelectedDayDetail({ dateSlash: cell.dateSlash, dateObj: cell.dateObj, plans: cell.events })}
-                  className={`min-h-[105px] sm:min-h-[120px] p-2 transition-all flex flex-col justify-between ${
+                  onClick={() => setSelectedDayDetail({ dateSlash: cell.dateSlash, dateObj: cell.dateObj, plans: cell.events })}
+                  className={`min-h-[105px] sm:min-h-[120px] p-2 transition-all flex flex-col justify-between cursor-pointer group ${
                     cell.isCurrentMonth ? "bg-white text-slate-800" : "bg-slate-50/50 text-slate-400"
-                  } ${cell.isToday ? "ring-2 ring-inset ring-[#007AFF] bg-blue-50/20" : ""} ${
-                    cell.events.length > 0 ? "cursor-pointer hover:bg-blue-50/40" : ""
-                  }`}
+                  } ${cell.isToday ? "ring-2 ring-inset ring-[#007AFF] bg-blue-50/20" : ""} hover:bg-blue-50/40`}
                 >
                   {/* Date Number Header */}
                   <div className="flex items-center justify-between">
@@ -934,11 +1118,25 @@ export default function MasterCalendarView({
                     }`}>
                       {cell.dayNumber}
                     </span>
-                    {cell.events.length > 0 && (
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md">
-                        {cell.events.length} chuyến
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {cell.events.length > 0 ? (
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md">
+                          {cell.events.length} chuyến
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAddPlan(cell.dateSlash);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-[#007AFF] hover:bg-blue-100 rounded transition text-[10px] flex items-center"
+                          title={`Lên lịch cho ngày ${cell.dateSlash}`}
+                        >
+                          <Plus size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Cell Events Preview */}
@@ -1110,56 +1308,308 @@ export default function MasterCalendarView({
               </button>
             </div>
 
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {selectedDayDetail.plans.map((item, idx) => {
-                const gCal = getGoogleCalendarUrl(item);
-                return (
-                  <div key={idx} className="p-3.5 bg-[#FBFBFD] rounded-xl border border-slate-200/80 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-sm">{item.customer}</span>
-                      <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                        {item.poNumber}
-                      </span>
-                    </div>
-
-                    <div className="text-slate-600 font-medium">{item.product}</div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                      <div>
-                        <span className="text-slate-400 mr-1">Số lượng:</span>
-                        <strong className="text-slate-900 tabular-nums">{item.quantity.toLocaleString("vi-VN")} {item.unit}</strong>
+            {selectedDayDetail.plans.length === 0 ? (
+              <div className="py-8 text-center space-y-3 bg-[#FBFBFD] rounded-xl border border-dashed border-slate-200">
+                <CalendarDays className="mx-auto text-slate-300" size={36} />
+                <p className="text-sm font-medium text-slate-500">Chưa có lịch giao hàng nào trong ngày {selectedDayDetail.dateSlash}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const dateToUse = selectedDayDetail.dateSlash;
+                    setSelectedDayDetail(null);
+                    handleOpenAddPlan(dateToUse);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-sm transition"
+                >
+                  <Plus size={14} />
+                  <span>+ Lên Lịch Giao Cho Ngày Này</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {selectedDayDetail.plans.map((item, idx) => {
+                  const gCal = getGoogleCalendarUrl(item);
+                  return (
+                    <div key={idx} className="p-3.5 bg-[#FBFBFD] rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 text-sm">{item.customer}</span>
+                        <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                          {item.poNumber}
+                        </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
-                        item.status === "Đã giao" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                      }`}>
-                        {item.status}
-                      </span>
-                    </div>
 
-                    <div className="pt-1.5 flex items-center justify-between border-t border-slate-100">
-                      <a
-                        href={gCal}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline text-[11px]"
-                      >
-                        <ExternalLink size={11} />
-                        <span>Thêm vào Google Calendar</span>
-                      </a>
-                      {item.notes && <span className="text-slate-400 italic text-[11px]">{item.notes}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="text-slate-600 font-medium">{item.product}</div>
 
-            <div className="pt-2 flex justify-end">
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <div>
+                          <span className="text-slate-400 mr-1">Số lượng:</span>
+                          <strong className="text-slate-900 tabular-nums">{item.quantity.toLocaleString("vi-VN")} {item.unit}</strong>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
+                          item.status === "Đã giao" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                        }`}>
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <div className="pt-1.5 flex items-center justify-between border-t border-slate-100">
+                        <a
+                          href={gCal}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline text-[11px]"
+                        >
+                          <ExternalLink size={11} />
+                          <span>Thêm vào Google Calendar</span>
+                        </a>
+                        {item.notes && <span className="text-slate-400 italic text-[11px]">{item.notes}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const dateToUse = selectedDayDetail.dateSlash;
+                  setSelectedDayDetail(null);
+                  handleOpenAddPlan(dateToUse);
+                }}
+                className="inline-flex items-center gap-1.5 text-[#007AFF] hover:text-blue-700 font-semibold text-xs py-2 px-3 hover:bg-blue-50 rounded-xl transition"
+              >
+                <Plus size={14} />
+                <span>Thêm chuyến cho ngày này</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedDayDetail(null)}
                 className="px-5 py-2 bg-slate-900 text-white font-semibold rounded-xl text-xs hover:bg-slate-800 transition"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MANUAL ADD DELIVERY SCHEDULE MODAL */}
+      {/* ========================================================================= */}
+      {isAddPlanModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-50 text-[#007AFF] rounded-xl">
+                  <CalendarPlus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Bổ Sung Lịch Giao Hàng Thủ Công</h3>
+                  <p className="text-xs text-slate-400">Điều phối xe và chuyến giao hàng trực tiếp lên lịch</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddPlanModalOpen(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form Body */}
+            <div className="space-y-3.5 text-xs">
+              {/* Ngày giao & PO Source */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Ngày giao hàng *</label>
+                  <input
+                    type="date"
+                    value={newPlanForm.date}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, date: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Chọn từ đơn PO có sẵn</label>
+                  <select
+                    value={newPlanForm.poNumber}
+                    onChange={(e) => handleSelectPO(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  >
+                    <option value="">-- Nhập tay tự do --</option>
+                    {availablePOs.map((po, idx) => (
+                      <option key={idx} value={po.poNumber}>
+                        {po.poNumber} ({po.customer})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Số PO (nếu nhập tay) & Khách hàng */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Mã PO / Số chứng từ</label>
+                  <input
+                    type="text"
+                    value={newPlanForm.poNumber}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, poNumber: e.target.value })}
+                    placeholder="VD: PO-2026-09"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Tên khách hàng / Đại lý *</label>
+                  <input
+                    type="text"
+                    value={newPlanForm.customer}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, customer: e.target.value })}
+                    placeholder="VD: Đại lý Hoàng Phát"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+              </div>
+
+              {/* Tên hàng hóa / Sản phẩm */}
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Hàng hóa / Sản phẩm *</label>
+                {availableProductsForPO.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <select
+                      value={newPlanForm.product}
+                      onChange={(e) => setNewPlanForm({ ...newPlanForm, product: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                    >
+                      <option value="">-- Chọn mặt hàng từ PO --</option>
+                      {availableProductsForPO.map((pName, pIdx) => (
+                        <option key={pIdx} value={pName}>
+                          {pName}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={newPlanForm.product}
+                      onChange={(e) => setNewPlanForm({ ...newPlanForm, product: e.target.value })}
+                      placeholder="Hoặc tự gõ tên mặt hàng khác..."
+                      className="w-full px-3 py-1.5 text-xs bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={newPlanForm.product}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, product: e.target.value })}
+                    placeholder="VD: NPK 16-16-8 Đầu Trâu"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                )}
+              </div>
+
+              {/* Số lượng, Đơn vị & Trạng thái */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Số lượng *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newPlanForm.quantity}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, quantity: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Đơn vị tính</label>
+                  <select
+                    value={newPlanForm.unit}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, unit: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  >
+                    <option value="bao">Bao</option>
+                    <option value="tấn">Tấn</option>
+                    <option value="kg">Kg</option>
+                    <option value="thùng">Thùng</option>
+                    <option value="cuộn">Cuộn</option>
+                    <option value="cái">Cái</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Trạng thái</label>
+                  <select
+                    value={newPlanForm.status}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  >
+                    <option value="Chờ giao">Chờ giao</option>
+                    <option value="Đang vận chuyển">Đang vận chuyển</option>
+                    <option value="Đã giao">Đã giao</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Xe vận chuyển & Số ĐT tài xế */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Xe vận chuyển / Biển số</label>
+                  <input
+                    type="text"
+                    value={newPlanForm.vehicle}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, vehicle: e.target.value })}
+                    placeholder="VD: Xe 3.5T (29C-123.45)"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-semibold mb-1">Số điện thoại tài xế</label>
+                  <input
+                    type="text"
+                    value={newPlanForm.driverPhone}
+                    onChange={(e) => setNewPlanForm({ ...newPlanForm, driverPhone: e.target.value })}
+                    placeholder="VD: 0912 345 678"
+                    className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                  />
+                </div>
+              </div>
+
+              {/* Ghi chú điều phối */}
+              <div>
+                <label className="block text-slate-600 font-semibold mb-1">Ghi chú điều phối (Xe, tài xế, địa chỉ giao...)</label>
+                <textarea
+                  rows={2}
+                  value={newPlanForm.notes}
+                  onChange={(e) => setNewPlanForm({ ...newPlanForm, notes: e.target.value })}
+                  placeholder="VD: Xe 5 tấn 29C-12345, giao sáng trước 10h, liên hệ A. Bình"
+                  className="w-full px-3 py-2 bg-[#FBFBFD] border border-slate-200 rounded-xl text-slate-800 font-medium resize-none focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAddPlanModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold rounded-xl text-xs transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewPlan}
+                className="px-5 py-2 bg-[#007AFF] hover:bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-sm flex items-center gap-1.5 transition"
+              >
+                <Check size={14} />
+                <span>Lưu Lịch Giao</span>
               </button>
             </div>
           </div>
