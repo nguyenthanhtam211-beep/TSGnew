@@ -16,6 +16,7 @@ import {
   Search, 
   ExternalLink, 
   ChevronRight,
+  ChevronLeft,
   Sparkles,
   Plus,
   ArrowUpRight,
@@ -82,8 +83,9 @@ export default function LogisticsHubView({
   const [reconcileFilterStatus, setReconcileFilterStatus] = useState<string>('ALL');
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<string>('ALL');
 
-  // Modal: Quick Plan Creation
+  // Modal: Unified Dispatch Plan Creation (Step 1: Select PO Table -> Step 2: Trip Details)
   const [isQuickPlanOpen, setIsQuickPlanOpen] = useState(false);
+  const [quickPlanStep, setQuickPlanStep] = useState<'select_po' | 'details'>('select_po');
   const [quickPlanForm, setQuickPlanForm] = useState({
     poNumber: '',
     customer: '',
@@ -94,8 +96,6 @@ export default function LogisticsHubView({
     vehicle: ''
   });
 
-  // Modal: System PO Selector Table
-  const [isPOSelectorModalOpen, setIsPOSelectorModalOpen] = useState(false);
   const [poSearchTerm, setPOSearchTerm] = useState('');
   const [poFilterStatus, setPOFilterStatus] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('PENDING');
 
@@ -220,35 +220,26 @@ export default function LogisticsHubView({
       quantity: targetQty ? String(targetQty) : prev.quantity
     }));
 
-    setIsPOSelectorModalOpen(false);
-    setIsPOComboboxOpen(false);
+    setQuickPlanStep('details');
     setIsQuickPlanOpen(true);
     toast.success(`Đã chọn đơn hàng ${po.poNumber}`);
   };
 
-  // Inline PO Combobox State & Click Outside Listener
-  const [isPOComboboxOpen, setIsPOComboboxOpen] = useState(false);
-  const poComboboxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (poComboboxRef.current && !poComboboxRef.current.contains(event.target as Node)) {
-        setIsPOComboboxOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const comboboxFilteredPOs = useMemo(() => {
-    const q = (quickPlanForm.poNumber || '').toLowerCase().trim();
-    if (!q) return availableSystemPOs;
-    return availableSystemPOs.filter(po => 
-      po.poNumber.toLowerCase().includes(q) || 
-      po.customer.toLowerCase().includes(q) ||
-      po.lines.some((l: any) => l.productName.toLowerCase().includes(q))
-    );
-  }, [availableSystemPOs, quickPlanForm.poNumber]);
+  const handleOpenQuickPlan = () => {
+    setQuickPlanForm({
+      poNumber: '',
+      customer: '',
+      product: '',
+      quantity: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: '',
+      vehicle: ''
+    });
+    setPOSearchTerm('');
+    setPOFilterStatus('PENDING');
+    setQuickPlanStep('select_po');
+    setIsQuickPlanOpen(true);
+  };
 
   // Unique customers for filter
   const customerOptions = useMemo(() => {
@@ -485,21 +476,11 @@ export default function LogisticsHubView({
             <div className="flex items-center gap-2.5 flex-wrap lg:justify-end">
               <button
                 type="button"
-                onClick={() => setIsPOSelectorModalOpen(true)}
-                className="px-4 py-2.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-200 hover:text-white rounded-2xl text-xs font-bold backdrop-blur-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-                title="Xem bảng chọn đơn hàng PO hệ thống để lên kế hoạch"
-              >
-                <Package size={16} className="text-teal-300" />
-                <span>Bảng Chọn PO ({availableSystemPOs.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsQuickPlanOpen(true)}
+                onClick={handleOpenQuickPlan}
                 className="px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white rounded-2xl text-xs font-bold shadow-lg shadow-teal-500/25 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={16} />
-                <span>Lập Kế Hoạch Giao Mới</span>
+                <span>Lập Kế Hoạch Điều Độ Mới</span>
               </button>
 
               <button
@@ -1024,495 +1005,486 @@ export default function LogisticsHubView({
         </div>
       )}
 
-      {/* 🌟 QUICK PLAN MODAL */}
+      {/* 🌟 UNIFIED DISPATCH PLAN MODAL (2-STEP ENTERPRISE FLOW) */}
       {isQuickPlanOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header with Stepper */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-[#FBFBFD]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                  <ClipboardList size={20} />
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                  <ClipboardList size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">Lập Kế Hoạch Điều Độ Mới</h3>
-                  <p className="text-xs text-slate-500">Phân bổ chuyến giao hàng theo PO cho đội vận tải</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsQuickPlanOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateQuickPlanSubmit} className="space-y-4">
-              {/* Số Đơn Hàng PO with Interactive Selection Table */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-800">
-                    Số Đơn Hàng PO * <span className="text-[11px] font-medium text-teal-600">(Chọn từ hệ thống)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsPOSelectorModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-white bg-teal-50 hover:bg-teal-600 border border-teal-300 px-3 py-1 rounded-xl transition shadow-2xs cursor-pointer active:scale-95"
-                  >
-                    <Package size={13} />
-                    <span>Mở Bảng Chọn PO ({availableSystemPOs.length})</span>
-                  </button>
-                </div>
-
-                {/* Big Visual Table Modal Trigger Button */}
-                <div
-                  onClick={() => setIsPOSelectorModalOpen(true)}
-                  className="w-full p-3 bg-gradient-to-r from-teal-50 via-teal-50/60 to-emerald-50 hover:from-teal-100/90 hover:to-emerald-100/90 border-2 border-dashed border-teal-400 hover:border-teal-600 rounded-2xl cursor-pointer transition flex items-center justify-between group shadow-2xs"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                      <Package size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-extrabold text-teal-950 flex items-center gap-1.5">
-                        <span>{quickPlanForm.poNumber ? `Đã chọn PO: ${quickPlanForm.poNumber}` : 'BẤM VÀO ĐÂY ĐỂ CHỌN PO TỪ BẢNG HỆ THỐNG'}</span>
-                      </div>
-                      <p className="text-[11px] text-teal-700 truncate mt-0.5">
-                        {quickPlanForm.poNumber 
-                          ? `${quickPlanForm.customer} • Bấm để mở lại bảng chọn PO khác` 
-                          : `Xem danh sách đầy đủ ${availableSystemPOs.length} đơn PO với khách hàng & sản phẩm`}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 px-3 py-1.5 bg-teal-600 group-hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1">
-                    <span>Bảng Chọn PO</span>
-                    <ChevronRight size={14} />
-                  </span>
-                </div>
-
-                {/* Direct Dropdown Select as Quick Alternative */}
-                <div className="relative">
-                  <select
-                    required
-                    value={quickPlanForm.poNumber}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (!val) {
-                        setQuickPlanForm(prev => ({ ...prev, poNumber: '', customer: '', product: '', quantity: '' }));
-                        return;
-                      }
-                      const found = availableSystemPOs.find(p => p.poNumber === val);
-                      if (found) {
-                        handleSelectPOFromTable(found);
-                      } else {
-                        setQuickPlanForm(prev => ({ ...prev, poNumber: val }));
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 transition cursor-pointer"
-                  >
-                    <option value="">-- Hoặc nhấp chọn nhanh mã PO từ danh sách thả xuống ({availableSystemPOs.length} đơn) --</option>
-                    {availableSystemPOs.map((po, idx) => (
-                      <option key={idx} value={po.poNumber}>
-                        {po.poNumber} | {po.customer} (Còn {po.remainingToPlan.toLocaleString('vi-VN')} sp)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Selected PO helper badge & Quick Line Selector */}
-                {selectedPOInfo && (
-                  <div className="p-3 bg-teal-50/90 border border-teal-200 rounded-2xl space-y-2 text-xs animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono font-bold text-teal-800 bg-white px-2 py-0.5 rounded border border-teal-200 shrink-0">
-                          {selectedPOInfo.poNumber}
-                        </span>
-                        <span className="font-bold text-slate-800 truncate">
-                          {selectedPOInfo.customer}
-                        </span>
-                        {selectedPOInfo.date && (
-                          <span className="text-[10.5px] text-slate-500 shrink-0">
-                            ({selectedPOInfo.date})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[11px] font-bold text-teal-700">
-                          Còn {selectedPOInfo.remainingToPlan.toLocaleString('vi-VN')} sp
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setQuickPlanForm(prev => ({ ...prev, poNumber: '', customer: '', product: '', quantity: '' }))}
-                          className="text-[11px] text-red-600 hover:underline"
-                        >
-                          Hủy chọn
-                        </button>
-                      </div>
-                    </div>
-
-                    {selectedPOInfo.lines.length > 0 && (
-                      <div className="pt-1.5 border-t border-teal-100">
-                        <div className="text-[10.5px] text-slate-500 mb-1 font-semibold">
-                          Bấm vào sản phẩm để tự động điền vào kế hoạch:
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedPOInfo.lines.map((l: any, lIdx: number) => {
-                            const isLineSel = quickPlanForm.product === l.productName;
-                            return (
-                              <button
-                                key={lIdx}
-                                type="button"
-                                onClick={() => {
-                                  setQuickPlanForm(prev => ({
-                                    ...prev,
-                                    product: l.productName,
-                                    quantity: String(l.qtyRemainingToPlan > 0 ? l.qtyRemainingToPlan : l.qtyOrdered)
-                                  }));
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1.5 ${
-                                  isLineSel
-                                    ? 'bg-teal-600 text-white font-bold shadow-2xs'
-                                    : 'bg-white text-slate-700 border border-teal-200 hover:bg-teal-100'
-                                }`}
-                              >
-                                <span>{l.productName}</span>
-                                <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${
-                                  isLineSel ? 'bg-teal-700 text-teal-100' : 'bg-slate-100 text-slate-600'
-                                }`}>
-                                  Còn {l.qtyRemainingToPlan.toLocaleString('vi-VN')} {l.unit}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Khách Hàng</label>
-                  <input
-                    type="text"
-                    placeholder="Tên khách hàng"
-                    value={quickPlanForm.customer}
-                    onChange={(e) => setQuickPlanForm({ ...quickPlanForm, customer: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Ngày Dự Kiến Giao *</label>
-                  <input
-                    type="date"
-                    required
-                    value={quickPlanForm.date}
-                    onChange={(e) => setQuickPlanForm({ ...quickPlanForm, date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tên Sản Phẩm *</label>
-                  {selectedPOInfo && selectedPOInfo.lines.length > 0 ? (
-                    <div className="space-y-1.5">
-                      <select
-                        value={quickPlanForm.product}
-                        onChange={(e) => {
-                          const matched = selectedPOInfo.lines.find((l: any) => l.productName === e.target.value);
-                          setQuickPlanForm({
-                            ...quickPlanForm,
-                            product: e.target.value,
-                            quantity: matched ? String(matched.qtyRemainingToPlan > 0 ? matched.qtyRemainingToPlan : matched.qtyOrdered) : quickPlanForm.quantity
-                          });
-                        }}
-                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                      >
-                        <option value="">-- Chọn sản phẩm từ PO --</option>
-                        {selectedPOInfo.lines.map((l: any, lIdx: number) => (
-                          <option key={lIdx} value={l.productName}>
-                            {l.productName} (Còn {l.qtyRemainingToPlan.toLocaleString('vi-VN')} {l.unit})
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Hoặc gõ tên mặt hàng khác..."
-                        value={quickPlanForm.product}
-                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, product: e.target.value })}
-                        className="w-full px-3 py-1.5 text-[11px] bg-[#F5F5F7] border border-slate-200 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-teal-500"
-                      />
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      required
-                      placeholder="Tên hoặc quy cách sản phẩm"
-                      value={quickPlanForm.product}
-                      onChange={(e) => setQuickPlanForm({ ...quickPlanForm, product: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Số Lượng *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="VD: 5000"
-                    value={quickPlanForm.quantity}
-                    onChange={(e) => setQuickPlanForm({ ...quickPlanForm, quantity: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-semibold tabular-nums outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Xe / Tài Xế</label>
-                  <input
-                    type="text"
-                    placeholder="Biển số xe / Lái xe"
-                    value={quickPlanForm.vehicle}
-                    onChange={(e) => setQuickPlanForm({ ...quickPlanForm, vehicle: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Ghi Chú</label>
-                  <input
-                    type="text"
-                    placeholder="Ghi chú giao nhận..."
-                    value={quickPlanForm.notes}
-                    onChange={(e) => setQuickPlanForm({ ...quickPlanForm, notes: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsQuickPlanOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-500/20 active:scale-95 transition"
-                >
-                  Lưu Kế Hoạch
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 🌟 SYSTEM PO SELECTOR TABLE MODAL */}
-      {isPOSelectorModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                  <Package size={22} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
-                    Bảng Chọn Đơn Hàng (PO) Trong Hệ Thống
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Lập Kế Hoạch Điều Độ Giao Hàng</span>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Chọn đơn đặt hàng để tự động nạp khách hàng, mặt hàng và số lượng còn lại vào kế hoạch
+                    {quickPlanStep === 'select_po' 
+                      ? 'Bước 1: Chọn đơn đặt hàng (PO) cần lên lịch phân bổ xe' 
+                      : 'Bước 2: Cấu hình ngày giao, số lượng và đội xe phụ trách'}
                   </p>
                 </div>
               </div>
+
+              {/* Stepper Indicator */}
+              <div className="hidden sm:flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setQuickPlanStep('select_po')}
+                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
+                    quickPlanStep === 'select_po'
+                      ? 'bg-white text-teal-700 font-bold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 cursor-pointer'
+                  }`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">1</span>
+                  <span>Chọn PO</span>
+                  {quickPlanForm.poNumber && <Check size={12} className="text-teal-600" />}
+                </button>
+                <ChevronRight size={12} className="text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (quickPlanForm.poNumber || quickPlanForm.customer) {
+                      setQuickPlanStep('details');
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
+                    quickPlanStep === 'details'
+                      ? 'bg-white text-teal-700 font-bold shadow-2xs'
+                      : quickPlanForm.poNumber ? 'text-slate-600 hover:text-slate-900 cursor-pointer' : 'text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                  <span>Chuyến xe & Số lượng</span>
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setIsPOSelectorModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+                onClick={() => setIsQuickPlanOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Search & Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between shrink-0">
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm theo mã PO, khách hàng, tên mặt hàng..."
-                  value={poSearchTerm}
-                  onChange={(e) => setPOSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {quickPlanStep === 'select_po' ? (
+                /* ================= STEP 1: PO SELECTION TABLE ================= */
+                <div className="space-y-4">
+                  {/* Search and Filter Tabs */}
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                    <div className="relative flex-1">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Tìm theo mã đơn hàng PO, tên khách hàng, mã/tên mặt hàng..."
+                        value={poSearchTerm}
+                        onChange={(e) => setPOSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
 
-              <div className="flex items-center gap-1.5 p-1 bg-[#F5F5F7] rounded-xl border border-slate-200/80 text-xs font-semibold shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setPOFilterStatus('PENDING')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    poFilterStatus === 'PENDING'
-                      ? 'bg-white text-teal-700 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Cần lên lịch ({availableSystemPOs.filter(p => !p.isCompleted).length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPOFilterStatus('ALL')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    poFilterStatus === 'ALL'
-                      ? 'bg-white text-teal-700 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Tất cả ({availableSystemPOs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPOFilterStatus('COMPLETED')}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    poFilterStatus === 'COMPLETED'
-                      ? 'bg-white text-teal-700 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Đã hoàn thành ({availableSystemPOs.filter(p => p.isCompleted).length})
-                </button>
-              </div>
-            </div>
+                    <div className="flex items-center gap-1.5 p-1 bg-[#F5F5F7] rounded-xl border border-slate-200/80 text-xs font-semibold shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPOFilterStatus('PENDING')}
+                        className={`px-3 py-1.5 rounded-lg transition ${
+                          poFilterStatus === 'PENDING'
+                            ? 'bg-white text-teal-700 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Cần lên lịch ({availableSystemPOs.filter(p => !p.isCompleted).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPOFilterStatus('ALL')}
+                        className={`px-3 py-1.5 rounded-lg transition ${
+                          poFilterStatus === 'ALL'
+                            ? 'bg-white text-teal-700 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Tất cả ({availableSystemPOs.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPOFilterStatus('COMPLETED')}
+                        className={`px-3 py-1.5 rounded-lg transition ${
+                          poFilterStatus === 'COMPLETED'
+                            ? 'bg-white text-teal-700 shadow-2xs font-bold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Đã giao đủ ({availableSystemPOs.filter(p => p.isCompleted).length})
+                      </button>
+                    </div>
+                  </div>
 
-            {/* PO List Table */}
-            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl">
-              {filteredSystemPOs.length === 0 ? (
-                <div className="py-12 text-center space-y-2">
-                  <Package className="mx-auto text-slate-300" size={40} />
-                  <p className="text-sm font-semibold text-slate-600">Không tìm thấy đơn hàng PO nào phù hợp</p>
-                  <p className="text-xs text-slate-400">Thử tìm kiếm với từ khóa khác hoặc chuyển bộ lọc trạng thái</p>
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="sticky top-0 bg-[#F5F5F7] border-b border-slate-200 text-slate-700 font-bold z-10">
-                    <tr>
-                      <th className="py-3 px-3.5">Mã PO / Ngày đặt</th>
-                      <th className="py-3 px-3.5">Khách hàng</th>
-                      <th className="py-3 px-3.5">Mặt hàng & Số lượng</th>
-                      <th className="py-3 px-3.5 text-center">Tiến độ</th>
-                      <th className="py-3 px-3.5 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredSystemPOs.map((po, idx) => (
-                      <tr key={idx} className="hover:bg-teal-50/30 transition group">
-                        <td className="py-3 px-3.5 align-top">
-                          <div className="font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 inline-block">
-                            {po.poNumber}
-                          </div>
-                          {po.date && (
-                            <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
-                              <Calendar size={11} />
-                              <span>{po.date}</span>
-                            </div>
-                          )}
-                        </td>
+                  {/* PO Table */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs bg-white">
+                    <div className="max-h-[50vh] overflow-y-auto">
+                      {filteredSystemPOs.length === 0 ? (
+                        <div className="py-12 text-center space-y-2">
+                          <Package className="mx-auto text-slate-300" size={38} />
+                          <p className="text-sm font-semibold text-slate-600">Không tìm thấy đơn hàng PO nào khớp</p>
+                          <p className="text-xs text-slate-400">Thử tìm kiếm với từ khóa khác hoặc chuyển bộ lọc "Tất cả"</p>
+                        </div>
+                      ) : (
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="sticky top-0 bg-[#F5F5F7] border-b border-slate-200 text-slate-700 font-bold z-10">
+                            <tr>
+                              <th className="py-3 px-3.5">Mã PO / Ngày đặt</th>
+                              <th className="py-3 px-3.5">Khách hàng</th>
+                              <th className="py-3 px-3.5">Mặt hàng & Số lượng còn lại</th>
+                              <th className="py-3 px-3.5 text-center">Tiến độ</th>
+                              <th className="py-3 px-3.5 text-right">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredSystemPOs.map((po, idx) => (
+                              <tr 
+                                key={idx} 
+                                onClick={() => handleSelectPOFromTable(po)}
+                                className="hover:bg-teal-50/40 transition cursor-pointer group"
+                              >
+                                <td className="py-3 px-3.5 align-top">
+                                  <div className="font-mono font-extrabold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 inline-block group-hover:border-teal-400 transition">
+                                    {po.poNumber}
+                                  </div>
+                                  {po.date && (
+                                    <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
+                                      <Calendar size={11} />
+                                      <span>{po.date}</span>
+                                    </div>
+                                  )}
+                                </td>
 
-                        <td className="py-3 px-3.5 align-top">
-                          <div className="font-bold text-slate-900 text-xs">
-                            {po.customer}
-                          </div>
-                          <div className="text-[10.5px] text-slate-400 mt-0.5">
-                            {po.lines.length} mặt hàng
-                          </div>
-                        </td>
+                                <td className="py-3 px-3.5 align-top">
+                                  <div className="font-bold text-slate-900 text-xs">
+                                    {po.customer}
+                                  </div>
+                                  <div className="text-[10.5px] text-slate-400 mt-0.5">
+                                    {po.lines.length} dòng hàng
+                                  </div>
+                                </td>
 
-                        <td className="py-3 px-3.5 align-top space-y-1.5">
-                          {po.lines.map((line: any, lIdx: number) => (
-                            <div
-                              key={lIdx}
-                              className="flex items-center justify-between gap-2 p-1.5 bg-[#FBFBFD] rounded-lg border border-slate-100"
-                            >
-                              <div className="truncate max-w-[200px]" title={line.productName}>
-                                <span className="font-medium text-slate-800">{line.productName}</span>
-                                <span className="text-[10px] text-slate-400 ml-1">
-                                  ({line.qtyOrdered.toLocaleString('vi-VN')} {line.unit})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                  line.qtyRemainingToPlan > 0
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                }`}>
-                                  {line.qtyRemainingToPlan > 0 ? `Còn ${line.qtyRemainingToPlan.toLocaleString('vi-VN')}` : 'Đã đủ'}
-                                </span>
-                                {po.lines.length > 1 && (
+                                <td className="py-3 px-3.5 align-top space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                                  {po.lines.map((line: any, lIdx: number) => (
+                                    <div
+                                      key={lIdx}
+                                      className="flex items-center justify-between gap-2 p-1.5 bg-[#FBFBFD] rounded-lg border border-slate-100"
+                                    >
+                                      <div className="truncate max-w-[200px]" title={line.productName}>
+                                        <span className="font-medium text-slate-800">{line.productName}</span>
+                                        <span className="text-[10px] text-slate-400 ml-1">
+                                          (Đặt: {line.qtyOrdered.toLocaleString('vi-VN')} {line.unit})
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                          line.qtyRemainingToPlan > 0
+                                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                        }`}>
+                                          {line.qtyRemainingToPlan > 0 ? `Còn ${line.qtyRemainingToPlan.toLocaleString('vi-VN')}` : 'Đã đủ'}
+                                        </span>
+                                        {po.lines.length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSelectPOFromTable(po, line)}
+                                            className="px-2 py-0.5 text-[10px] font-bold text-teal-700 bg-white border border-teal-200 hover:bg-teal-50 rounded transition cursor-pointer"
+                                          >
+                                            Chọn dòng
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </td>
+
+                                <td className="py-3 px-3.5 align-top text-center w-28">
+                                  <div className="text-[10.5px] font-bold text-slate-800">
+                                    {po.totalPlanned.toLocaleString('vi-VN')} / {po.totalOrdered.toLocaleString('vi-VN')}
+                                  </div>
+                                  <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
+                                    <div
+                                      className="bg-teal-600 h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${Math.min(100, po.totalOrdered > 0 ? (po.totalPlanned / po.totalOrdered) * 100 : 0)}%`
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">
+                                    {po.totalOrdered > 0 ? Math.round((po.totalPlanned / po.totalOrdered) * 100) : 0}% đã lên lịch
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-3.5 align-top text-right">
                                   <button
                                     type="button"
-                                    onClick={() => handleSelectPOFromTable(po, line)}
-                                    className="px-2 py-0.5 text-[10px] font-bold text-teal-700 bg-white border border-teal-200 hover:bg-teal-50 rounded transition"
+                                    onClick={() => handleSelectPOFromTable(po)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs hover:shadow transition active:scale-95 cursor-pointer"
                                   >
-                                    Chọn dòng
+                                    <Check size={13} />
+                                    <span>Chọn Lên Lịch</span>
                                   </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </td>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
 
-                        <td className="py-3 px-3.5 align-top text-center w-28">
-                          <div className="text-[10.5px] font-bold text-slate-800">
-                            {po.totalPlanned.toLocaleString('vi-VN')} / {po.totalOrdered.toLocaleString('vi-VN')}
+                  {/* Fallback link */}
+                  <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                    <span>💡 Nhấp vào bất kỳ dòng PO nào để tự động nạp thông tin vào kế hoạch</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickPlanForm({
+                          poNumber: '',
+                          customer: '',
+                          product: '',
+                          quantity: '',
+                          date: new Date().toISOString().split('T')[0],
+                          notes: '',
+                          vehicle: ''
+                        });
+                        setQuickPlanStep('details');
+                      }}
+                      className="text-teal-700 hover:text-teal-800 font-bold hover:underline"
+                    >
+                      + Hoặc lập kế hoạch điều độ thủ công (không theo PO)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ================= STEP 2: DISPATCH TRIP DETAILS ================= */
+                <form id="quick-plan-form" onSubmit={handleCreateQuickPlanSubmit} className="space-y-4">
+                  {/* Selected PO Summary Card */}
+                  {quickPlanForm.poNumber ? (
+                    <div className="p-4 bg-gradient-to-r from-teal-50 via-teal-50/70 to-emerald-50 border border-teal-200 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-11 h-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Package size={22} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-extrabold text-teal-900 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-teal-300 shadow-2xs">
+                              {quickPlanForm.poNumber}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900">
+                              {quickPlanForm.customer}
+                            </span>
+                            {selectedPOInfo?.date && (
+                              <span className="text-[11px] text-slate-500">
+                                (Đặt ngày: {selectedPOInfo.date})
+                              </span>
+                            )}
                           </div>
-                          <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
-                            <div
-                              className="bg-teal-600 h-full rounded-full transition-all"
-                              style={{
-                                width: `${Math.min(100, po.totalOrdered > 0 ? (po.totalPlanned / po.totalOrdered) * 100 : 0)}%`
-                              }}
-                            />
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            {po.totalOrdered > 0 ? Math.round((po.totalPlanned / po.totalOrdered) * 100) : 0}% đã lên lịch
-                          </div>
-                        </td>
+                          <p className="text-[11px] text-teal-700 mt-1 font-medium">
+                            {selectedPOInfo 
+                              ? `Tổng đặt: ${selectedPOInfo.totalOrdered.toLocaleString('vi-VN')} • Còn ${selectedPOInfo.remainingToPlan.toLocaleString('vi-VN')} sp cần lập lịch` 
+                              : 'Đã liên kết đơn hàng'}
+                          </p>
+                        </div>
+                      </div>
 
-                        <td className="py-3 px-3.5 align-top text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectPOFromTable(po)}
-                            className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-2xs hover:shadow transition active:scale-95 cursor-pointer"
+                      <button
+                        type="button"
+                        onClick={() => setQuickPlanStep('select_po')}
+                        className="px-3.5 py-2 bg-white border border-teal-300 hover:bg-teal-100 text-teal-800 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        <ChevronLeft size={14} />
+                        <span>Đổi PO khác</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs">
+                      <span className="text-amber-800 font-medium">
+                        ⚠️ Bạn đang tạo kế hoạch tự do (không liên kết PO đơn hàng)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickPlanStep('select_po')}
+                        className="text-teal-700 font-bold hover:underline"
+                      >
+                        Quay lại Bảng Chọn PO
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Form fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Mã PO / Chứng Từ *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Mã đơn hàng PO"
+                        value={quickPlanForm.poNumber}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, poNumber: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Khách Hàng *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Tên khách hàng"
+                        value={quickPlanForm.customer}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, customer: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Tên Mặt Hàng / Quy Cách *</label>
+                      {selectedPOInfo && selectedPOInfo.lines.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <select
+                            value={quickPlanForm.product}
+                            onChange={(e) => {
+                              const matched = selectedPOInfo.lines.find((l: any) => l.productName === e.target.value);
+                              setQuickPlanForm({
+                                ...quickPlanForm,
+                                product: e.target.value,
+                                quantity: matched ? String(matched.qtyRemainingToPlan > 0 ? matched.qtyRemainingToPlan : matched.qtyOrdered) : quickPlanForm.quantity
+                              });
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
                           >
-                            <Check size={13} />
-                            <span>Chọn PO Này</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            <option value="">-- Chọn mặt hàng từ đơn PO này --</option>
+                            {selectedPOInfo.lines.map((l: any, lIdx: number) => (
+                              <option key={lIdx} value={l.productName}>
+                                {l.productName} (Còn {l.qtyRemainingToPlan.toLocaleString('vi-VN')} {l.unit})
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Hoặc gõ quy cách / mặt hàng khác..."
+                            value={quickPlanForm.product}
+                            onChange={(e) => setQuickPlanForm({ ...quickPlanForm, product: e.target.value })}
+                            className="w-full px-3 py-1.5 text-[11px] bg-[#F5F5F7] border border-slate-200 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-teal-500"
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Tên hoặc quy cách sản phẩm"
+                          value={quickPlanForm.product}
+                          onChange={(e) => setQuickPlanForm({ ...quickPlanForm, product: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Số Lượng Giao Chuyến Này *</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="VD: 5000"
+                        value={quickPlanForm.quantity}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, quantity: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-bold text-slate-900 tabular-nums outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Ngày Dự Kiến Giao *</label>
+                      <input
+                        type="date"
+                        required
+                        value={quickPlanForm.date}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, date: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Xe / Tài Xế Phụ Trách</label>
+                      <input
+                        type="text"
+                        placeholder="Biển số xe / Lái xe"
+                        value={quickPlanForm.vehicle}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, vehicle: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Ghi Chú Điều Độ</label>
+                      <input
+                        type="text"
+                        placeholder="Ghi chú giao nhận..."
+                        value={quickPlanForm.notes}
+                        onChange={(e) => setQuickPlanForm({ ...quickPlanForm, notes: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+                </form>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3 shrink-0">
-              <div className="text-xs text-slate-500">
-                Hiển thị <strong>{filteredSystemPOs.length}</strong> đơn đặt hàng PO
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPOSelectorModalOpen(false)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
-              >
-                Đóng
-              </button>
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between shrink-0 bg-[#FBFBFD]">
+              {quickPlanStep === 'select_po' ? (
+                <>
+                  <div className="text-xs text-slate-500">
+                    Chọn đơn hàng PO từ bảng để tiếp tục lập kế hoạch
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickPlanOpen(false)}
+                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setQuickPlanStep('select_po')}
+                    className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Quay lại Bảng Chọn PO</span>
+                  </button>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickPlanOpen(false)}
+                      className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                    >
+                      Hủy Bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      form="quick-plan-form"
+                      className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer"
+                    >
+                      Lưu Kế Hoạch Điều Độ
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
