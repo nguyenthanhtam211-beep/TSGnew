@@ -192,8 +192,38 @@ export default function MemoryStorageModal({
     }
   };
 
+  // Helper to sanitize row data for Excel, avoiding cell character limit (32,767) & corrupt sheets
+  const sanitizeRowForExcel = (row: any): Record<string, any> => {
+    const clean: Record<string, any> = {};
+    if (!row || typeof row !== 'object') return clean;
+
+    for (const [k, v] of Object.entries(row)) {
+      if (k === 'content' || k === 'dataUrl' || k === 'base64' || k === 'rawBuffer') {
+        clean[k] = v ? '[Tệp nhị phân đã lưu]' : '';
+        continue;
+      }
+      if (k === '_userModified') continue;
+
+      if (v === null || v === undefined) {
+        clean[k] = '';
+      } else if (typeof v === 'object') {
+        if (v instanceof Date) {
+          clean[k] = v.toISOString();
+        } else if (Array.isArray(v)) {
+          clean[k] = v.map(item => (typeof item === 'object' ? (item.name || item.title || JSON.stringify(item)) : String(item))).join('; ');
+        } else {
+          clean[k] = JSON.stringify(v);
+        }
+      } else {
+        clean[k] = v;
+      }
+    }
+    return clean;
+  };
+
   // Action: Export Multi-sheet Excel Master Backup
   const handleExportMasterExcel = () => {
+    const toastId = toast.loading("Đang xuất sổ Excel tổng hợp...");
     try {
       const wb = XLSX.utils.book_new();
 
@@ -213,16 +243,23 @@ export default function MemoryStorageModal({
       ];
 
       sheets.forEach(s => {
-        if (Array.isArray(s.data) && s.data.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(s.data);
-          XLSX.utils.book_append_sheet(wb, ws, s.name);
+        const rows = Array.isArray(s.data) ? s.data.map(sanitizeRowForExcel) : [];
+        const safeSheetName = s.name.slice(0, 31);
+        if (rows.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(rows);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        } else {
+          const ws = XLSX.utils.aoa_to_sheet([['Thông báo', 'Chưa có bản ghi nào trong hệ thống']]);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
         }
       });
 
-      XLSX.writeFile(wb, `TSG_Master_Database_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success("Đã xuất sổ Excel tổng hợp 12 trang tính!");
+      const fileName = `TSG_Master_Database_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success("Đã xuất sổ Excel tổng hợp 12 trang tính thành công!", { id: toastId });
     } catch (err: any) {
-      toast.error("Lỗi xuất Excel: " + (err?.message || err));
+      console.error("Master Excel export error:", err);
+      toast.error("Lỗi xuất Excel: " + (err?.message || err), { id: toastId });
     }
   };
 
@@ -233,40 +270,36 @@ export default function MemoryStorageModal({
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      const toastId = toast.loading("Đang đọc tệp sao lưu...");
       try {
         const text = evt.target?.result as string;
         const parsed = JSON.parse(text);
 
-        if (!parsed.data && !parsed.customers) {
-          toast.error("Tệp sao lưu không đúng cấu trúc TSG Business OS!");
+        if (!parsed.data && !parsed.customers && !parsed.customerData) {
+          toast.error("Tệp sao lưu không đúng cấu trúc TSG Business OS!", { id: toastId });
           return;
         }
 
         const dataToRestore = parsed.data || parsed;
         const confirmRestore = window.confirm(
-          `Bạn có chắc muốn khôi phục dữ liệu từ bản sao lưu ngày ${parsed.backupDateFormatted || "không rõ"}?\nTổng số bản ghi: ${parsed.totalRecords || "nhiều"} mục.`
+          `Bạn có chắc muốn khôi phục dữ liệu từ bản sao lưu ngày ${parsed.exportedAt || parsed.backupDateFormatted || "không rõ"}?\nTổng số bản ghi: ${parsed.totalRecords || "nhiều"} mục.`
         );
 
         if (confirmRestore) {
-          // Store directly to local storage
-          Object.keys(dataToRestore).forEach(col => {
-            const list = dataToRestore[col];
-            if (Array.isArray(list)) {
-              localStorage.setItem(`tsg_cache_${col}`, JSON.stringify(list));
-            }
-          });
-
           if (onRestoreData) {
             await onRestoreData(dataToRestore);
+          } else {
+            const res = await dbEngine.restoreDatabase(parsed);
+            toast.success(`Đã khôi phục thành công ${res.totalRestored} bản ghi!`, { id: toastId });
           }
-
-          toast.success("Đã khôi phục bộ nhớ thành công! Hệ thống đang tải lại...");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
+          toast.success("Đã khôi phục bộ nhớ thành công!", { id: toastId });
+          onClose();
+        } else {
+          toast.dismiss(toastId);
         }
       } catch (err: any) {
-        toast.error("Lỗi đọc tệp sao lưu: " + (err?.message || err));
+        console.error("Restore error:", err);
+        toast.error("Lỗi đọc tệp sao lưu: " + (err?.message || err), { id: toastId });
       }
     };
     reader.readAsText(file);

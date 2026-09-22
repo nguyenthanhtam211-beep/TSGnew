@@ -544,6 +544,17 @@ export default function App() {
     }
   };
 
+  const handleRestoreDatabase = async (importedData: any) => {
+    const toastId = toast.loading('Đang khôi phục toàn bộ cơ sở dữ liệu...');
+    try {
+      const res = await dbEngine.restoreDatabase(importedData);
+      toast.success(`Đã khôi phục thành công ${res.totalRestored} bản ghi (${res.restoredCollections.length} danh mục)!`, { id: toastId });
+    } catch (err: any) {
+      console.error("Restore error:", err);
+      toast.error("Lỗi khi khôi phục dữ liệu: " + (err?.message || err), { id: toastId });
+    }
+  };
+
   const handleUploadToDrive = async (file: File, metadata: { documentType: string, documentNumber: string, fileName?: string }) => {
     try {
       const now = new Date();
@@ -1209,6 +1220,7 @@ export default function App() {
               onUpload={handleUploadToDrive}
               onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
               onUpdateFile={(file) => handleUpdateToFirestore("file_storage", file)}
+              onRestoreData={handleRestoreDatabase}
               onPoClick={(val) => setSelectedPoDetails(val)}
               onProductClick={(val) => setSelectedProductDetails(val)}
             />
@@ -1241,6 +1253,7 @@ export default function App() {
       <MemoryStorageModal
         isOpen={isMemoryModalOpen}
         onClose={() => setIsMemoryModalOpen(false)}
+        onRestoreData={handleRestoreDatabase}
         allData={{
           pricingData,
           poHeaderData,

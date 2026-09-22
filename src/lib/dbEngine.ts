@@ -370,6 +370,101 @@ class TSGDataEngine {
   }
 
   /**
+   * Restore full database from any backup format (JSON backup from StorageView, MemoryStorageModal, or raw object)
+   */
+  public async restoreDatabase(payload: any): Promise<{ success: boolean; totalRestored: number; restoredCollections: string[] }> {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Dữ liệu sao lưu không hợp lệ');
+    }
+
+    // Extract the raw dictionary of datasets
+    const rawData = payload.data || payload;
+    if (!rawData || typeof rawData !== 'object') {
+      throw new Error('Không tìm thấy dữ liệu danh mục trong bản sao lưu');
+    }
+
+    const keyMapping: Record<string, CollectionName> = {
+      // Customer
+      customers: 'customers',
+      customerData: 'customers',
+      Khach_Hang: 'customers',
+      // Supplier
+      suppliers: 'suppliers',
+      supplierData: 'suppliers',
+      Nha_Cung_Cap: 'suppliers',
+      // Pricing
+      pricing: 'pricing',
+      pricingData: 'pricing',
+      Bang_Gia: 'pricing',
+      Bang_Gia_2026: 'pricing',
+      // Products
+      products: 'products',
+      productData: 'products',
+      San_Pham: 'products',
+      // PO Headers
+      po_headers: 'po_headers',
+      poHeaderData: 'po_headers',
+      Don_Hang_PO: 'po_headers',
+      pos: 'po_headers',
+      // PO Lines
+      po_lines: 'po_lines',
+      poLinesData: 'po_lines',
+      Chi_Tiet_Don: 'po_lines',
+      Chi_Tiet_PO: 'po_lines',
+      // Deliveries
+      deliveries: 'deliveries',
+      deliveryData: 'deliveries',
+      Giao_Hang_PXK: 'deliveries',
+      Phieu_Xuat_Kho: 'deliveries',
+      // Delivery Plans
+      delivery_plans: 'delivery_plans',
+      deliveryPlanData: 'delivery_plans',
+      Ke_Hoach_Giao: 'delivery_plans',
+      // Contracts
+      contracts: 'contracts',
+      contractsData: 'contracts',
+      Hop_Dong: 'contracts',
+      // Commissions
+      commissions: 'commissions',
+      commissionData: 'commissions',
+      Hoa_Hong: 'commissions',
+      // Specs
+      specs: 'specs',
+      specsData: 'specs',
+      Specs_Ky_Thuat: 'specs',
+      // Contacts
+      contacts: 'contacts',
+      contactData: 'contacts',
+      Danh_Ba: 'contacts',
+      // File storage
+      file_storage: 'file_storage',
+      fileStorageData: 'file_storage',
+      files: 'file_storage',
+      So_Doi_Soat_File: 'file_storage'
+    };
+
+    let totalRestored = 0;
+    const restoredCollections: string[] = [];
+
+    for (const [key, items] of Object.entries(rawData)) {
+      const canonicalCol = keyMapping[key];
+      if (canonicalCol && Array.isArray(items) && items.length > 0) {
+        await this.saveBatch(canonicalCol, items);
+        totalRestored += items.length;
+        if (!restoredCollections.includes(canonicalCol)) {
+          restoredCollections.push(canonicalCol);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      totalRestored,
+      restoredCollections
+    };
+  }
+
+  /**
    * Delete an item
    */
   public async delete(colName: CollectionName, id: string): Promise<{ success: boolean; id: string }> {

@@ -35,6 +35,7 @@ import clsx from 'clsx';
 import { motion } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
+import dbEngine from '../lib/dbEngine';
 
 export interface StorageFile {
   id?: string;
@@ -45,6 +46,10 @@ export interface StorageFile {
   mimeType?: string;
   driveLink?: string;
   downloadLink?: string;
+  webContentLink?: string;
+  url?: string;
+  content?: string;
+  dataUrl?: string;
   folderLink?: string;
   folderPath?: string;
   uploadDate?: string;
@@ -205,18 +210,65 @@ export default function StorageView({
     }
   };
 
+  // Helper to sanitize row data for Excel, avoiding cell character limit (32,767) & corrupt sheets
+  const sanitizeRowForExcel = (row: any): Record<string, any> => {
+    const clean: Record<string, any> = {};
+    if (!row || typeof row !== 'object') return clean;
+
+    for (const [k, v] of Object.entries(row)) {
+      if (k === 'content' || k === 'dataUrl' || k === 'base64' || k === 'rawBuffer') {
+        clean[k] = v ? '[Tệp nhị phân đã lưu]' : '';
+        continue;
+      }
+      if (k === '_userModified') continue;
+
+      if (v === null || v === undefined) {
+        clean[k] = '';
+      } else if (typeof v === 'object') {
+        if (v instanceof Date) {
+          clean[k] = v.toISOString();
+        } else if (Array.isArray(v)) {
+          clean[k] = v.map(item => (typeof item === 'object' ? (item.name || item.title || JSON.stringify(item)) : String(item))).join('; ');
+        } else {
+          clean[k] = JSON.stringify(v);
+        }
+      } else {
+        clean[k] = v;
+      }
+    }
+    return clean;
+  };
+
   // Download Full JSON Backup
   const handleDownloadFullBackupJSON = () => {
+    const toastId = toast.loading("Đang chuẩn bị tệp sao lưu hệ thống...");
     try {
       const backupPayload = {
         app: "TSG Business OS",
         version: "2026.1",
         exportedAt: new Date().toISOString(),
         totalRecords: collectionsStats.totalRecords,
-        data: allData
+        data: {
+          customers: allData?.customerData || [],
+          suppliers: allData?.supplierData || [],
+          pricing: allData?.pricingData || [],
+          products: allData?.productData || [],
+          po_headers: allData?.poHeaderData || [],
+          po_lines: allData?.poLinesData || [],
+          delivery_plans: allData?.deliveryPlanData || [],
+          deliveries: allData?.deliveryData || [],
+          contracts: allData?.contractsData || [],
+          commissions: allData?.commissionData || [],
+          specs: allData?.specsData || [],
+          contacts: allData?.contactData || [],
+          file_storage: (files || []).map(f => {
+            const { content, dataUrl, ...rest } = f as any;
+            return rest;
+          })
+        }
       };
 
-      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: "application/json;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -225,15 +277,17 @@ export default function StorageView({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Đã tải tệp sao lưu JSON về máy tính!");
+      toast.success("Đã tải tệp sao lưu JSON về máy tính an toàn!", { id: toastId });
     } catch (e: any) {
-      toast.error("Lỗi tạo bản sao lưu: " + (e?.message || e));
+      console.error("Download JSON error:", e);
+      toast.error("Lỗi tạo bản sao lưu: " + (e?.message || e), { id: toastId });
     }
   };
 
   // Export Master Excel
   const handleExportMasterExcel = () => {
     if (!allData) return;
+    const toastId = toast.loading("Đang khởi tạo sổ Excel tổng hợp 13 danh mục...");
     try {
       const wb = XLSX.utils.book_new();
 
@@ -254,16 +308,23 @@ export default function StorageView({
       ];
 
       sheets.forEach(s => {
-        if (Array.isArray(s.data) && s.data.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(s.data);
-          XLSX.utils.book_append_sheet(wb, ws, s.name);
+        const rows = Array.isArray(s.data) ? s.data.map(sanitizeRowForExcel) : [];
+        const safeSheetName = s.name.slice(0, 31);
+        if (rows.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(rows);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        } else {
+          const ws = XLSX.utils.aoa_to_sheet([['Thông báo', 'Chưa có bản ghi nào trong hệ thống']]);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
         }
       });
 
-      XLSX.writeFile(wb, `TSG_Master_Database_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success("Đã xuất sổ Excel tổng hợp 13 trang tính!");
+      const fileName = `TSG_Master_Database_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success("Đã xuất sổ Excel tổng hợp 13 trang tính thành công!", { id: toastId });
     } catch (err: any) {
-      toast.error("Lỗi xuất Excel: " + (err?.message || err));
+      console.error("Master Excel export error:", err);
+      toast.error("Lỗi xuất Excel: " + (err?.message || err), { id: toastId });
     }
   };
 
@@ -305,6 +366,37 @@ export default function StorageView({
     toast.loading(`Đang tải xuống: ${fileName}...`, { id: `dl-${fileId}`, duration: 2500 });
 
     try {
+      // 1. Kiểm tra nếu tệp có sẵn Base64 hoặc DataURL trong máy (hoàn toàn không cần mạng)
+      const rawContent = (file as any).content || (file as any).dataUrl || (file as any).url;
+      if (rawContent && typeof rawContent === 'string' && (rawContent.startsWith('data:') || rawContent.startsWith('blob:'))) {
+        let blobUrl = rawContent;
+        if (rawContent.startsWith('data:')) {
+          const parts = rawContent.split(',');
+          const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          blobUrl = URL.createObjectURL(blob);
+        }
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (blobUrl.startsWith('blob:') && blobUrl !== rawContent) {
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        }
+        toast.success(`Đã tải xuống: ${fileName}`, { id: `dl-${fileId}` });
+        return;
+      }
+
+      // 2. Google Drive / Remote File Download
       const token = localStorage.getItem('google_access_token') || '';
       const proxyUrl = fileId && !fileId.startsWith('local_') 
         ? `/api/drive/download/${fileId}?fileName=${encodeURIComponent(fileName)}${token ? `&token=${encodeURIComponent(token)}` : ''}` 
@@ -313,7 +405,7 @@ export default function StorageView({
         ? `https://drive.google.com/uc?export=download&id=${fileId}` 
         : '';
 
-      const targetUrl = proxyUrl || file.downloadLink || directGoogleUrl || file.driveLink;
+      const targetUrl = proxyUrl || file.downloadLink || file.webContentLink || directGoogleUrl || file.driveLink;
 
       if (!targetUrl) {
         toast.error("Không tìm thấy liên kết tải về cho tệp này.", { id: `dl-${fileId}` });
@@ -1123,15 +1215,21 @@ export default function StorageView({
                   className="hidden" 
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file && onRestoreData) {
+                    if (file) {
                       const reader = new FileReader();
                       reader.onload = async (evt) => {
+                        const toastId = toast.loading("Đang đọc và khôi phục cơ sở dữ liệu...");
                         try {
                           const parsed = JSON.parse(evt.target?.result as string);
-                          await onRestoreData(parsed.data || parsed);
-                          toast.success("Khôi phục thành công!");
+                          if (onRestoreData) {
+                            await onRestoreData(parsed.data || parsed);
+                          } else {
+                            const res = await dbEngine.restoreDatabase(parsed);
+                            toast.success(`Đã khôi phục thành công ${res.totalRestored} bản ghi!`, { id: toastId });
+                          }
                         } catch (err: any) {
-                          toast.error("Lỗi đọc file: " + (err.message || err));
+                          console.error("Restore error:", err);
+                          toast.error("Lỗi khôi phục tệp: " + (err.message || err), { id: toastId });
                         }
                       };
                       reader.readAsText(file);

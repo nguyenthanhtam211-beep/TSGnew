@@ -14,6 +14,7 @@ import { handleFirestoreError, OperationType } from '../lib/errorHelper';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 import { getStoredGeminiKey, setStoredGeminiKey, testGeminiConnection } from '../lib/gemini';
 import { exportMasterDataToExcelDirectly, getStoredMasterSpreadsheetId } from '../lib/driveSync';
+import dbEngine from '../lib/dbEngine';
 import Papa from 'papaparse';
 
 const parseCSV = (csv: string) => {
@@ -224,13 +225,18 @@ export default function SettingsView() {
 
       for (const t of tableNames) {
         try {
-          const snap = await getDocs(collection(db, t.name));
-          const docs = snap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+          let docs = dbEngine.getAll(t.name as any);
+          if (!docs || docs.length === 0) {
+            const snap = await getDocs(collection(db, t.name));
+            docs = snap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+          }
           const values = prepareSheetValues(docs);
           allTableData.push({ title: t.title, values });
         } catch (e) {
           console.warn(`Lỗi lấy bảng ${t.name}:`, e);
-          allTableData.push({ title: t.title, values: [["Lỗi"], ["Không thể truy xuất dữ liệu"]] });
+          const fallbackDocs = dbEngine.getAll(t.name as any) || [];
+          const values = prepareSheetValues(fallbackDocs);
+          allTableData.push({ title: t.title, values });
         }
       }
 
@@ -307,20 +313,36 @@ export default function SettingsView() {
   const handleDownloadOfflineBackup = async () => {
     const toastId = toast.loading('Đang xuất tệp JSON sao lưu hệ thống...');
     try {
-      const collections = ["customers", "suppliers", "pricing", "po_headers", "po_lines", "deliveries", "contacts", "products", "delivery_plans", "specs"];
+      const collections = ["customers", "suppliers", "pricing", "po_headers", "po_lines", "deliveries", "contacts", "products", "delivery_plans", "specs", "contracts", "commissions"];
       const backupData: Record<string, any[]> = {};
+      let totalCount = 0;
       
       for (const colName of collections) {
         try {
-          const snap = await getDocs(collection(db, colName));
-          backupData[colName] = snap.docs.map(d => d.data());
+          let items = dbEngine.getAll(colName as any);
+          if (!items || items.length === 0) {
+            const snap = await getDocs(collection(db, colName));
+            items = snap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+          }
+          backupData[colName] = items || [];
+          totalCount += (items || []).length;
         } catch (e) {
           console.warn(`Lỗi xuất bảng ${colName}:`, e);
-          backupData[colName] = [];
+          const fallback = dbEngine.getAll(colName as any) || [];
+          backupData[colName] = fallback;
+          totalCount += fallback.length;
         }
       }
 
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const payload = {
+        app: "TSG Business OS",
+        version: "2026.1",
+        exportedAt: new Date().toISOString(),
+        totalRecords: totalCount,
+        data: backupData
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -330,7 +352,7 @@ export default function SettingsView() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success('Đã tải xuống tệp JSON sao lưu an toàn!', { id: toastId });
+      toast.success(`Đã tải xuống tệp JSON sao lưu (${totalCount} bản ghi) an toàn!`, { id: toastId });
     } catch (err: any) {
       toast.error('Lỗi khi tải bản sao lưu: ' + err.message, { id: toastId });
     }
