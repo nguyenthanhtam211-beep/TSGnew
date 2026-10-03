@@ -1339,14 +1339,14 @@ function TableView({
       </div>
 
       {/* Hallmark Enterprise Table Container */}
-      <div className="bg-white rounded-xl border border-slate-200/85 md:flex-1 md:overflow-hidden flex flex-col md:min-h-[360px]">
+      <div className="cockpit-table-shell md:flex-1 md:overflow-hidden flex flex-col md:min-h-[360px]">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-auto flex-1">
           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-            <thead className="bg-[#F8FAFA] text-slate-700 sticky top-0 border-b border-slate-200/85 z-10 font-display font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="cockpit-table-header">
               <tr>
                 {onDelete && (
-                  <th className="px-4 py-3 font-semibold border-b border-slate-200/85 bg-[#F8FAFA] w-10 text-center">
+                  <th className="px-4 py-3 font-semibold border-b border-black/[0.06] bg-[#F5F5F7] dark:bg-slate-900 w-10 text-center">
                     <input 
                       type="checkbox"
                       checked={paginatedData.length > 0 && paginatedData.every(r => selectedRowIds.has(r.id || JSON.stringify(r)))}
@@ -1366,7 +1366,7 @@ function TableView({
                   </th>
                 )}
                 {visibleColumns.map((h, idx) => (
-                  <th key={h} className={`px-4 py-3 font-semibold font-display border-b border-slate-200/85 bg-[#F8FAFA] text-slate-700 tracking-wider text-[11px] uppercase ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_rgba(226,232,240,0.85)] z-[15]' : ''}`}>
+                  <th key={h} className={`px-4 py-3 font-semibold font-display border-b border-black/[0.06] bg-[#F5F5F7] dark:bg-slate-900 text-slate-700 dark:text-slate-200 tracking-wider text-[11px] uppercase ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_rgba(226,232,240,0.85)] z-[15]' : ''}`}>
                     <div className="flex items-center justify-between relative gap-2">
                       <span className="truncate">{h}</span>
                       <button 
@@ -1429,7 +1429,7 @@ function TableView({
                 
                 const rowClass = isOverdue 
                     ? 'bg-rose-50/60 hover:bg-rose-100/60' 
-                    : (isHighlighted ? 'bg-amber-50/70 hover:bg-amber-100/70' : 'hover:bg-slate-50/80');
+                    : (isHighlighted ? 'bg-amber-50/70 hover:bg-amber-100/70' : '');
 
                 return (
                   <tr 
@@ -1441,7 +1441,7 @@ function TableView({
                       setIsEditModalOpen(true);
                       setConfirmDelete(false);
                     }}
-                    className={`transition-all duration-150 border-b border-slate-100 last:border-0 group/tr cursor-pointer ${rowClass}`}
+                    className={`cockpit-table-row transition-all duration-150 border-b border-black/[0.04] last:border-0 group/tr cursor-pointer ${rowClass}`}
                   >
                     {onDelete && (
                       <td className="px-4 py-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>

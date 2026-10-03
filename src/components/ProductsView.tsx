@@ -13,6 +13,12 @@ import { formatVND, parseNumber, getDefaultSpecs } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import MacTrafficLights from './MacTrafficLights';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
+import { 
+  CockpitTableToolbar, 
+  CockpitPagination, 
+  CockpitTableEmptyState, 
+  CockpitBadge 
+} from './ui';
 
 interface ProductsViewProps {
   productData: any[];
@@ -56,6 +62,9 @@ export default function ProductsView({
   const [selectedCustomer, setSelectedCustomer] = useState<string>('All');
   const [selectedSupplier, setSelectedSupplier] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [activeTab, setActiveTab] = useState<'all' | 'with_pricing' | 'with_orders' | 'with_specs'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Edit / Add modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -236,9 +245,20 @@ export default function ProductsView({
       const matchesCust = selectedCustomer === 'All' || p.relatedCustomers.includes(selectedCustomer);
       const matchesSupp = selectedSupplier === 'All' || p.relatedSuppliers.includes(selectedSupplier);
 
-      return matchesSearch && matchesCat && matchesCust && matchesSupp;
+      const matchesTab = 
+        activeTab === 'all' ? true :
+        activeTab === 'with_pricing' ? p.matchedPricings.length > 0 :
+        activeTab === 'with_orders' ? p.matchedPOLines.length > 0 :
+        activeTab === 'with_specs' ? !!p.primarySpec : true;
+
+      return matchesSearch && matchesCat && matchesCust && matchesSupp && matchesTab;
     });
-  }, [enrichedProducts, searchTerm, selectedCategory, selectedCustomer, selectedSupplier]);
+  }, [enrichedProducts, searchTerm, selectedCategory, selectedCustomer, selectedSupplier, activeTab]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
@@ -311,142 +331,100 @@ export default function ProductsView({
   };
 
   return (
-    <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 bg-[#F8F9FA] min-h-screen relative font-sans">
-      {/* 1. macOS Window Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-2xs font-bold shrink-0">
-              <Package size={18} />
+    <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-4 bg-[#F8FAFA] min-h-screen relative font-sans">
+      {/* 1. Universal Cockpit Toolbar */}
+      <CockpitTableToolbar
+        moduleCode="MOD // 05 · PRODUCTS"
+        title="Danh Mục Sản Phẩm & Mã Hiệu"
+        subtitle="Hồ sơ 360° đa chiều: Bảng giá • Khách hàng • Nhà cung cấp • Specs • Hợp đồng Drive"
+        icon={<Package size={22} className="text-white" />}
+        stats={[
+          { label: 'Tổng SKU', value: metrics.total, tone: 'default' },
+          { label: 'Có Báo Giá', value: metrics.withPricing, tone: 'cobalt' },
+          { label: 'Có Đơn PO', value: metrics.withOrders, tone: 'emerald' },
+          { label: 'Có Specs QC', value: metrics.withSpecs, tone: 'amber' },
+        ]}
+        searchTerm={searchTerm}
+        onSearchChange={(v) => { setSearchTerm(v); setCurrentPage(1); }}
+        searchPlaceholder="Tìm theo mã SKU, tên sản phẩm, khách hàng, nhà cung cấp..."
+        searchResultCount={filteredProducts.length}
+        tabs={[
+          { id: 'all', label: 'Tất cả sản phẩm', count: enrichedProducts.length },
+          { id: 'with_pricing', label: 'Có bảng giá', count: metrics.withPricing },
+          { id: 'with_orders', label: 'Có đơn PO', count: metrics.withOrders },
+          { id: 'with_specs', label: 'Đã lập Specs', count: metrics.withSpecs },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(t) => { setActiveTab(t as any); setCurrentPage(1); }}
+        filtersSlot={(
+          <>
+            {/* Category Filter */}
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/90 text-xs">
+              <span className="text-[11px] font-semibold text-slate-500">Nhóm:</span>
+              <select
+                value={selectedCategory}
+                onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent font-medium text-slate-800 focus:outline-none pr-1 cursor-pointer"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c === 'All' ? 'Tất cả nhóm' : c}</option>
+                ))}
+              </select>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Danh Mục Sản Phẩm</h1>
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded-md border border-slate-200">
-                  {metrics.total} sản phẩm
-                </span>
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold rounded-md border border-blue-200/60 flex items-center gap-1">
-                  <Sparkles size={11} /> Hồ sơ 360°
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tổng quan liên kết đa chiều: Khách hàng • Nhà cung cấp • Bảng giá • Đơn hàng • Specs kỹ thuật • Hợp đồng Drive
-              </p>
+
+            {/* Customer Filter */}
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/90 text-xs">
+              <span className="text-[11px] font-semibold text-slate-500">Khách:</span>
+              <select
+                value={selectedCustomer}
+                onChange={(e) => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent font-medium text-slate-800 focus:outline-none pr-1 max-w-[130px] truncate cursor-pointer"
+              >
+                {customersList.map((c) => (
+                  <option key={c} value={c}>{c === 'All' ? 'Tất cả khách hàng' : c}</option>
+                ))}
+              </select>
             </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => {
-              setEditFormData({
-                'Mã sản phẩm': '',
-                'Tên sản phẩm': '',
-                'Nhóm hàng': 'Thùng carton',
-                'Đơn Vị Tính': 'Cái',
-                'Khách hàng': allCustomerOptions[0] || 'Thăng Long',
-                'Mã Nhà Cung Cấp': allSupplierOptions[0] || 'YFY',
-                'Tình trạng': 'Đang kinh doanh'
-              });
-              setIsAddModalOpen(true);
-            }}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all"
-          >
-            <Plus size={14} />
-            <span>Thêm sản phẩm</span>
-          </button>
+            {/* Supplier Filter */}
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200/90 text-xs">
+              <span className="text-[11px] font-semibold text-slate-500">NCC:</span>
+              <select
+                value={selectedSupplier}
+                onChange={(e) => { setSelectedSupplier(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent font-medium text-slate-800 focus:outline-none pr-1 max-w-[130px] truncate cursor-pointer"
+              >
+                {suppliersList.map((s) => (
+                  <option key={s} value={s}>{s === 'All' ? 'Tất cả NCC' : s}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+        onAddNew={() => {
+          setEditFormData({
+            'Mã sản phẩm': '',
+            'Tên sản phẩm': '',
+            'Nhóm hàng': 'Thùng carton',
+            'Đơn Vị Tính': 'Cái',
+            'Khách hàng': allCustomerOptions[0] || 'Thăng Long',
+            'Mã Nhà Cung Cấp': allSupplierOptions[0] || 'YFY',
+            'Tình trạng': 'Đang kinh doanh'
+          });
+          setIsAddModalOpen(true);
+        }}
+        addNewLabel="Thêm sản phẩm"
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
 
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
-            <button
-              onClick={() => setViewMode('table')}
-              className={clsx(
-                "p-1.5 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all",
-                viewMode === 'table' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
-              )}
-              title="Xem dạng bảng"
-            >
-              <List size={14} />
-              <span className="hidden sm:inline">Bảng</span>
-            </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              className={clsx(
-                "p-1.5 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all",
-                viewMode === 'cards' ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
-              )}
-              title="Xem dạng thẻ"
-            >
-              <LayoutGrid size={14} />
-              <span className="hidden sm:inline">Thẻ</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Filters & Search Toolbar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-wrap items-center gap-2.5 text-xs">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-          <input
-            type="text"
-            placeholder="Tìm theo mã SP, tên sản phẩm, đối tác..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-          />
-        </div>
-
-        {/* Category Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-medium text-slate-500">Nhóm:</span>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 cursor-pointer"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>{c === 'All' ? 'Tất cả nhóm' : c}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Customer Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-medium text-slate-500">Khách:</span>
-          <select
-            value={selectedCustomer}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 max-w-[140px] truncate cursor-pointer"
-          >
-            {customersList.map((c) => (
-              <option key={c} value={c}>{c === 'All' ? 'Tất cả khách hàng' : c}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Supplier Filter */}
-        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200/80">
-          <span className="text-[11px] font-medium text-slate-500">NCC:</span>
-          <select
-            value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
-            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none pr-1 max-w-[140px] truncate cursor-pointer"
-          >
-            {suppliersList.map((s) => (
-              <option key={s} value={s}>{s === 'All' ? 'Tất cả NCC' : s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* 3. Products Table View */}
+      {/* 2. Products Table View */}
       {viewMode === 'table' ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+        <div className="cockpit-table-shell">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1150px] text-left border-collapse">
               <thead>
-                <tr className="bg-[#F8F9FA] text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+                <tr className="cockpit-table-header">
                   <th className="py-3 px-4 w-[28%]">Sản Phẩm & Mã Hiệu</th>
                   <th className="py-3 px-3 w-[13%]">Khách Hàng</th>
                   <th className="py-3 px-3 w-[13%]">Nhà Cung Cấp</th>
@@ -460,31 +438,34 @@ export default function ProductsView({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
-                      <Package size={32} className="mx-auto mb-2 opacity-30 text-slate-400" />
-                      <p className="font-medium text-slate-600">Không tìm thấy sản phẩm nào</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Thử thay đổi từ khóa hoặc bộ lọc</p>
+                    <td colSpan={8} className="py-8">
+                      <CockpitTableEmptyState 
+                        searchTerm={searchTerm}
+                        onClearSearch={() => setSearchTerm('')}
+                        title="Không tìm thấy sản phẩm nào"
+                        description="Thử thay đổi từ khóa tìm kiếm hoặc chuyển sang tab lọc khác"
+                      />
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p, idx) => (
+                  paginatedProducts.map((p, idx) => (
                     <tr 
                       key={p.code || idx}
                       onClick={() => onSelectProductDetails(p.code || p.name)}
-                      className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                      className="cockpit-table-row group cursor-pointer"
                     >
                       {/* Product Name & Code */}
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-blue-50 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors">
-                            <Package size={14} />
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-50 text-slate-600 group-hover:text-blue-600 flex items-center justify-center shrink-0 transition-colors border border-slate-200/60">
+                            <Package size={15} />
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate" title={p.name}>
                               {p.name}
                             </p>
                             <div className="flex items-center gap-1.5 mt-0.5 text-[11px]">
-                              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1 py-0.2 rounded border border-slate-200/80 shrink-0">
+                              <span className="cockpit-code">
                                 {p.code}
                               </span>
                               <span className="text-slate-400 truncate">• {p.category}</span>
@@ -535,10 +516,10 @@ export default function ProductsView({
                       <td className="py-2.5 px-3 text-right">
                         {p.sellPrice > 0 ? (
                           <div>
-                            <p className="font-bold text-slate-900 text-xs">{formatVND(p.sellPrice)}</p>
+                            <p className="font-bold text-slate-900 font-mono tabular-nums text-xs">{formatVND(p.sellPrice)}</p>
                             <div className="flex items-center justify-end gap-1.5 mt-0.5 text-[10.5px]">
-                              <span className="text-slate-400">Mua: {formatVND(p.buyPrice)}</span>
-                              <span className="font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200/50">
+                              <span className="text-slate-400 font-mono tabular-nums">Mua: {formatVND(p.buyPrice)}</span>
+                              <span className="font-bold font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                                 {p.marginPct}
                               </span>
                             </div>
@@ -561,7 +542,7 @@ export default function ProductsView({
                             >
                               {p.latestPO['Số đơn hàng'] || p.latestPO['Đơn hàng']}
                             </span>
-                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate font-mono tabular-nums">
                               {p.latestPO['Số lượng']} {p.unit}
                             </p>
                           </div>
@@ -636,6 +617,17 @@ export default function ProductsView({
               </tbody>
             </table>
           </div>
+
+          {/* Unified Pagination */}
+          {filteredProducts.length > 0 && (
+            <CockpitPagination
+              currentPage={currentPage}
+              totalItems={filteredProducts.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </div>
       ) : (
         /* Cards View */

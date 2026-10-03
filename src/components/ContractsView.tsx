@@ -13,7 +13,10 @@ import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO, findPrice
 import { processContractOCR } from '../lib/gemini';
 import { registerAndUploadDriveDocument, getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
 import CompanyLogo from './CompanyLogo';
-import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
+import { 
+  CockpitCard, CockpitButton, CockpitBadge, CockpitStat,
+  CockpitTableToolbar, CockpitPagination, CockpitTableEmptyState 
+} from './ui';
 
 export interface ContractItem {
   id?: string;
@@ -122,6 +125,14 @@ export default function ContractsView({
       );
     });
   }, [contractsData, activeTab, searchQuery]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const paginatedContracts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredContracts.slice(start, start + pageSize);
+  }, [filteredContracts, currentPage, pageSize]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -509,143 +520,66 @@ export default function ContractsView({
         )}
       </div>
 
-      {/* Top Header */}
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/85 px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <CockpitBadge tone="cobalt" size="sm" dot>
-              Pháp lý & Bảng Giá
-            </CockpitBadge>
-            <h1 className="text-base sm:text-xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
-          </div>
-          <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
-            Quét OCR hợp đồng, tóm tắt điều khoản AI, trích xuất bảng đơn giá cam kết và đối chiếu chéo Bảng Giá 2026
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <CockpitButton
-            variant="primary"
-            icon={<Sparkles size={14} className="animate-pulse" />}
-            onClick={() => {
-              setIsOcrModalOpen(true);
-              if (!ocrContractResult) handleLoadSampleContract('ThangLong');
-            }}
-          >
-            <span className="hidden sm:inline">Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá</span>
-            <span className="sm:hidden">Quét OCR HĐ</span>
-          </CockpitButton>
-          <CockpitButton
-            variant="secondary"
-            icon={<Plus size={14} />}
-            onClick={handleOpenAdd}
-          >
-            Thêm HĐ
-          </CockpitButton>
-        </div>
-      </div>
-
-      {/* KPI Bento Grid */}
-      <div className="px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <CockpitStat
-          label="Tổng Hợp Đồng"
-          value={stats.total}
-          icon={<FileText size={16} />}
-          subValue="Đã lưu trong CSDL"
-          delta={{ value: "+100%", trend: "up" }}
-        />
-        <CockpitStat
-          label="Đang Có Hiệu Lực"
-          value={stats.active}
-          icon={<CheckCircle2 size={16} />}
-          subValue="Căn cứ pháp lý chuẩn"
-          delta={{ value: `${Math.round((stats.active / (stats.total || 1)) * 100)}%`, trend: "up" }}
-        />
-        <CockpitStat
-          label="Sắp Hết Hạn (<45 ngày)"
-          value={stats.expiringSoon}
-          icon={<Clock size={16} />}
-          subValue="Cần tái ký / lập phụ lục"
-          delta={{ value: `${stats.expiringSoon} HĐ`, trend: stats.expiringSoon === 0 ? "neutral" : "down" }}
-        />
-        <CockpitStat
-          label="Tổng Giá Trị Cam Kết"
-          value={formatVND(stats.totalVal)}
-          icon={<DollarSign size={16} />}
-          subValue="Quy mô các hợp đồng"
-          delta={{ value: "HĐMB", trend: "neutral" }}
+      {/* Top Cockpit Toolbar */}
+      <div className="px-3 sm:px-6 lg:px-8 pt-4">
+        <CockpitTableToolbar
+          moduleCode="MOD // 02 · CONTRACTS"
+          title="Hợp Đồng & Phụ Lục Kinh Tế"
+          subtitle="Quét OCR hợp đồng, trích xuất bảng đơn giá cam kết và đối chiếu chéo Google Drive"
+          icon={<Scale size={22} className="text-white" />}
+          stats={[
+            { label: 'Tổng Hợp Đồng', value: stats.total, tone: 'default' },
+            { label: 'Đang Hiệu Lực', value: stats.active, tone: 'emerald' },
+            { label: 'Sắp Hết Hạn', value: stats.expiringSoon, tone: 'amber' },
+            { label: 'Tổng Giá Trị', value: formatVND(stats.totalVal), tone: 'cobalt' },
+          ]}
+          searchTerm={searchQuery}
+          onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
+          searchPlaceholder="Tìm số HĐ, tên đối tác, loại hợp đồng..."
+          searchResultCount={filteredContracts.length}
+          tabs={[
+            { id: 'all', label: 'Tất cả hợp đồng', count: contractsData.length },
+            { id: 'customer', label: 'HĐ Khách hàng' },
+            { id: 'supplier', label: 'HĐ Nhà cung cấp' },
+          ]}
+          activeTab={activeTab}
+          onTabChange={(t) => { setActiveTab(t as any); setCurrentPage(1); }}
+          extraActionsSlot={(
+            <CockpitButton
+              variant="primary"
+              icon={<Sparkles size={14} className="animate-pulse" />}
+              onClick={() => {
+                setIsOcrModalOpen(true);
+                if (!ocrContractResult) handleLoadSampleContract('ThangLong');
+              }}
+            >
+              <span className="hidden sm:inline">Quét OCR Hợp Đồng</span>
+              <span className="sm:hidden">OCR</span>
+            </CockpitButton>
+          )}
+          onAddNew={handleOpenAdd}
+          addNewLabel="Thêm HĐ"
         />
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
+      <div className="flex-1 px-3 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
         {/* Left: Contracts Table List */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200/85 flex flex-col min-h-[400px] overflow-hidden">
-          {/* Filter Bar */}
-          <div className="p-3 sm:p-4 border-b border-slate-200/85 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1 bg-[#F8FAFA] p-1 rounded-xl border border-slate-200/85 overflow-x-auto max-w-full">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
-                  activeTab === 'all' ? "bg-white text-slate-900 shadow-2xs border border-slate-200/60 font-bold" : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                Tất cả ({contractsData.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('customer')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
-                  activeTab === 'customer' ? "bg-[#0066FF] text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                HĐ Khách hàng
-              </button>
-              <button
-                onClick={() => setActiveTab('supplier')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
-                  activeTab === 'supplier' ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                HĐ Nhà cung cấp
-              </button>
-            </div>
-
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-              <input
-                type="text"
-                placeholder="Tìm số HĐ, tên đối tác..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-[#F8FAFA] hover:bg-white focus:bg-white border border-slate-200/85 focus:border-[#0066FF] focus:ring-2 focus:ring-[#0066FF]/10 rounded-xl text-xs outline-none transition-all placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-
+        <div className="flex-1 cockpit-table-shell flex flex-col min-h-[400px]">
           {/* Table / Cards Container */}
           <div className="flex-1 overflow-y-auto">
             {filteredContracts.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                <FileText size={48} className="mb-3 text-slate-300 stroke-[1.5]" />
-                <p className="text-sm font-semibold text-slate-600">Chưa có Hợp đồng nào</p>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                  Hãy bấm "Thêm Hợp Đồng Mới" hoặc quét OCR hợp đồng PDF/scan để nạp danh mục đơn giá đối chiếu
-                </p>
-                <button
-                  onClick={handleOpenAdd}
-                  className="mt-4 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-xs font-bold transition-all"
-                >
-                  + Thêm Hợp Đồng Đầu Tiên
-                </button>
-              </div>
+              <CockpitTableEmptyState
+                searchTerm={searchQuery}
+                onClearSearch={() => setSearchQuery('')}
+                title="Chưa có hợp đồng nào"
+                description="Thử thay đổi từ khóa tìm kiếm hoặc bấm Thêm HĐ / Quét OCR"
+              />
             ) : (
               <>
                 {/* Mobile Cards Feed (Visible on sm:hidden) */}
                 <div className="block sm:hidden p-3 space-y-3">
-                  {filteredContracts.map((contract, index) => {
+                  {paginatedContracts.map((contract, index) => {
                     const isSelected = selectedContract?.id === contract.id;
                     return (
                       <div
@@ -655,7 +589,7 @@ export default function ContractsView({
                           setIsMobileDetailOpen(true);
                         }}
                         className={clsx(
-                          "bg-white rounded-2xl p-4 border border-black/[0.06] shadow-xs active:scale-[0.99] transition-all cursor-pointer",
+                          "bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs active:scale-[0.99] transition-all cursor-pointer",
                           isSelected ? "ring-2 ring-blue-500/50 bg-blue-50/20" : ""
                         )}
                       >
@@ -689,17 +623,17 @@ export default function ContractsView({
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 block">Giá trị hợp đồng</span>
-                            <span className="font-bold text-purple-700">
+                            <span className="font-bold font-mono text-purple-700">
                               {contract.totalValue ? formatVND(contract.totalValue) : 'Theo đơn đặt'}
                             </span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 block">Ngày ký</span>
-                            <span className="font-medium text-slate-700">{formatDateForDisplay(contract.signDate)}</span>
+                            <span className="font-medium text-slate-700 font-mono">{formatDateForDisplay(contract.signDate)}</span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 block">Hết hạn</span>
-                            <span className="font-medium text-slate-700">{formatDateForDisplay(contract.expirationDate) || 'Vô thời hạn'}</span>
+                            <span className="font-medium text-slate-700 font-mono">{formatDateForDisplay(contract.expirationDate) || 'Vô thời hạn'}</span>
                           </div>
                         </div>
 
@@ -737,10 +671,10 @@ export default function ContractsView({
                   })}
                 </div>
 
-                {/* Desktop Table (Visible on sm and above with horizontal scroll) */}
+                {/* Desktop Table */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead className="sticky top-0 bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06] z-10">
+                    <thead className="cockpit-table-header sticky top-0 z-10">
                       <tr>
                         <th className="py-3 px-4">Số Hợp Đồng</th>
                         <th className="py-3 px-4">Đối Tác</th>
@@ -752,20 +686,22 @@ export default function ContractsView({
                         <th className="py-3 px-4 text-center">Thao tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-black/[0.04]">
-                      {filteredContracts.map((contract, index) => {
+                    <tbody className="divide-y divide-slate-100">
+                      {paginatedContracts.map((contract, index) => {
                         const isSelected = selectedContract?.id === contract.id;
                         return (
                           <tr
                             key={contract.id || index}
                             onClick={() => setSelectedContract(contract)}
                             className={clsx(
-                              "hover:bg-blue-50/50 cursor-pointer transition-colors",
-                              isSelected ? "bg-blue-50/70" : ""
+                              "cockpit-table-row cursor-pointer transition-colors",
+                              isSelected ? "is-selected" : ""
                             )}
                           >
-                            <td className="py-3 px-4 font-mono font-bold text-blue-600">
-                              {contract.contractNumber}
+                            <td className="py-3 px-4">
+                              <span className="cockpit-code text-blue-700 bg-blue-50 border-blue-200">
+                                {contract.contractNumber}
+                              </span>
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
@@ -781,13 +717,13 @@ export default function ContractsView({
                                 {contract.contractType}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-slate-600">
+                            <td className="py-3 px-4 text-slate-600 font-mono tabular-nums">
                               {formatDateForDisplay(contract.signDate)}
                             </td>
-                            <td className="py-3 px-4 text-slate-600">
+                            <td className="py-3 px-4 text-slate-600 font-mono tabular-nums">
                               {formatDateForDisplay(contract.expirationDate) || 'Vô thời hạn'}
                             </td>
-                            <td className="py-3 px-4 text-right font-bold text-slate-900">
+                            <td className="py-3 px-4 text-right font-bold text-slate-900 font-mono tabular-nums">
                               {contract.totalValue ? formatVND(contract.totalValue) : 'Theo đơn đặt'}
                             </td>
                             <td className="py-3 px-4 text-center">
@@ -829,6 +765,15 @@ export default function ContractsView({
                     </tbody>
                   </table>
                 </div>
+
+                {/* Unified Pagination */}
+                <CockpitPagination
+                  currentPage={currentPage}
+                  totalItems={filteredContracts.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
               </>
             )}
           </div>

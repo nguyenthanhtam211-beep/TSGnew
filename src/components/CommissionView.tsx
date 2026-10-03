@@ -11,6 +11,12 @@ import * as XLSX from 'xlsx';
 import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
+import { 
+  CockpitTableToolbar, 
+  CockpitPagination, 
+  CockpitTableEmptyState, 
+  CockpitBadge 
+} from './ui';
 
 export type CommissionMethod = 'profit_percent' | 'weight_rate' | 'monthly_lump_sum';
 
@@ -249,6 +255,19 @@ export default function CommissionView({
       a.beneficiaryName.toLowerCase().includes(query)
     );
   }, [poCommissionAnalysisList, searchQuery]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const paginatedCommissions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCommissions.slice(start, start + pageSize);
+  }, [filteredCommissions, currentPage, pageSize]);
+
+  const paginatedPOAnalysisList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPOAnalysisList.slice(start, start + pageSize);
+  }, [filteredPOAnalysisList, currentPage, pageSize]);
 
   // Financial Stats
   const stats = useMemo(() => {
@@ -590,217 +609,45 @@ export default function CommissionView({
   };
 
   return (
-    <div className="flex-1 bg-[#F5F5F7] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
-      {/* Top Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold uppercase tracking-wider">
-              Tài chính & Chiết khấu
-            </span>
-            <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight">Quản Lý Hoa Hồng (3 Phương Thức Chiết Khấu)</h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Hỗ trợ linh hoạt: <strong>Chia % Lợi nhuận</strong>, <strong>Theo trọng lượng (1.000 ₫/kg Lưỡi gà)</strong> hoặc <strong>Chi khoán theo tháng</strong> (Nhập thủ công độc lập)
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleExportExcel}
-            className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5"
-          >
-            <Download size={14} className="text-slate-500" />
-            Xuất Excel
-          </button>
-          
-          {/* Quick Create Dropdown / Buttons */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleOpenAdd('profit_percent')}
-              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-purple-500/20 active:scale-95 transition-all flex items-center gap-1.5"
-            >
-              <Plus size={14} />
-              + Lập Phiếu Hoa Hồng
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-5">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-          {/* Total */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Tổng Hoa Hồng Đã Lập</span>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                <Receipt size={16} />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
-                {formatVND(stats.totalAmount)}
-              </p>
-              <span className="text-[11px] text-slate-400 font-medium">{stats.total} phiếu hoa hồng</span>
-            </div>
-          </div>
-
-          {/* Method 1: Profit Share */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-700">1. Chia % Lợi Nhuận</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                <Percent size={16} />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <p className="text-xl sm:text-2xl font-black text-blue-900 font-mono">
-                {formatVND(stats.profitShareTotal)}
-              </p>
-              <span className="text-[11px] text-blue-500 font-medium">Theo tỷ lệ % LN gộp KH</span>
-            </div>
-          </div>
-
-          {/* Method 2: Weight Rate (LGT) */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-700">2. Theo Trọng Lượng (Kg)</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Scale size={16} />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <p className="text-xl sm:text-2xl font-black text-emerald-900 font-mono">
-                {formatVND(stats.weightRateTotal)}
-              </p>
-              <span className="text-[11px] text-emerald-600 font-medium">Định mức 1.000 ₫/kg LGT</span>
-            </div>
-          </div>
-
-          {/* Method 3: Monthly Lump Sum */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-700">3. Chi Khoán Theo Tháng</span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                <CalendarDays size={16} />
-              </div>
-            </div>
-            <div className="mt-2.5">
-              <p className="text-xl sm:text-2xl font-black text-amber-900 font-mono">
-                {formatVND(stats.lumpSumTotal)}
-              </p>
-              <span className="text-[11px] text-amber-600 font-medium">Khoán trọn gói nhập tay</span>
-            </div>
-          </div>
-        </div>
+    <div className="flex-1 bg-[#F8FAFA] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
+      {/* Top Cockpit Toolbar */}
+      <div className="px-4 sm:px-6 lg:px-8 pt-4">
+        <CockpitTableToolbar
+          moduleCode="MOD // 06 · COMMISSIONS"
+          title="Sổ Cái Hoa Hồng & Chiết Khấu"
+          subtitle="Quản lý chi trả hoa hồng 3 phương thức: % Lợi nhuận, Định mức 1.000 ₫/kg LGT hoặc Chi khoán theo tháng"
+          icon={<Receipt size={22} className="text-white" />}
+          stats={[
+            { label: 'Tổng Đã Lập', value: formatVND(stats.totalAmount), tone: 'default' },
+            { label: '1. % Lợi Nhuận', value: formatVND(stats.profitShareTotal), tone: 'cobalt' },
+            { label: '2. Trọng Lượng kg', value: formatVND(stats.weightRateTotal), tone: 'emerald' },
+            { label: '3. Khoán Tháng', value: formatVND(stats.lumpSumTotal), tone: 'amber' },
+          ]}
+          searchTerm={searchQuery}
+          onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
+          searchPlaceholder="Tìm khách hàng, người nhận, số PO, ghi chú..."
+          searchResultCount={activeTab === 'auto_po' ? filteredPOAnalysisList.length : filteredCommissions.length}
+          tabs={[
+            { id: 'auto_po', label: '⚡ Tự Động PO', count: filteredPOAnalysisList.length },
+            { id: 'all', label: 'Tất cả phiếu', count: commissionData.length },
+            { id: 'profit_percent', label: 'Chia % Lợi nhuận' },
+            { id: 'weight_rate', label: 'Theo kg LGT' },
+            { id: 'monthly_lump_sum', label: 'Khoán tháng' },
+            { id: 'pending', label: 'Chờ duyệt' },
+            { id: 'paid', label: 'Đã thanh toán' },
+          ]}
+          activeTab={activeTab}
+          onTabChange={(t) => { setActiveTab(t as any); setCurrentPage(1); }}
+          onExport={handleExportExcel}
+          onAddNew={() => handleOpenAdd('profit_percent')}
+          addNewLabel="Lập Phiếu Hoa Hồng"
+        />
       </div>
 
       {/* Main Content Area */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-5 flex-1 flex flex-col lg:flex-row gap-5 min-h-0">
-        {/* Left: Commission List & Filters */}
-        <div className="flex-1 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col overflow-hidden">
-          {/* Filter Bar & Tabs */}
-          <div className="p-3.5 sm:p-4 border-b border-black/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FBFBFD]">
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              <button
-                onClick={() => setActiveTab('auto_po')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer",
-                  activeTab === 'auto_po'
-                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs"
-                    : "bg-white text-purple-700 hover:bg-purple-50 border border-purple-200"
-                )}
-              >
-                <Sparkles size={12} className="text-amber-300" />
-                ⚡ Tự Động Tính Theo PO ({filteredPOAnalysisList.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('all')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
-                  activeTab === 'all'
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                )}
-              >
-                Tất cả phiếu ({commissionData.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('profit_percent')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
-                  activeTab === 'profit_percent'
-                    ? "bg-blue-600 text-white shadow-2xs"
-                    : "bg-white text-blue-700 hover:bg-blue-50 border border-blue-200"
-                )}
-              >
-                <Percent size={12} />
-                Chia % Lợi nhuận
-              </button>
-              <button
-                onClick={() => setActiveTab('weight_rate')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
-                  activeTab === 'weight_rate'
-                    ? "bg-emerald-600 text-white shadow-2xs"
-                    : "bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
-                )}
-              >
-                <Scale size={12} />
-                Theo Trọng lượng (kg)
-              </button>
-              <button
-                onClick={() => setActiveTab('monthly_lump_sum')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer",
-                  activeTab === 'monthly_lump_sum'
-                    ? "bg-amber-600 text-white shadow-2xs"
-                    : "bg-white text-amber-700 hover:bg-amber-50 border border-amber-200"
-                )}
-              >
-                <CalendarDays size={12} />
-                Khoán theo tháng
-              </button>
-              <button
-                onClick={() => setActiveTab('pending')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
-                  activeTab === 'pending'
-                    ? "bg-purple-600 text-white shadow-2xs"
-                    : "bg-white text-purple-700 hover:bg-purple-50 border border-purple-200"
-                )}
-              >
-                Chờ duyệt
-              </button>
-              <button
-                onClick={() => setActiveTab('paid')}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
-                  activeTab === 'paid'
-                    ? "bg-teal-600 text-white shadow-2xs"
-                    : "bg-white text-teal-700 hover:bg-teal-50 border border-teal-200"
-                )}
-              >
-                Đã thanh toán
-              </button>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative min-w-[220px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tìm khách hàng, người nhận, PO..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-purple-500"
-              />
-            </div>
-          </div>
-
+      <div className="px-4 sm:px-6 lg:px-8 flex-1 flex flex-col lg:flex-row gap-5 min-h-0">
+        {/* Left: Commission List */}
+        <div className="flex-1 cockpit-table-shell flex flex-col overflow-hidden">
           {/* Table Container */}
           <div className="flex-1 overflow-x-auto min-h-0">
             {activeTab === 'auto_po' ? (
@@ -827,8 +674,8 @@ export default function CommissionView({
                 </div>
 
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-black/[0.06] bg-[#F5F5F7] text-slate-500 font-bold">
+                  <thead className="cockpit-table-header">
+                    <tr>
                       <th className="py-3 px-4">Đơn Hàng (PO) & KH</th>
                       <th className="py-3 px-4">Người Đặt Đơn Sản Xuất</th>
                       <th className="py-3 px-4">Sản Phẩm & Số Cuộn</th>
@@ -839,122 +686,128 @@ export default function CommissionView({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/[0.04]">
-                    {filteredPOAnalysisList.map((analysis, index) => (
-                      <tr key={analysis.poNumber || index} className="hover:bg-purple-50/40 transition-colors">
-                        {/* PO Number & Customer */}
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          <div className="flex items-center gap-2">
-                            <CompanyLogo name={analysis.customerName} size="sm" />
-                            <div>
-                              <span className="font-mono text-purple-700 font-bold block">{analysis.poNumber}</span>
-                              <span className="text-[11px] text-slate-600 truncate block max-w-[130px]">{analysis.customerName}</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Order Placer Beneficiary */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5">
-                            <UserCheck size={14} className="text-purple-600 shrink-0" />
-                            <div>
-                              <p className="font-bold text-purple-950">{analysis.beneficiaryName}</p>
-                              <span className="text-[10px] text-slate-500 block">{analysis.beneficiaryRole} {analysis.beneficiaryPhone ? `• ${analysis.beneficiaryPhone}` : ''}</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Product & Quantity */}
-                        <td className="py-3 px-4">
-                          {analysis.hasLGT ? (
-                            <div>
-                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
-                                <Scale size={11} /> LGT 71 x 800mm
-                              </span>
-                              <p className="text-xs font-bold text-slate-800 mt-1">
-                                {analysis.totalRolls.toLocaleString()} cuộn
-                              </p>
-                            </div>
-                          ) : (
-                            <div>
-                              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[11px] inline-flex items-center gap-1">
-                                <Percent size={11} /> Sản phẩm khác
-                              </span>
-                              <p className="text-xs font-bold text-slate-800 mt-1">
-                                Giá trị PO: {formatVND(analysis.totalPoValue)}
-                              </p>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Weight Conversion */}
-                        <td className="py-3 px-4 text-right font-mono">
-                          {analysis.hasLGT ? (
-                            <div>
-                              <span className="text-xs font-black text-emerald-700">
-                                {analysis.weightKg.toLocaleString()} kg
-                              </span>
-                              <span className="text-[10px] text-slate-400 block mt-0.5">
-                                ({analysis.totalRolls} × 11,92 kg)
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 text-[11px]">LN: {formatVND(analysis.totalProfit)}</span>
-                          )}
-                        </td>
-
-                        {/* Rate */}
-                        <td className="py-3 px-4 text-right font-bold text-slate-700 font-mono">
-                          {analysis.hasLGT ? '1.000 ₫/kg' : '10% LN'}
-                        </td>
-
-                        {/* Commission Amount */}
-                        <td className="py-3 px-4 text-right">
-                          <span className="text-sm font-black text-purple-900 font-mono block">
-                            {formatVND(analysis.commissionAmount)}
-                          </span>
-                          <span className="text-[10px] text-emerald-600 font-semibold">Tự động</span>
-                        </td>
-
-                        {/* Action */}
-                        <td className="py-3 px-4 text-center">
-                          {analysis.isExistingCommission ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1">
-                              <CheckCircle2 size={12} /> Đã lập phiếu
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleQuickCreatePOCommission(analysis)}
-                              className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Sparkles size={11} className="text-amber-300" />
-                              Lập Phiếu
-                            </button>
-                          )}
+                    {paginatedPOAnalysisList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-0">
+                          <CockpitTableEmptyState
+                            title="Không có đơn hàng PO nào phù hợp"
+                            description="Thử xóa bộ lọc tìm kiếm hoặc kiểm tra các đơn hàng PO đã phát sinh."
+                            searchTerm={searchQuery}
+                            onClearSearch={() => setSearchQuery('')}
+                          />
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      paginatedPOAnalysisList.map((analysis, index) => (
+                        <tr key={analysis.poNumber || index} className="cockpit-table-row">
+                          {/* PO Number & Customer */}
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <CompanyLogo name={analysis.customerName} size="sm" />
+                              <div>
+                                <span className="cockpit-code text-purple-700 font-bold block">{analysis.poNumber}</span>
+                                <span className="text-[11px] text-slate-600 truncate block max-w-[130px]">{analysis.customerName}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Order Placer Beneficiary */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-purple-600 shrink-0" />
+                              <div>
+                                <p className="font-bold text-purple-950">{analysis.beneficiaryName}</p>
+                                <span className="text-[10px] text-slate-500 block">{analysis.beneficiaryRole} {analysis.beneficiaryPhone ? `• ${analysis.beneficiaryPhone}` : ''}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Product & Quantity */}
+                          <td className="py-3 px-4">
+                            {analysis.hasLGT ? (
+                              <div>
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                  <Scale size={11} /> LGT 71 x 800mm
+                                </span>
+                                <p className="text-xs font-bold text-slate-800 mt-1 font-mono tabular-nums">
+                                  {analysis.totalRolls.toLocaleString()} cuộn
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                  <Percent size={11} /> Sản phẩm khác
+                                </span>
+                                <p className="text-xs font-bold text-slate-800 mt-1 font-mono tabular-nums">
+                                  Giá trị PO: {formatVND(analysis.totalPoValue)}
+                                </p>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Weight Conversion */}
+                          <td className="py-3 px-4 text-right font-mono tabular-nums">
+                            {analysis.hasLGT ? (
+                              <div>
+                                <span className="text-xs font-black text-emerald-700">
+                                  {analysis.weightKg.toLocaleString()} kg
+                                </span>
+                                <span className="text-[10px] text-slate-400 block mt-0.5">
+                                  ({analysis.totalRolls} × 11,92 kg)
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">LN: {formatVND(analysis.totalProfit)}</span>
+                            )}
+                          </td>
+
+                          {/* Rate */}
+                          <td className="py-3 px-4 text-right font-bold text-slate-700 font-mono tabular-nums">
+                            {analysis.hasLGT ? '1.000 ₫/kg' : '10% LN'}
+                          </td>
+
+                          {/* Commission Amount */}
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-sm font-black text-purple-900 font-mono tabular-nums block">
+                              {formatVND(analysis.commissionAmount)}
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-semibold">Tự động</span>
+                          </td>
+
+                          {/* Action */}
+                          <td className="py-3 px-4 text-center">
+                            {analysis.isExistingCommission ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Đã lập phiếu
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleQuickCreatePOCommission(analysis)}
+                                className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Sparkles size={11} className="text-amber-300" />
+                                Lập Phiếu
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             ) : filteredCommissions.length === 0 ? (
-              <div className="h-64 flex flex-col items-center justify-center text-center p-6">
-                <Receipt size={40} className="text-slate-300 stroke-[1.5] mb-2" />
-                <p className="text-sm font-bold text-slate-700">Chưa có phiếu hoa hồng nào</p>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                  Bạn có thể lập phiếu hoa hồng mới theo 3 hình thức: Chia % Lợi nhuận, Theo trọng lượng kg hoặc Chi khoán theo tháng.
-                </p>
-                <button
-                  onClick={() => handleOpenAdd('profit_percent')}
-                  className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
-                >
-                  + Lập Phiếu Hoa Hồng Mới
-                </button>
-              </div>
+              <CockpitTableEmptyState
+                title="Chưa có phiếu hoa hồng nào"
+                description="Bạn có thể lập phiếu hoa hồng mới theo 3 hình thức: Chia % Lợi nhuận, Theo trọng lượng kg hoặc Chi khoán theo tháng."
+                searchTerm={searchQuery}
+                onClearSearch={() => setSearchQuery('')}
+              />
             ) : (
               <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-black/[0.06] bg-[#F5F5F7] text-slate-500 font-bold">
+                <thead className="cockpit-table-header">
+                  <tr>
                     <th className="py-3 px-4">Khách Hàng</th>
                     <th className="py-3 px-4">Người Nhận Hoa Hồng</th>
                     <th className="py-3 px-4">Phương Thức & Căn Cứ</th>
@@ -965,7 +818,7 @@ export default function CommissionView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.04]">
-                  {filteredCommissions.map((item, index) => {
+                  {paginatedCommissions.map((item, index) => {
                     const isSelected = selectedCommission?.id === item.id;
                     const method = getItemMethod(item);
 
@@ -974,7 +827,7 @@ export default function CommissionView({
                         key={item.id || index}
                         onClick={() => setSelectedCommission(item)}
                         className={clsx(
-                          "hover:bg-purple-50/40 cursor-pointer transition-colors",
+                          "cockpit-table-row cursor-pointer transition-colors",
                           isSelected ? "bg-purple-50/70" : ""
                         )}
                       >
@@ -985,7 +838,7 @@ export default function CommissionView({
                             <div>
                               <span className="truncate max-w-[150px] block">{item.customerName}</span>
                               {item.poNumber && (
-                                <span className="text-[10px] text-blue-600 font-mono block">PO: {item.poNumber}</span>
+                                <span className="cockpit-code text-blue-600 font-mono block">PO: {item.poNumber}</span>
                               )}
                             </div>
                           </div>
@@ -1011,7 +864,7 @@ export default function CommissionView({
                               <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[11px] inline-flex items-center gap-1">
                                 <Percent size={11} /> Chia % Lợi Nhuận
                               </span>
-                              <span className="text-[10px] text-slate-500 block mt-0.5">
+                              <span className="text-[10px] text-slate-500 block mt-0.5 font-mono tabular-nums">
                                 LN cơ sở: {formatVND(item.baseProfit || 0)}
                               </span>
                             </div>
@@ -1022,7 +875,7 @@ export default function CommissionView({
                               <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
                                 <Scale size={11} /> Theo Trọng Lượng
                               </span>
-                              <span className="text-[10px] text-slate-500 block mt-0.5">
+                              <span className="text-[10px] text-slate-500 block mt-0.5 font-mono tabular-nums">
                                 Khối lượng: {(item.weightKg || 0).toLocaleString()} kg
                               </span>
                             </div>
@@ -1041,7 +894,7 @@ export default function CommissionView({
                         </td>
 
                         {/* Rate / Formula */}
-                        <td className="py-3 px-4 text-right font-bold text-slate-700">
+                        <td className="py-3 px-4 text-right font-bold text-slate-700 font-mono tabular-nums">
                           {method === 'profit_percent' && (
                             <span className="text-blue-700">{item.profitPercent || 10}%</span>
                           )}
@@ -1054,25 +907,22 @@ export default function CommissionView({
                         </td>
 
                         {/* Amount */}
-                        <td className="py-3 px-4 text-right font-bold text-purple-700 text-sm font-mono">
+                        <td className="py-3 px-4 text-right font-bold text-purple-700 text-sm font-mono tabular-nums">
                           {formatVND(item.commissionAmount)}
                         </td>
 
                         {/* Payment Status */}
                         <td className="py-3 px-4 text-center">
-                          <span className={clsx(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
-                            item.paymentStatus === 'Đã thanh toán' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                            item.paymentStatus === 'Đã duyệt' ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                            "bg-amber-50 text-amber-700 border border-amber-200"
-                          )}>
-                            <span className={clsx(
-                              "w-1.5 h-1.5 rounded-full",
-                              item.paymentStatus === 'Đã thanh toán' ? "bg-emerald-500" :
-                              item.paymentStatus === 'Đã duyệt' ? "bg-blue-500" : "bg-amber-500"
-                            )} />
+                          <CockpitBadge
+                            tone={
+                              item.paymentStatus === 'Đã thanh toán' ? 'emerald' :
+                              item.paymentStatus === 'Đã duyệt' ? 'cobalt' : 'amber'
+                            }
+                            dot
+                            size="sm"
+                          >
                             {item.paymentStatus}
-                          </span>
+                          </CockpitBadge>
                         </td>
 
                         {/* Actions */}
@@ -1101,6 +951,15 @@ export default function CommissionView({
               </table>
             )}
           </div>
+
+          {/* Unified Pagination */}
+          <CockpitPagination
+            currentPage={currentPage}
+            totalItems={activeTab === 'auto_po' ? filteredPOAnalysisList.length : filteredCommissions.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => { setPageSize(newSize); setCurrentPage(1); }}
+          />
         </div>
 
         {/* Right: Commission Detail Panel (Desktop) */}

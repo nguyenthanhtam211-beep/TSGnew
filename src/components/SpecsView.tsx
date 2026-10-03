@@ -10,6 +10,12 @@ import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 import MacTrafficLights from './MacTrafficLights';
+import {
+  CockpitTableToolbar,
+  CockpitPagination,
+  CockpitBadge,
+  CockpitTableEmptyState
+} from './ui';
 
 interface SpecParameter {
   criterion: string;
@@ -114,6 +120,14 @@ export default function SpecsView({
       return matchSearch && matchTab;
     });
   }, [specsData, searchTerm, activeTab]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const paginatedSpecs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
 
   const addParameter = () => {
     const params = [...(formData['Thông số kỹ thuật'] || [])];
@@ -342,130 +356,69 @@ export default function SpecsView({
   };
 
   return (
-    <div className="space-y-6">
-      {/* 1. Header & Hero Section */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded-full text-xs font-semibold flex items-center gap-1.5">
-                <ShieldCheck size={14} className="animate-pulse" /> Tiêu chuẩn ISO 9001:2015
-              </span>
-              <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 rounded-full text-xs font-semibold">
-                Kiểm soát Chất lượng (QA/QC)
-              </span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
-              Quản Lý Tiêu Chuẩn Kỹ Thuật (Specs)
-            </h2>
-            <p className="text-slate-300 text-xs md:text-sm mt-1 max-w-2xl">
-              Hệ thống định chuẩn thông số kỹ thuật sản phẩm, kiểm soát độ chịu nén, định lượng, kích thước và quy cách đóng gói xuất khẩu.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleExportAllToExcel}
-              className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 text-xs"
-              title="Xuất toàn bộ Specs ra Excel"
-            >
-              <FileSpreadsheet size={16} className="text-emerald-400" />
-              Xuất Excel
-            </button>
-            <button 
-              onClick={() => handleOpenModal()}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2 text-xs hover:scale-[1.02] active:scale-95"
-            >
-              <Plus size={18} />
-              Thêm Tiêu Chuẩn Mới
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Filter Tabs */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-6 border-t border-slate-800/80">
-          {[
-            { key: 'ALL', label: `Tất cả Specs (${stats.total})` },
-            { key: 'CARTON', label: `Thùng Carton (${stats.carton})` },
-            { key: 'LABEL', label: `Tem Nhãn (${stats.label})` },
-            { key: 'APPROVED', label: `Đã Phê Duyệt (${stats.approved})` },
-            { key: 'DRAFT', label: `Bản Nháp (${stats.draft})` },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={clsx(
-                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border",
-                activeTab === tab.key
-                  ? "bg-blue-600 border-blue-400 text-white shadow-md shadow-blue-600/30"
-                  : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-800"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 2. Controls & Search Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-        {/* Search */}
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Tìm theo Mã Spec, Tên tiêu chuẩn, Khách hàng hoặc Sản phẩm..."
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-          <span className="text-xs text-slate-500 font-medium">
-            Hiển thị <strong>{filteredData.length}</strong> tiêu chuẩn
-          </span>
-
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+    <div className="space-y-4">
+      {/* 1. Cockpit Header & Live HUD Stats Toolbar */}
+      <CockpitTableToolbar
+        moduleCode="MOD // 07 · SPECS"
+        title="Quản Lý Tiêu Chuẩn Kỹ Thuật (Specs QA/QC)"
+        subtitle="Định chuẩn thông số kỹ thuật sản phẩm, kiểm soát độ chịu nén, định lượng, dung sai ISO 9001:2015"
+        icon={<ShieldCheck size={22} className="text-white" />}
+        stats={[
+          { label: 'Tổng Tiêu Chuẩn', value: stats.total, tone: 'cobalt' },
+          { label: 'Thùng Carton', value: stats.carton, tone: 'emerald' },
+          { label: 'Tem Nhãn', value: stats.label, tone: 'cobalt' },
+          { label: 'Đã Phê Duyệt', value: stats.approved, tone: 'emerald' },
+          { label: 'Bản Nháp', value: stats.draft, tone: 'amber' },
+        ]}
+        searchPlaceholder="Tìm theo Mã Spec, Tên tiêu chuẩn, Khách hàng hoặc Sản phẩm..."
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        tabs={[
+          { id: 'ALL', label: 'Tất cả', count: stats.total },
+          { id: 'CARTON', label: 'Thùng Carton', count: stats.carton },
+          { id: 'LABEL', label: 'Tem Nhãn', count: stats.label },
+          { id: 'APPROVED', label: 'Đã Duyệt', count: stats.approved },
+          { id: 'DRAFT', label: 'Bản Nháp', count: stats.draft },
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        filtersSlot={
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-black/[0.06]">
             <button
               onClick={() => setViewMode('grid')}
               className={clsx(
                 "p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1",
-                viewMode === 'grid' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                viewMode === 'grid' ? "bg-white text-blue-600 shadow-2xs" : "text-slate-500 hover:text-slate-900"
               )}
               title="Xem dạng thẻ"
             >
-              <LayoutGrid size={16} />
+              <LayoutGrid size={15} />
             </button>
             <button
               onClick={() => setViewMode('table')}
               className={clsx(
                 "p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1",
-                viewMode === 'table' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                viewMode === 'table' ? "bg-white text-blue-600 shadow-2xs" : "text-slate-500 hover:text-slate-900"
               )}
               title="Xem dạng bảng"
             >
-              <TableIcon size={16} />
+              <TableIcon size={15} />
             </button>
           </div>
-        </div>
-      </div>
+        }
+        onExport={handleExportAllToExcel}
+        onAddNew={() => handleOpenModal()}
+        addNewLabel="Thêm Tiêu Chuẩn"
+      />
 
       {/* 3. Main Data View (Grid or Table) */}
       {filteredData.length === 0 ? (
-        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
-          <ShieldCheck size={48} className="mx-auto text-slate-300" />
-          <h3 className="font-bold text-slate-700 text-lg">Chưa tìm thấy tiêu chuẩn kỹ thuật phù hợp</h3>
-          <p className="text-slate-400 text-xs max-w-sm mx-auto">Thử thay đổi từ khóa tìm kiếm hoặc bấm nút bên dưới để tạo Tiêu chuẩn Spec ISO mới.</p>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-          >
-            <Plus size={16} /> Tạo Spec Mới
-          </button>
-        </div>
+        <CockpitTableEmptyState
+          title="Chưa tìm thấy tiêu chuẩn kỹ thuật phù hợp"
+          description="Thử thay đổi từ khóa tìm kiếm hoặc bấm nút bên dưới để tạo Tiêu chuẩn Spec ISO mới."
+          searchTerm={searchTerm}
+          onClearSearch={() => setSearchTerm('')}
+        />
       ) : viewMode === 'grid' ? (
         /* GRID VIEW CARDS */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -595,11 +548,11 @@ export default function SpecsView({
         </div>
       ) : (
         /* TABLE VIEW */
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+        <div className="cockpit-table-shell flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 min-h-0">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="cockpit-table-header">
+                <tr>
                   <th className="px-6 py-3.5">Mã Spec / Tên Tiêu Chuẩn</th>
                   <th className="px-6 py-3.5">Khách hàng & Sản phẩm</th>
                   <th className="px-6 py-3.5 text-center">Phiên bản</th>
@@ -608,41 +561,42 @@ export default function SpecsView({
                   <th className="px-6 py-3.5 text-right">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredData.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4">
+              <tbody className="divide-y divide-black/[0.04]">
+                {paginatedSpecs.map((row, idx) => (
+                  <tr key={idx} className="cockpit-table-row">
+                    <td className="px-6 py-3.5">
                       <div 
                         className="flex flex-col cursor-pointer"
                         onClick={() => setSelectedDetailSpec(row)}
                       >
-                        <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{row['Tên tiêu chuẩn']}</span>
-                        <span className="text-[11px] font-mono font-bold text-blue-500">{row['Mã Spec']}</span>
+                        <span className="font-bold text-slate-900 transition-colors">{row['Tên tiêu chuẩn']}</span>
+                        <span className="cockpit-code text-blue-600 font-mono font-bold mt-0.5">{row['Mã Spec']}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-3.5">
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-slate-800">{row['Khách hàng']}</span>
                         <span className="text-[11px] text-slate-400">{row['Sản phẩm liên kết']}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-3.5 text-center font-mono">
                       <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px] font-bold">
                         v{row['Phiên bản'] || '1.0'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={clsx(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        row['Trạng thái'] === 'Đã phê duyệt' ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"
-                      )}>
+                    <td className="px-6 py-3.5 text-center">
+                      <CockpitBadge
+                        tone={row['Trạng thái'] === 'Đã phê duyệt' ? 'emerald' : 'amber'}
+                        dot
+                        size="sm"
+                      >
                         {row['Trạng thái']}
-                      </span>
+                      </CockpitBadge>
                     </td>
-                    <td className="px-6 py-4 text-xs font-medium text-slate-500">
+                    <td className="px-6 py-3.5 text-xs font-mono tabular-nums text-slate-500">
                       {row['Ngày lập']}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button 
                           onClick={() => handleCloneSpec(row)}
@@ -683,6 +637,15 @@ export default function SpecsView({
               </tbody>
             </table>
           </div>
+
+          {/* Unified Pagination */}
+          <CockpitPagination
+            currentPage={currentPage}
+            totalItems={filteredData.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => { setPageSize(newSize); setCurrentPage(1); }}
+          />
         </div>
       )}
 

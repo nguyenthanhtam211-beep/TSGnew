@@ -790,10 +790,10 @@ export default function SupplierView({
             {/* Supplier Table / Grid */}
             {filteredSuppliers.length > 0 ? (
               viewMode === 'table' ? (
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                <div className="cockpit-table-shell flex flex-col overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1100px] text-xs sm:text-sm text-left border-collapse">
-                      <thead className="bg-[#F8F9FA] text-slate-500 font-semibold border-b border-slate-200/80 text-[11px] uppercase tracking-wider">
+                    <table className="w-full min-w-[1100px] text-xs text-left border-collapse">
+                      <thead className="cockpit-table-header">
                         <tr>
                           <th className="px-4 py-3 w-[26%]">Nhà Cung Cấp</th>
                           <th className="px-3 py-3 w-[14%]">Phân Loại & Nhóm</th>
@@ -805,7 +805,7 @@ export default function SupplierView({
                           <th className="px-4 py-3 w-[9%] text-center">Thao Tác</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 text-xs">
+                      <tbody className="divide-y divide-black/[0.04] text-xs">
                         {filteredSuppliers.map((supplier, idx) => {
                           const cleanName = cleanCompanyName(supplier["Tên Nhà Cung Cấp"] || "");
                           const linkedContacts = getLinkedContacts(supplier);
@@ -817,7 +817,7 @@ export default function SupplierView({
                             <tr 
                               key={suppKey}
                               onClick={() => setSelectedSupplierDetail(supplier)}
-                              className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                              className="cockpit-table-row cursor-pointer group"
                             >
                               <td className="px-4 py-2.5">
                                 <div className="flex items-center gap-2.5 min-w-0">

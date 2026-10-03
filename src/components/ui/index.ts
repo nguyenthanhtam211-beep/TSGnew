@@ -9,3 +9,12 @@ export type { CockpitBadgeProps, BadgeTone, BadgeSize } from './CockpitBadge';
 
 export { CockpitStat, default as Stat } from './CockpitStat';
 export type { CockpitStatProps } from './CockpitStat';
+
+export { default as CockpitTableToolbar } from './CockpitTableToolbar';
+export type { CockpitTableToolbarProps, CockpitTableToolbarStat, CockpitTableFilterTab } from './CockpitTableToolbar';
+
+export { default as CockpitPagination } from './CockpitPagination';
+export type { CockpitPaginationProps } from './CockpitPagination';
+
+export { default as CockpitTableEmptyState } from './CockpitTableEmptyState';
+export type { CockpitTableEmptyStateProps } from './CockpitTableEmptyState';

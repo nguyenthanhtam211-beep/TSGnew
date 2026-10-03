@@ -871,10 +871,10 @@ export default function CustomerView({
             {/* Companies List / Grid */}
             {filteredCustomers.length > 0 ? (
               viewMode === 'table' ? (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="cockpit-table-shell flex flex-col overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1100px] text-xs sm:text-sm text-left border-collapse">
-                      <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200 text-xs">
+                    <table className="w-full min-w-[1100px] text-xs text-left border-collapse">
+                      <thead className="cockpit-table-header">
                         <tr>
                           <th className="px-5 py-3.5">Mã & Doanh nghiệp</th>
                           <th className="px-5 py-3.5">Loại hình & Phân loại</th>
@@ -886,7 +886,7 @@ export default function CustomerView({
                           <th className="px-5 py-3.5 text-right">Thao tác</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-black/[0.04]">
                         {filteredCustomers.map((customer, idx) => {
                           const cleanName = cleanCompanyName(customer["Tên đầy đủ"] || "");
                           const cardStatus = customer["Tình trạng"] || "Đang mua";
@@ -898,7 +898,7 @@ export default function CustomerView({
                             <tr 
                               key={customerKey}
                               onClick={() => setSelectedCustomerDetail(customer)}
-                              className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                              className="cockpit-table-row cursor-pointer group"
                             >
                               {/* Company Name & Logo */}
                               <td className="px-5 py-3">
