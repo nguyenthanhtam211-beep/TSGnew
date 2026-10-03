@@ -898,23 +898,23 @@ function TableView({
 
     // Bold identifiers
     if (header === 'Đơn hàng' || header === 'Số đơn hàng' || header === 'Mã sản phẩm' || header === 'Chi tiết đơn hàng' || header === 'Số PXK') {
-       return <span className="font-semibold text-gray-900">{strVal}</span>;
+       return <span className="font-mono font-bold text-slate-900 tracking-tight">{strVal}</span>;
     }
 
     // Currencies and numbers
     if (header.includes('giá') || header.includes('tiền') || header.includes('Lợi nhuận') || header.includes('Doanh thu') || header.includes('Tổng') || header === 'Số lượng' || header === 'Số lượng giao' || header === 'Số lượng đặt' || header === 'Còn lại' || header === 'Đã giao') {
        if (strVal.match(/^-?[0-9,.]+$/)) {
-         return <span className="font-medium text-gray-900">{strVal}</span>;
+         return <span className="font-mono font-semibold text-slate-900 tabular-nums">{strVal}</span>;
        }
     }
 
     // Date
     if (header.includes('Ngày') || header.includes('Thời gian')) {
-       return <span className="text-gray-600">{strVal}</span>;
+       return <span className="font-mono text-xs text-slate-600 tabular-nums">{strVal}</span>;
     }
 
     // Default
-    return <span className="text-gray-600 truncate max-w-xs block" title={strVal}>{strVal}</span>;
+    return <span className="text-slate-700 truncate max-w-xs block" title={strVal}>{strVal}</span>;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1022,8 +1022,8 @@ function TableView({
       {/* Apple macOS Table Title & Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 flex-shrink-0 relative">
         <div className="flex items-center gap-3">
-          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1D1D1F] tracking-[-0.015em]">{title}</h2>
-          <span className="text-[11px] font-semibold text-slate-500 bg-[#E5E5EA]/80 px-2.5 py-0.5 rounded-full">
+          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-slate-900 tracking-tight font-display">{title}</h2>
+          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full font-mono border border-slate-200/80">
             {filteredData.length} bản ghi
           </span>
         </div>
@@ -1179,7 +1179,7 @@ function TableView({
         </div>
       </div>
       
-      {/* Apple Spotlight Search Capsule & KPI Cards */}
+      {/* Spotlight Search Capsule & KPI Cards */}
       <div className="mb-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1 max-w-md">
@@ -1189,7 +1189,7 @@ function TableView({
               placeholder="Tìm kiếm nhanh trong bảng (Spotlight ⌘K)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#E5E5EA]/60 hover:bg-[#E5E5EA] focus:bg-white border border-black/[0.06] rounded-full pl-9 pr-4 py-2 text-xs font-medium text-[#1D1D1F] focus:border-[#007AFF] outline-none transition-all"
+              className="w-full bg-[#F8FAFA] hover:bg-white focus:bg-white border border-slate-200/85 focus:border-[#0066FF] focus:ring-2 focus:ring-[#0066FF]/10 rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -1199,19 +1199,19 @@ function TableView({
             {summaries.map((s, idx) => (
               <div 
                 key={s.label + idx} 
-                className="bg-white border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md transition-all rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 min-w-0"
+                className="bg-white border border-slate-200/85 hover:border-slate-300 transition-all rounded-xl p-3 sm:p-3.5 flex items-center gap-3 min-w-0"
               >
                 <div className={clsx(
-                  "w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 text-white shadow-2xs",
-                  s.color || "bg-blue-500"
+                  "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 text-white shadow-2xs",
+                  s.color || "bg-[#0066FF]"
                 )}>
                   {s.icon || <Layers size={16} />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold text-slate-500 truncate" title={s.label}>
+                  <p className="text-[11px] font-medium text-slate-500 truncate" title={s.label}>
                     {s.label}
                   </p>
-                  <p className="text-xs sm:text-sm font-extrabold text-[#1D1D1F] tracking-tight truncate mt-0.5" title={String(s.value)}>
+                  <p className="text-xs sm:text-sm font-bold font-display text-slate-900 tracking-tight tabular-nums truncate mt-0.5" title={String(s.value)}>
                     {s.value}
                   </p>
                 </div>
@@ -1222,11 +1222,11 @@ function TableView({
 
         {/* Pricing Table Custom Filter Section (By Customer & By Product Group) */}
         {isPricingTable && (
-          <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-2xs">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/60">
+          <div className="bg-[#F8FAFA] border border-slate-200/85 rounded-xl p-3 sm:p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/85">
               <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Package size={14} className="text-blue-600" /> Phân Loại Danh Mục Đơn Giá & Khách Hàng
+                <h4 className="text-xs font-bold font-display text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package size={14} className="text-[#0066FF]" /> Phân Loại Danh Mục Đơn Giá & Khách Hàng
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Lọc nhanh theo Khách hàng và Nhóm sản phẩm để tra cứu đơn giá mua/bán chính xác
@@ -1238,7 +1238,7 @@ function TableView({
                   <button
                     type="button"
                     onClick={() => onNavigateTab('contracts')}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    className="px-3 py-1.5 bg-[#0066FF] hover:bg-[#0052CC] text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs active:scale-[0.98]"
                   >
                     <Scale size={13} />
                     <span>Hợp Đồng Mua / Bán ↗</span>
@@ -1246,7 +1246,7 @@ function TableView({
                   <button
                     type="button"
                     onClick={() => onNavigateTab('commissions')}
-                    className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs active:scale-[0.98]"
                   >
                     <Percent size={13} />
                     <span>Hoa Hồng (3 Cách) ↗</span>
@@ -1258,18 +1258,18 @@ function TableView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               {/* Filter By Customer */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                  <Users size={12} className="text-sky-600" /> Theo Khách hàng ({pricingCustomers.length}):
+                <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                  <Users size={12} className="text-[#0066FF]" /> Theo Khách hàng ({pricingCustomers.length}):
                 </span>
                 <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar sm:flex-wrap">
                   <button
                     type="button"
                     onClick={() => setSelectedPricingCustomer('all')}
                     className={clsx(
-                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 border",
                       selectedPricingCustomer === 'all'
-                        ? "bg-blue-600 text-white shadow-2xs"
-                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        ? "bg-[#0066FF] border-[#0066FF] text-white shadow-2xs"
+                        : "bg-white border-slate-200/85 text-slate-600 hover:bg-slate-100"
                     )}
                   >
                     Tất cả ({data.length})
@@ -1282,10 +1282,10 @@ function TableView({
                         type="button"
                         onClick={() => setSelectedPricingCustomer(c)}
                         className={clsx(
-                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 border",
                           selectedPricingCustomer === c
-                            ? "bg-blue-600 text-white shadow-2xs"
-                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                            ? "bg-[#0066FF] border-[#0066FF] text-white shadow-2xs"
+                            : "bg-white border-slate-200/85 text-slate-600 hover:bg-slate-100"
                         )}
                       >
                         {c} ({count})
@@ -1297,7 +1297,7 @@ function TableView({
 
               {/* Filter By Product Group */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
                   <Layers size={12} className="text-indigo-600" /> Theo Nhóm hàng ({pricingGroups.length}):
                 </span>
                 <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar sm:flex-wrap">
@@ -1305,10 +1305,10 @@ function TableView({
                     type="button"
                     onClick={() => setSelectedPricingGroup('all')}
                     className={clsx(
-                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 border",
                       selectedPricingGroup === 'all'
-                        ? "bg-indigo-600 text-white shadow-2xs"
-                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        ? "bg-slate-900 border-slate-900 text-white shadow-2xs"
+                        : "bg-white border-slate-200/85 text-slate-600 hover:bg-slate-100"
                     )}
                   >
                     Tất cả nhóm ({data.length})
@@ -1321,10 +1321,10 @@ function TableView({
                         type="button"
                         onClick={() => setSelectedPricingGroup(g)}
                         className={clsx(
-                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 border",
                           selectedPricingGroup === g
-                            ? "bg-indigo-600 text-white shadow-2xs"
-                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                            ? "bg-slate-900 border-slate-900 text-white shadow-2xs"
+                            : "bg-white border-slate-200/85 text-slate-600 hover:bg-slate-100"
                         )}
                       >
                         {g} ({count})
@@ -1338,15 +1338,15 @@ function TableView({
         )}
       </div>
 
-      {/* Apple Inset-Grouped Table Container */}
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] md:flex-1 md:overflow-hidden flex flex-col md:min-h-[360px]">
+      {/* Hallmark Enterprise Table Container */}
+      <div className="bg-white rounded-xl border border-slate-200/85 md:flex-1 md:overflow-hidden flex flex-col md:min-h-[360px]">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-auto flex-1">
           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-            <thead className="bg-[#F5F5F7] text-slate-600 sticky top-0 border-b border-black/[0.06] z-10 font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="bg-[#F8FAFA] text-slate-700 sticky top-0 border-b border-slate-200/85 z-10 font-display font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 {onDelete && (
-                  <th className="px-4 py-3 font-semibold border-b border-gray-200 bg-gray-50 w-10 text-center">
+                  <th className="px-4 py-3 font-semibold border-b border-slate-200/85 bg-[#F8FAFA] w-10 text-center">
                     <input 
                       type="checkbox"
                       checked={paginatedData.length > 0 && paginatedData.every(r => selectedRowIds.has(r.id || JSON.stringify(r)))}
@@ -1361,12 +1361,12 @@ function TableView({
                           setSelectedRowIds(newSet);
                         }
                       }}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                      className="rounded border-slate-300 text-[#0066FF] focus:ring-[#0066FF] w-4 h-4 cursor-pointer"
                     />
                   </th>
                 )}
                 {visibleColumns.map((h, idx) => (
-                  <th key={h} className={`px-4 py-3 font-semibold border-b border-gray-200 bg-gray-50 ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_#e5e7eb] z-[15]' : ''}`}>
+                  <th key={h} className={`px-4 py-3 font-semibold font-display border-b border-slate-200/85 bg-[#F8FAFA] text-slate-700 tracking-wider text-[11px] uppercase ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_rgba(226,232,240,0.85)] z-[15]' : ''}`}>
                     <div className="flex items-center justify-between relative gap-2">
                       <span className="truncate">{h}</span>
                       <button 
@@ -1428,8 +1428,8 @@ function TableView({
                 }
                 
                 const rowClass = isOverdue 
-                    ? 'bg-red-50 hover:bg-red-100' 
-                    : (isHighlighted ? 'bg-amber-100/50 hover:bg-amber-100/70' : 'hover:bg-gray-50');
+                    ? 'bg-rose-50/60 hover:bg-rose-100/60' 
+                    : (isHighlighted ? 'bg-amber-50/70 hover:bg-amber-100/70' : 'hover:bg-slate-50/80');
 
                 return (
                   <tr 
@@ -1441,7 +1441,7 @@ function TableView({
                       setIsEditModalOpen(true);
                       setConfirmDelete(false);
                     }}
-                    className={`transition-all duration-200 border-b border-gray-100 last:border-0 group/tr cursor-pointer ${rowClass}`}
+                    className={`transition-all duration-150 border-b border-slate-100 last:border-0 group/tr cursor-pointer ${rowClass}`}
                   >
                     {onDelete && (
                       <td className="px-4 py-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
@@ -1454,19 +1454,19 @@ function TableView({
                             else newSet.delete(rowId);
                             setSelectedRowIds(newSet);
                           }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                          className="rounded border-slate-300 text-[#0066FF] focus:ring-[#0066FF] w-4 h-4 cursor-pointer"
                         />
                       </td>
                     )}
                     {visibleColumns.map((h, idx) => (
                       <td 
                         key={h} 
-                        className={`px-4 py-3 align-middle ${idx === 0 ? `sticky left-0 shadow-[1px_0_0_0_#f3f4f6] z-[5] transition-colors ${isOverdue ? 'bg-red-50 group-hover/tr:bg-red-100' : isHighlighted ? 'bg-[#fef3c7]/50 group-hover/tr:bg-[#fef3c7]/70' : 'bg-white group-hover/tr:bg-gray-50'}` : ''}`}
+                        className={`px-4 py-3 align-middle ${idx === 0 ? `sticky left-0 shadow-[1px_0_0_0_rgba(226,232,240,0.85)] z-[5] transition-colors ${isOverdue ? 'bg-rose-50/90 group-hover/tr:bg-rose-100/90' : isHighlighted ? 'bg-[#fef3c7]/70 group-hover/tr:bg-[#fef3c7]/90' : 'bg-white group-hover/tr:bg-slate-50/80'}` : ''}`}
                       >
                         <div className="flex items-center gap-2">
                            {renderCell(h, row[h], row)}
                            {h === 'Ngày giao' && isOverdue && (
-                               <span title="Quá hạn giao hàng"><AlertTriangle size={16} className="text-red-500" /></span>
+                               <span title="Quá hạn giao hàng"><AlertTriangle size={15} className="text-rose-500" /></span>
                            )}
                         </div>
                       </td>
@@ -1604,7 +1604,7 @@ function TableView({
                     setConfirmDelete(false);
                   }}
                   className={clsx(
-                    "bg-white rounded-2xl p-3.5 border border-black/[0.06] shadow-xs active:scale-[0.98] transition-all cursor-pointer space-y-2.5",
+                    "bg-white rounded-xl p-3.5 border border-slate-200/85 hover:border-slate-300 active:scale-[0.99] transition-all cursor-pointer space-y-2.5",
                     isOverdue ? "border-l-4 border-l-rose-500 bg-rose-50/20" : "",
                     isHighlighted ? "ring-2 ring-amber-400 bg-amber-50/30" : ""
                   )}
@@ -1718,46 +1718,46 @@ function TableView({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white px-4 py-3 border border-gray-200 border-t-0 rounded-b-lg flex-shrink-0">
+        <div className="flex items-center justify-between bg-[#F8FAFA] px-4 py-3 border border-slate-200/85 border-t-0 rounded-b-xl flex-shrink-0">
           <div className="flex flex-1 justify-between sm:hidden">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="relative inline-flex items-center rounded-lg border border-slate-200/85 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
             >
               Trang trước
             </button>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="relative ml-3 inline-flex items-center rounded-lg border border-slate-200/85 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
             >
               Trang sau
             </button>
           </div>
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
-                Hiển thị <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> đến <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> trong số <span className="font-medium">{filteredData.length}</span> kết quả
+              <p className="text-xs text-slate-500 font-mono">
+                Hiển thị <span className="font-bold text-slate-900 tabular-nums">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-slate-900 tabular-nums">{Math.min(currentPage * itemsPerPage, filteredData.length)}</span> / <span className="font-bold text-slate-900 tabular-nums">{filteredData.length}</span> bản ghi
               </p>
             </div>
             <div>
-              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <nav className="isolate inline-flex -space-x-px rounded-lg shadow-2xs" aria-label="Pagination">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                  className="relative inline-flex items-center rounded-l-lg px-2.5 py-1.5 text-slate-500 ring-1 ring-inset ring-slate-200/85 bg-white hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <span className="sr-only">Previous</span>
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                  className="relative inline-flex items-center rounded-r-lg px-2.5 py-1.5 text-slate-500 ring-1 ring-inset ring-slate-200/85 bg-white hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   <span className="sr-only">Next</span>
-                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </button>
               </nav>
             </div>

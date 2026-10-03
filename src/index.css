@@ -1,28 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,500;1,700&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700;1,900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Roboto+Condensed:wght@400;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Space Grotesk", "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Inter", "Roboto Mono", SFMono-Regular, monospace;
-  --font-tabular: "Inter", "Roboto", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", SFMono-Regular, monospace;
+  --font-tabular: "JetBrains Mono", "Inter", system-ui, sans-serif;
 
-  --color-cockpit-bg: #F8F9FB;
+  /* Hallmark Cobalt & Open-Design Surface Palette */
+  --color-cockpit-bg: #F8F9FA;
   --color-cockpit-surface: #FFFFFF;
-  --color-cockpit-subtle: #F1F5F9;
-  --color-cockpit-raised: #FAFAFC;
-  --color-cockpit-hover: #E2E8F0;
-  --color-cockpit-active: #CBD5E1;
-  --color-cockpit-hairline: rgba(203, 213, 225, 0.65);
-  --color-cockpit-hairline-subtle: rgba(226, 232, 240, 0.55);
-  --color-cockpit-hairline-strong: rgba(148, 163, 184, 0.80);
+  --color-cockpit-subtle: #F1F4F9;
+  --color-cockpit-raised: #FFFFFF;
+  --color-cockpit-hover: #EEF2F6;
+  --color-cockpit-active: #E2E8F0;
+  --color-cockpit-hairline: rgba(226, 232, 240, 0.85);
+  --color-cockpit-hairline-subtle: rgba(241, 245, 249, 0.75);
+  --color-cockpit-hairline-strong: rgba(203, 213, 225, 0.90);
 
   --color-cockpit-text: #0F172A;
   --color-cockpit-secondary: #334155;
   --color-cockpit-muted: #64748B;
   --color-cockpit-faint: #94A3B8;
 
-  --color-accent-blue: #007AFF;
+  /* Hallmark Cobalt & Bento Semantic Accents */
+  --color-cobalt: #0066FF;
+  --color-accent-blue: #0066FF;
   --color-accent-emerald: #10B981;
   --color-accent-amber: #F59E0B;
   --color-accent-indigo: #6366F1;
@@ -465,4 +468,49 @@ body {
     transition: none !important;
     transform: none !important;
   }
+}
+
+/* ==========================================================================
+   Hallmark & Open-Design Bento Utility Classes
+   ========================================================================== */
+.bento-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.bento-card {
+  background: var(--cockpit-surface, #FFFFFF);
+  border: 1px solid var(--cockpit-hairline, rgba(226, 232, 240, 0.85));
+  border-radius: 14px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.bento-card:hover {
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+}
+
+.hairline-rule {
+  border-color: rgba(226, 232, 240, 0.85) !important;
+}
+
+.tabular-figures {
+  font-family: var(--font-tabular);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+
+.cobalt-pill {
+  background: rgba(0, 102, 255, 0.08);
+  color: #0066FF;
+  border: 1px solid rgba(0, 102, 255, 0.2);
+}
+
+.graphite-card {
+  background: #0F172A;
+  color: #F8FAFC;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
 }

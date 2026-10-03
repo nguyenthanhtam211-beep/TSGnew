@@ -13,6 +13,7 @@ import PDFExportModal from './PDFExportModal';
 import { sanitizeDocColorsForCanvas } from '../lib/pdf-exporter';
 import { CustomChartTooltip } from './CustomChartTooltip';
 import { RECHARTS_PALETTE } from '../lib/design-tokens';
+import { CockpitCard, CockpitStat, CockpitBadge, CockpitButton } from './ui';
 
 export default function DashboardView({ 
   poData, 
@@ -1136,68 +1137,65 @@ export default function DashboardView({
           </div>
         </div>
 
-        {/* Bento Grid Executive Insights & KPI Highlights */}
+        {/* Bento Grid Executive Insights & KPI Highlights (Hallmark Graphite Style) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-5 mb-5 sm:mb-8">
-          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-blue-500/10 backdrop-blur-md border border-blue-500/30 relative overflow-hidden group cockpit-card-hover">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-blue-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 bg-blue-500/20 backdrop-blur-md rounded-xl border border-blue-400/30 text-blue-400">
-                <TrendingUp size={20} />
+          <div className="bg-[#0F172A] rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden group transition-all duration-200 hover:border-slate-700">
+            <div className="flex justify-between items-start mb-3 sm:mb-4">
+              <div className="p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/20 text-[#0066FF]">
+                <TrendingUp size={18} />
               </div>
-              <span className="text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-blue-400/30 tracking-wider">
-                DỰ BÁO DÒNG TIỀN
+              <span className="text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 px-2.5 py-0.5 rounded-full border border-blue-500/20 tracking-wider uppercase">
+                Dự báo dòng tiền
               </span>
             </div>
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-sans">
               Doanh thu dự kiến (PO còn lại)
             </h3>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-1.5 relative z-10 font-mono tabular-nums">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1.5 font-display tabular-nums">
               {formatter.format(executiveInsights.projectedRev)}
             </div>
-            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
-              Dựa trên khối lượng hàng chưa xuất kho trong các PO hiện hành
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Khối lượng hàng chưa xuất kho trong các PO hiện hành
             </p>
           </div>
 
-          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-amber-500/10 backdrop-blur-md border border-amber-500/30 relative overflow-hidden group cockpit-card-hover">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-amber-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 bg-amber-500/20 backdrop-blur-md rounded-xl border border-amber-400/30 text-amber-400">
-                <Clock size={20} />
+          <div className="bg-[#0F172A] rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden group transition-all duration-200 hover:border-slate-700">
+            <div className="flex justify-between items-start mb-3 sm:mb-4">
+              <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400">
+                <Clock size={18} />
               </div>
-              <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-amber-400/30 tracking-wider">
-                TIẾN ĐỘ & UY TÍN
+              <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-500/20 tracking-wider uppercase">
+                Tiến độ & uy tín
               </span>
             </div>
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-sans">
               Đơn hàng chậm tiến độ
             </h3>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-amber-400 mb-1.5 relative z-10 font-mono tabular-nums">
-              {executiveInsights.delayedPOs} <span className="text-sm font-semibold text-slate-400">PO Line</span>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-400 mb-1.5 font-display tabular-nums">
+              {executiveInsights.delayedPOs} <span className="text-sm font-semibold text-slate-500 font-sans">PO Line</span>
             </div>
-            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
-              {executiveInsights.delayedPOs > 0 ? "Cảnh báo: Đã quá hạn giao nhưng chưa xuất kho đủ 100%" : "Tuyệt vời: Không có PO line nào bị quá hạn giao"}
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {executiveInsights.delayedPOs > 0 ? "Cảnh báo: Quá hạn giao nhưng chưa xuất kho đủ 100%" : "Đúng tiến độ: Không có PO line nào bị quá hạn"}
             </p>
           </div>
 
-          <div className="bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-rose-500/10 backdrop-blur-md border border-rose-500/30 relative overflow-hidden group cockpit-card-hover sm:col-span-2 md:col-span-1">
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-rose-500/15 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-            <div className="flex justify-between items-start mb-3 sm:mb-4 relative z-10">
-              <div className="p-2.5 bg-rose-500/20 backdrop-blur-md rounded-xl border border-rose-400/30 text-rose-400">
-                <ShieldAlert size={20} />
+          <div className="bg-[#0F172A] rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden group transition-all duration-200 hover:border-slate-700 sm:col-span-2 md:col-span-1">
+            <div className="flex justify-between items-start mb-3 sm:mb-4">
+              <div className="p-2.5 bg-rose-500/10 rounded-xl border border-rose-500/20 text-rose-400">
+                <ShieldAlert size={18} />
               </div>
-              <span className="text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-rose-400/30 tracking-wider">
-                RỦI RO TÀI CHÍNH
+              <span className="text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 px-2.5 py-0.5 rounded-full border border-rose-500/20 tracking-wider uppercase">
+                Rủi ro tài chính
               </span>
             </div>
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1 relative z-10 font-display">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 font-sans">
               Biên lợi nhuận thấp (&lt;15%)
             </h3>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-rose-400 mb-1.5 relative z-10 font-mono tabular-nums">
-              {executiveInsights.lowMarginItems} <span className="text-sm font-semibold text-slate-400">SKU</span>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-rose-400 mb-1.5 font-display tabular-nums">
+              {executiveInsights.lowMarginItems} <span className="text-sm font-semibold text-slate-500 font-sans">SKU</span>
             </div>
-            <p className="text-[11px] text-slate-300/80 leading-relaxed relative z-10">
-              {executiveInsights.lowMarginItems > 0 ? "Cần rà soát lại bảng giá NCC hoặc chính sách giá bán KH" : "Biên lợi nhuận tất cả sản phẩm đều đạt &gt; 15%"}
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {executiveInsights.lowMarginItems > 0 ? "Rà soát lại giá NCC hoặc chính sách chiết khấu KH" : "Toàn bộ SKU đều đạt biên lợi nhuận > 15%"}
             </p>
           </div>
         </div>
@@ -1256,106 +1254,60 @@ export default function DashboardView({
 
         {/* Bento Grid Top 4 Executive KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 mb-5 sm:mb-8">
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-                <DollarSign size={72} className="text-blue-600" />
-             </div>
-             <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shadow-2xs">
-                 <TrendingUp size={20} />
-               </div>
-               <div>
-                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Doanh Thu</h3>
-                 <span className="text-[10.5px] text-blue-600 font-medium">Xuất kho thực tế</span>
-               </div>
-             </div>
-             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
-               {formatter.format(totalRevenue)}
-             </p>
-             <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 relative z-10">
-                <Activity size={13} /> <span>Tăng trưởng dương • {filteredDelivery.length} chuyến</span>
-             </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-                <Activity size={72} className="text-emerald-600" />
-             </div>
-             <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs">
-                 <DollarSign size={20} />
-               </div>
-               <div>
-                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Lợi Nhuận Gộp</h3>
-                 <span className="text-[10.5px] text-emerald-700 font-bold font-mono">
-                   Biên LN: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%
-                 </span>
-               </div>
-             </div>
-             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
-               {formatter.format(totalProfit)}
-             </p>
-             
-             {/* Commission Annotation Breakdown */}
-             {(() => {
-               const totalComm = (commissionData || []).reduce((acc: number, c: any) => acc + (parseFloat(String(c.commissionAmount || 0)) || 0), 0);
-               const netProfit = totalProfit - totalComm;
-               return (
-                 <div className="mt-2.5 pt-2 border-t border-slate-100 relative z-10 space-y-1">
-                   <div className="flex items-center justify-between text-[11px] text-purple-700 font-semibold bg-purple-50/80 px-2 py-0.5 rounded">
-                     <span>Hoa hồng đã chi:</span>
-                     <span className="font-mono font-bold">-{formatter.format(totalComm)}</span>
-                   </div>
-                   <div className="flex items-center justify-between text-[11px] text-emerald-800 font-bold bg-emerald-50/90 px-2 py-0.5 rounded">
-                     <span>LN ròng thực nhận:</span>
-                     <span className="font-mono font-bold">{formatter.format(netProfit)}</span>
-                   </div>
-                 </div>
-               );
-             })()}
-          </div>
+          <CockpitStat
+            label="Tổng Doanh Thu Xuất Kho"
+            value={formatter.format(totalRevenue)}
+            icon={<TrendingUp size={20} />}
+            iconBg="bg-blue-50 dark:bg-blue-950/40 text-[#0066FF]"
+            delta={{
+              value: `${filteredDelivery.length} chuyến xuất`,
+              trend: 'up',
+              label: 'Thực tế phát sinh'
+            }}
+          />
 
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-                <FileText size={72} className="text-amber-500" />
-             </div>
-             <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs">
-                 <Package size={20} />
-               </div>
-               <div>
-                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tổng Đơn Hàng PO</h3>
-                 <span className="text-[10.5px] text-amber-700 font-medium">{poLinesData.length} dòng sản phẩm</span>
-               </div>
-             </div>
-             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
-               {numFormatter.format(totalOrders)} <span className="text-base font-semibold text-slate-500">đơn</span>
-             </p>
-             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 relative z-10">
-                <span>Nhà máy Tâm Sen & Đối tác</span>
-             </div>
-          </div>
+          <CockpitStat
+            label="Tổng Lợi Nhuận Gộp"
+            value={formatter.format(totalProfit)}
+            icon={<DollarSign size={20} />}
+            iconBg="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600"
+            delta={{
+              value: `Biên LN: ${totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%`,
+              trend: 'up',
+            }}
+            subValue={(() => {
+              const totalComm = (commissionData || []).reduce((acc: number, c: any) => acc + (parseFloat(String(c.commissionAmount || 0)) || 0), 0);
+              const netProfit = totalProfit - totalComm;
+              return `Ròng: ${formatter.format(netProfit)}`;
+            })()}
+          />
 
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs relative overflow-hidden group cockpit-card-hover">
-             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-300 pointer-events-none">
-                <Truck size={72} className="text-purple-500" />
-             </div>
-             <div className="flex items-center gap-3 mb-3 relative z-10">
-               <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shadow-2xs">
-                 <CheckCircle size={20} />
-               </div>
-               <div>
-                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider font-display">Tỷ Lệ Hoàn Thành</h3>
-                 <span className="text-[10.5px] text-purple-700 font-medium">{completedDeliveries} chuyến hoàn tất</span>
-               </div>
-             </div>
-             <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 relative z-10 tracking-tight font-mono tabular-nums">
-               {filteredDelivery.length > 0 ? ((completedDeliveries / filteredDelivery.length) * 100).toFixed(1) : 0}%
-             </p>
-             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 relative z-10">
-                <span>Đúng hạn & đạt chuẩn QC</span>
-             </div>
-          </div>
+          <CockpitStat
+            label="Tổng Đơn Hàng PO"
+            value={numFormatter.format(totalOrders)}
+            unit="đơn"
+            icon={<Package size={20} />}
+            iconBg="bg-amber-50 dark:bg-amber-950/40 text-amber-600"
+            delta={{
+              value: `${poLinesData.length} SKU`,
+              trend: 'neutral',
+              label: 'Dòng sản phẩm'
+            }}
+            subValue="Tâm Sen & Đối tác"
+          />
+
+          <CockpitStat
+            label="Tỷ Lệ Hoàn Thành PO"
+            value={`${filteredDelivery.length > 0 ? ((completedDeliveries / filteredDelivery.length) * 100).toFixed(1) : 0}%`}
+            icon={<CheckCircle size={20} />}
+            iconBg="bg-purple-50 dark:bg-purple-950/40 text-purple-600"
+            delta={{
+              value: `${completedDeliveries}/${filteredDelivery.length}`,
+              trend: 'up',
+              label: 'Chuyến hoàn tất'
+            }}
+            subValue="Đúng hạn QC"
+          />
         </div>
 
         {/* 🌟 EXECUTIVE OPERATIONAL COCKPIT: ACTIVITY FEED & DELIVERY ALERTS */}

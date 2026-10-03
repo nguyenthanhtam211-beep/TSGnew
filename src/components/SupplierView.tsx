@@ -22,6 +22,7 @@ import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import MacTrafficLights from './MacTrafficLights';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
+import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
 
 export const getSupplierLogo = (s: any) => {
   if (!s) return '';
@@ -617,22 +618,22 @@ export default function SupplierView({
     <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
       <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
-        {/* Apple macOS Unified Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        {/* Hallmark Enterprise Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/85">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-slate-900">
                 Nhà Cung Cấp
               </h1>
               
-              {/* Integrated Apple Sub-Segmented Control */}
-              <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+              {/* Sub-Segmented Control */}
+              <div className="flex bg-[#F8FAFA] p-0.5 rounded-xl border border-slate-200/85 text-xs font-semibold">
                 <button
                   onClick={() => setActiveSubTab('companies')}
-                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeSubTab === 'companies'
-                      ? 'bg-white text-[#0071E3] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#0066FF] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Factory size={13} />
@@ -640,10 +641,10 @@ export default function SupplierView({
                 </button>
                 <button
                   onClick={() => setActiveSubTab('contacts')}
-                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeSubTab === 'contacts'
-                      ? 'bg-white text-[#0071E3] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#0066FF] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Users size={13} />
@@ -659,40 +660,40 @@ export default function SupplierView({
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
+            <CockpitButton
+              variant="secondary"
+              icon={<FileSpreadsheet size={15} className="text-emerald-600" />}
               onClick={handleExportToExcel}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
               title="Xuất Excel"
             >
-              <FileSpreadsheet size={15} className="text-emerald-600" />
-              <span>Xuất Excel</span>
-            </button>
+              Xuất Excel
+            </CockpitButton>
 
-            <button
+            <CockpitButton
+              variant="secondary"
+              icon={<Cloud size={15} className="text-[#0066FF]" />}
               onClick={() => setIsDriveModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-blue-800 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs"
               title="Kho Dữ Liệu Đồng Bộ Google Drive 2 Chiều"
             >
-              <Cloud size={15} className="text-blue-600" />
-              <span>Kho Google Drive</span>
-            </button>
+              Kho Google Drive
+            </CockpitButton>
 
             {activeSubTab === 'companies' ? (
-              <button 
+              <CockpitButton 
+                variant="primary"
+                icon={<Plus size={16} />}
                 onClick={() => handleOpenModal()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] transition-all shadow-xs"
               >
-                <Plus size={16} />
-                <span>Thêm nhà cung cấp</span>
-              </button>
+                Thêm nhà cung cấp
+              </CockpitButton>
             ) : (
-              <button 
+              <CockpitButton 
+                variant="primary"
+                icon={<Plus size={16} />}
                 onClick={() => handleOpenContactModal()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] transition-all shadow-xs"
               >
-                <Plus size={16} />
-                <span>Thêm đầu mối</span>
-              </button>
+                Thêm đầu mối
+              </CockpitButton>
             )}
           </div>
         </div>
@@ -700,47 +701,32 @@ export default function SupplierView({
         {/* SUB-VIEW 1: SUPPLIER COMPANIES */}
         {activeSubTab === 'companies' ? (
           <>
-            {/* Apple Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Đang hoạt động</span>
-                  <span className="text-lg font-bold text-emerald-600 mt-0.5 block">{stats.active}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
-                  ✓
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Đánh giá 5 Sao</span>
-                  <span className="text-lg font-bold text-amber-600 mt-0.5 block">{stats.fiveStar}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">
-                  ★
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Đầu mối nhân sự</span>
-                  <span className="text-lg font-bold text-purple-600 mt-0.5 block">{stats.totalContacts}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold">
-                  👥
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Tổng nhà cung cấp</span>
-                  <span className="text-lg font-bold text-slate-800 mt-0.5 block">{stats.total}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold">
-                  🏭
-                </div>
-              </div>
+            {/* Bento KPI Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <CockpitStat
+                label="Đang Hoạt Động"
+                value={stats.active}
+                delta={{ value: "Cung ứng", trend: "up" }}
+                subValue="Đối tác cấp hàng chính"
+              />
+              <CockpitStat
+                label="Đánh Giá 5 Sao"
+                value={stats.fiveStar}
+                delta={{ value: "Uy tín cao", trend: "up" }}
+                subValue="Chất lượng đảm bảo"
+              />
+              <CockpitStat
+                label="Đầu Mối Nhân Sự"
+                value={stats.totalContacts}
+                delta={{ value: "Liên hệ", trend: "neutral" }}
+                subValue="Danh bạ đầu mối liên hệ"
+              />
+              <CockpitStat
+                label="Tổng Nhà Cung Cấp"
+                value={stats.total}
+                delta={{ value: "Nhà máy", trend: "neutral" }}
+                subValue="Tổng số đối tác cung cấp"
+              />
             </div>
 
             {/* Search & Apple Segmented Control */}

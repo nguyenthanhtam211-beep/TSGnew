@@ -16,3 +16,4 @@ dev.db
 sheet_analysis_dump.json
 sheet_gviz.csv
 *.tar.gz
+.design-repos/

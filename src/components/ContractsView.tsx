@@ -13,6 +13,7 @@ import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO, findPrice
 import { processContractOCR } from '../lib/gemini';
 import { registerAndUploadDriveDocument, getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
 import CompanyLogo from './CompanyLogo';
+import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
 
 export interface ContractItem {
   id?: string;
@@ -509,13 +510,13 @@ export default function ContractsView({
       </div>
 
       {/* Top Header */}
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-black/[0.06] px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/85 px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
+            <CockpitBadge tone="cobalt" size="sm" dot>
               Pháp lý & Bảng Giá
-            </span>
-            <h1 className="text-base sm:text-xl font-bold text-[#1D1D1F] dark:text-white tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
+            </CockpitBadge>
+            <h1 className="text-base sm:text-xl font-bold font-display text-slate-900 dark:text-white tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
           </div>
           <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
             Quét OCR hợp đồng, tóm tắt điều khoản AI, trích xuất bảng đơn giá cam kết và đối chiếu chéo Bảng Giá 2026
@@ -523,78 +524,71 @@ export default function ContractsView({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
+          <CockpitButton
+            variant="primary"
+            icon={<Sparkles size={14} className="animate-pulse" />}
             onClick={() => {
               setIsOcrModalOpen(true);
               if (!ocrContractResult) handleLoadSampleContract('ThangLong');
             }}
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all"
           >
-            <Sparkles size={14} className="animate-pulse" />
             <span className="hidden sm:inline">Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá</span>
             <span className="sm:hidden">Quét OCR HĐ</span>
-          </button>
-          <button
+          </CockpitButton>
+          <CockpitButton
+            variant="secondary"
+            icon={<Plus size={14} />}
             onClick={handleOpenAdd}
-            className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold shadow-2xs active:scale-95 transition-all"
           >
-            <Plus size={14} />
-            <span>Thêm HĐ</span>
-          </button>
+            Thêm HĐ
+          </CockpitButton>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Bento Grid */}
       <div className="px-4 sm:px-6 lg:px-8 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
-            <span className="truncate">Tổng Hợp đồng</span>
-            <FileText size={16} className="text-blue-500 shrink-0" />
-          </div>
-          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-[#1D1D1F]">{stats.total}</p>
-          <span className="text-[10px] sm:text-[11px] text-slate-400">Đã lưu trong hệ thống</span>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
-            <span className="truncate">Đang Có Hiệu Lực</span>
-            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-          </div>
-          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600">{stats.active}</p>
-          <span className="text-[10px] sm:text-[11px] text-emerald-600/80">Căn cứ pháp lý chuẩn</span>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
-            <span className="truncate">Sắp Hết Hạn (&lt;45 ngày)</span>
-            <Clock size={16} className="text-amber-500 shrink-0" />
-          </div>
-          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-amber-600">{stats.expiringSoon}</p>
-          <span className="text-[10px] sm:text-[11px] text-amber-600/80">Cần tái ký / lập phụ lục</span>
-        </div>
-
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-black/[0.06] shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium mb-1 sm:mb-2">
-            <span className="truncate">Tổng Giá Trị Cam Kết</span>
-            <DollarSign size={16} className="text-purple-500 shrink-0" />
-          </div>
-          <p className="text-base sm:text-lg lg:text-2xl font-bold text-purple-700 truncate" title={formatVND(stats.totalVal)}>{formatVND(stats.totalVal)}</p>
-          <span className="text-[10px] sm:text-[11px] text-purple-600/80">Quy mô các hợp đồng</span>
-        </div>
+        <CockpitStat
+          label="Tổng Hợp Đồng"
+          value={stats.total}
+          icon={<FileText size={16} />}
+          subValue="Đã lưu trong CSDL"
+          delta={{ value: "+100%", trend: "up" }}
+        />
+        <CockpitStat
+          label="Đang Có Hiệu Lực"
+          value={stats.active}
+          icon={<CheckCircle2 size={16} />}
+          subValue="Căn cứ pháp lý chuẩn"
+          delta={{ value: `${Math.round((stats.active / (stats.total || 1)) * 100)}%`, trend: "up" }}
+        />
+        <CockpitStat
+          label="Sắp Hết Hạn (<45 ngày)"
+          value={stats.expiringSoon}
+          icon={<Clock size={16} />}
+          subValue="Cần tái ký / lập phụ lục"
+          delta={{ value: `${stats.expiringSoon} HĐ`, trend: stats.expiringSoon === 0 ? "neutral" : "down" }}
+        />
+        <CockpitStat
+          label="Tổng Giá Trị Cam Kết"
+          value={formatVND(stats.totalVal)}
+          icon={<DollarSign size={16} />}
+          subValue="Quy mô các hợp đồng"
+          delta={{ value: "HĐMB", trend: "neutral" }}
+        />
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
         {/* Left: Contracts Table List */}
-        <div className="flex-1 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex flex-col min-h-[400px] overflow-hidden">
+        <div className="flex-1 bg-white rounded-xl border border-slate-200/85 flex flex-col min-h-[400px] overflow-hidden">
           {/* Filter Bar */}
-          <div className="p-3 sm:p-4 border-b border-black/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-1 bg-[#F5F5F7] p-1 rounded-xl overflow-x-auto max-w-full">
+          <div className="p-3 sm:p-4 border-b border-slate-200/85 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1 bg-[#F8FAFA] p-1 rounded-xl border border-slate-200/85 overflow-x-auto max-w-full">
               <button
                 onClick={() => setActiveTab('all')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  activeTab === 'all' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  activeTab === 'all' ? "bg-white text-slate-900 shadow-2xs border border-slate-200/60 font-bold" : "text-slate-500 hover:text-slate-900"
                 )}
               >
                 Tất cả ({contractsData.length})
@@ -602,8 +596,8 @@ export default function ContractsView({
               <button
                 onClick={() => setActiveTab('customer')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  activeTab === 'customer' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  activeTab === 'customer' ? "bg-[#0066FF] text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-900"
                 )}
               >
                 HĐ Khách hàng
@@ -611,8 +605,8 @@ export default function ContractsView({
               <button
                 onClick={() => setActiveTab('supplier')}
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  activeTab === 'supplier' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-900"
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  activeTab === 'supplier' ? "bg-slate-900 text-white shadow-2xs font-bold" : "text-slate-500 hover:text-slate-900"
                 )}
               >
                 HĐ Nhà cung cấp
@@ -626,7 +620,7 @@ export default function ContractsView({
                 placeholder="Tìm số HĐ, tên đối tác..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-[#F5F5F7] border border-transparent rounded-xl text-xs focus:bg-white focus:border-blue-500 outline-none transition-all"
+                className="w-full pl-9 pr-4 py-1.5 bg-[#F8FAFA] hover:bg-white focus:bg-white border border-slate-200/85 focus:border-[#0066FF] focus:ring-2 focus:ring-[#0066FF]/10 rounded-xl text-xs outline-none transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -841,29 +835,30 @@ export default function ContractsView({
         </div>
 
         {/* Right: Contract Detail & Price Matching Panel (Desktop Only, lg:flex) */}
-        <div className="hidden lg:flex w-96 bg-white rounded-2xl border border-black/[0.06] shadow-2xs flex-col overflow-hidden">
+        <div className="hidden lg:flex w-96 bg-white rounded-xl border border-slate-200/85 flex-col overflow-hidden">
           {selectedContract ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Detail Header */}
-              <div className="p-4 border-b border-black/[0.06] bg-[#F5F5F7] flex items-center justify-between">
+              <div className="p-4 border-b border-slate-200/85 bg-[#F8FAFA] flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Chi Tiết Hợp Đồng</span>
-                  <h3 className="text-sm font-bold text-slate-900 font-mono mt-0.5">{selectedContract.contractNumber}</h3>
+                  <span className="text-[10px] font-bold text-[#0066FF] uppercase tracking-wider font-mono">Chi Tiết Hợp Đồng</span>
+                  <h3 className="text-sm font-bold font-display text-slate-900 font-mono mt-0.5">{selectedContract.contractNumber}</h3>
                 </div>
-                <button
+                <CockpitButton
+                  variant="secondary"
+                  size="sm"
+                  icon={<Edit3 size={12} />}
                   onClick={() => handleOpenEdit(selectedContract)}
-                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold shadow-2xs transition-all flex items-center gap-1"
                 >
-                  <Edit3 size={12} />
                   Sửa
-                </button>
+                </CockpitButton>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* General Info */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Thông tin chung</h4>
-                  <div className="bg-[#F5F5F7] p-3 rounded-xl space-y-2 text-xs">
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-display">Thông tin chung</h4>
+                  <div className="bg-[#F8FAFA] border border-slate-200/85 p-3 rounded-xl space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Đối tác:</span>
                       <span className="font-bold text-slate-900 text-right">{selectedContract.partnerName}</span>
@@ -874,11 +869,11 @@ export default function ContractsView({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Ngày ký:</span>
-                      <span className="font-medium text-slate-800">{formatDateForDisplay(selectedContract.signDate)}</span>
+                      <span className="font-medium font-mono text-slate-800 tabular-nums">{formatDateForDisplay(selectedContract.signDate)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Thời hạn:</span>
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium font-mono text-slate-800 tabular-nums">
                         {formatDateForDisplay(selectedContract.effectiveDate)} ➔ {formatDateForDisplay(selectedContract.expirationDate) || 'Không thời hạn'}
                       </span>
                     </div>
@@ -898,11 +893,11 @@ export default function ContractsView({
                 {/* AI Executive Summary Box (Nội dung sơ bộ AI) */}
                 {selectedContract.aiExecutiveSummary && (
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles size={13} className="text-indigo-600" />
+                    <h4 className="text-xs font-bold text-[#0066FF] uppercase tracking-wider flex items-center gap-1.5 font-display">
+                      <Sparkles size={13} className="text-[#0066FF]" />
                       <span>Tóm Tắt Sơ Bộ Bởi AI</span>
                     </h4>
-                    <div className="bg-gradient-to-br from-indigo-50/80 via-blue-50/60 to-purple-50/40 border border-indigo-200/70 p-3.5 rounded-2xl text-xs text-slate-700 leading-relaxed whitespace-pre-line shadow-2xs">
+                    <div className="bg-slate-900 text-slate-200 border border-slate-800 p-3.5 rounded-xl text-xs leading-relaxed whitespace-pre-line shadow-xs font-normal">
                       {selectedContract.aiExecutiveSummary}
                     </div>
                   </div>
@@ -910,9 +905,9 @@ export default function ContractsView({
 
                 {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between font-display">
                     <span>Hồ Sơ Hợp Đồng Gốc (PDF)</span>
-                    <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded">DRIVE CLOUD</span>
+                    <CockpitBadge tone="cobalt" size="sm">DRIVE CLOUD</CockpitBadge>
                   </h4>
                   <div className="bg-rose-50/60 border border-rose-200/80 p-3 rounded-xl space-y-2.5">
                     <div className="flex items-center gap-2.5">

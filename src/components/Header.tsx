@@ -132,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       {/* Main Glassmorphism Header Bar */}
       <header className={clsx(
-        "sticky top-0 z-30 w-full h-14 backdrop-blur-md bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-3 sm:px-5 transition-all select-none print:hidden",
+        "sticky top-0 z-30 w-full h-14 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200/85 dark:border-slate-800/85 flex items-center justify-between px-3 sm:px-5 transition-all select-none print:hidden",
         className
       )}>
         {/* Left Section: Mobile Menu / Desktop Sidebar Toggle + TSG Pill + Breadcrumbs */}
@@ -169,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
             <motion.div 
               initial={{ opacity: 0, scale: 0.85 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-xs text-xs font-black tracking-tight"
+              className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 bg-[#0066FF] text-white rounded-lg shadow-xs text-xs font-black tracking-tight font-display"
             >
               TSG
             </motion.div>
@@ -192,14 +192,14 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Center / Right Section: Region Switcher, Cmd+K Search, DB Pulse, AI Sparkle, Actions, Avatar */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Regional Switcher Pill */}
-          <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-bold">
+          <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-semibold">
             <button
               type="button"
               onClick={() => onRegionChange && onRegionChange('north')}
               className={clsx(
-                "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1",
+                "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] transition cursor-pointer flex items-center gap-1 font-medium",
                 selectedRegion === 'north'
-                  ? "bg-blue-600 text-white shadow-xs"
+                  ? "bg-[#0066FF] text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               )}
               title="Lọc 3 khách hàng Miền Bắc (Thăng Long, Bắc Sơn, Thanh Hóa)"

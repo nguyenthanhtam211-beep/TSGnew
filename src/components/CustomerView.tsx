@@ -25,6 +25,7 @@ import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import MacTrafficLights from './MacTrafficLights';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
+import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
 
 export const getCustomerLogo = (c: any) => {
   if (!c) return '';
@@ -688,22 +689,22 @@ export default function CustomerView({
     <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
       <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
-        {/* Apple macOS Unified Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        {/* Hallmark Enterprise Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/85">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-slate-900">
                 Khách Hàng
               </h1>
               
-              {/* Integrated Apple Sub-Segmented Control: Companies vs Contacts */}
-              <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+              {/* Sub-Segmented Control: Companies vs Contacts */}
+              <div className="flex bg-[#F8FAFA] p-0.5 rounded-xl border border-slate-200/85 text-xs font-semibold">
                 <button
                   onClick={() => setActiveSubTab('companies')}
-                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeSubTab === 'companies'
-                      ? 'bg-white text-[#0071E3] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#0066FF] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Building2 size={13} />
@@ -711,10 +712,10 @@ export default function CustomerView({
                 </button>
                 <button
                   onClick={() => setActiveSubTab('contacts')}
-                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     activeSubTab === 'contacts'
-                      ? 'bg-white text-[#0071E3] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#0066FF] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   <Users size={13} />
@@ -730,40 +731,40 @@ export default function CustomerView({
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
+            <CockpitButton
+              variant="secondary"
+              icon={<FileSpreadsheet size={15} className="text-emerald-600" />}
               onClick={handleExportToExcel}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs"
               title="Xuất file Excel"
             >
-              <FileSpreadsheet size={15} className="text-emerald-600" />
-              <span>Xuất Excel</span>
-            </button>
+              Xuất Excel
+            </CockpitButton>
 
-            <button
+            <CockpitButton
+              variant="secondary"
+              icon={<Cloud size={15} className="text-[#0066FF]" />}
               onClick={() => setIsDriveModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-blue-800 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-all shadow-xs"
               title="Kho Dữ Liệu Đồng Bộ Google Drive 2 Chiều"
             >
-              <Cloud size={15} className="text-blue-600" />
-              <span>Kho Google Drive</span>
-            </button>
+              Kho Google Drive
+            </CockpitButton>
 
             {activeSubTab === 'companies' ? (
-              <button 
+              <CockpitButton 
+                variant="primary"
+                icon={<Plus size={16} />}
                 onClick={() => handleOpenModal()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] transition-all shadow-xs"
               >
-                <Plus size={16} />
-                <span>Thêm khách hàng</span>
-              </button>
+                Thêm khách hàng
+              </CockpitButton>
             ) : (
-              <button 
+              <CockpitButton 
+                variant="primary"
+                icon={<Plus size={16} />}
                 onClick={() => handleOpenContactModal()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] transition-all shadow-xs"
               >
-                <Plus size={16} />
-                <span>Thêm nhân sự</span>
-              </button>
+                Thêm nhân sự
+              </CockpitButton>
             )}
           </div>
         </div>
@@ -771,47 +772,32 @@ export default function CustomerView({
         {/* SUB-VIEW 1: COMPANY PROFILES */}
         {activeSubTab === 'companies' ? (
           <>
-            {/* Apple Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Đang mua hàng</span>
-                  <span className="text-lg font-bold text-emerald-600 mt-0.5 block">{stats.active}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
-                  ✓
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Đang đàm phán</span>
-                  <span className="text-lg font-bold text-amber-600 mt-0.5 block">{stats.negotiating}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">
-                  ⏳
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Tạm dừng</span>
-                  <span className="text-lg font-bold text-slate-600 mt-0.5 block">{stats.stopped}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
-                  —
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-medium text-slate-400 block">Nhân sự liên kết</span>
-                  <span className="text-lg font-bold text-blue-600 mt-0.5 block">{stats.totalContacts}</span>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
-                  👥
-                </div>
-              </div>
+            {/* Bento KPI Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <CockpitStat
+                label="Đang Mua Hàng"
+                value={stats.active}
+                delta={{ value: "Hoạt động", trend: "up" }}
+                subValue="Khách hàng phát sinh đơn"
+              />
+              <CockpitStat
+                label="Đang Đàm Phán"
+                value={stats.negotiating}
+                delta={{ value: "Tiềm năng", trend: "neutral" }}
+                subValue="Đang thương thảo hợp đồng"
+              />
+              <CockpitStat
+                label="Tạm Dừng"
+                value={stats.stopped}
+                delta={{ value: "Cần chăm sóc", trend: "down" }}
+                subValue="Khách tạm ngưng"
+              />
+              <CockpitStat
+                label="Nhân Sự Liên Kết"
+                value={stats.totalContacts}
+                delta={{ value: "Đầu mối", trend: "up" }}
+                subValue="Danh bạ người liên hệ"
+              />
             </div>
 
             {/* Search & Apple Segmented Control Toolbar */}

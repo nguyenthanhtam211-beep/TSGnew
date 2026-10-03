@@ -47,3 +47,6 @@ export { default as HelpGuideView } from "./HelpGuideView";
 
 // Charts & Tooltips (Milestone M3)
 export { default as CustomChartTooltip, CustomChartTooltip as ChartTooltip, formatVND, formatCompactVND } from "./CustomChartTooltip";
+
+// Open-Design & Hallmark UI Primitives
+export * from "./ui";
