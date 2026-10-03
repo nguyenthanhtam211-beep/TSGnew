@@ -1,8 +1,46 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ---- Helpers ----
+
+    // Signed in with a verified email (Google sign-in provides this).
+    function isSignedIn() {
+      return request.auth != null
+        && request.auth.token.email_verified == true;
+    }
+
+    // OPTIONAL ALLOWLIST (NOT ENFORCED YET).
+    // To enable: replace the placeholder with your real emails (lowercase),
+    // e.g. ['owner@gmail.com', 'staff@gmail.com'], then change
+    // `canAccess()` below to `return isSignedIn() && isAllowedUser();`
+    // Until then any verified signed-in user has access, so you are not locked out.
+    function isAllowedUser() {
+      return request.auth.token.email in ['REPLACE_WITH_ALLOWED_EMAIL@example.com'];
+    }
+
+    // Single gate used by all collections. Allowlist intentionally not enforced yet.
+    function canAccess() {
+      return isSignedIn();
+      // return isSignedIn() && isAllowedUser();
+    }
+
+    // ---- App collections: read/create/update allowed, hard delete denied
+    // (the app uses soft-delete via isDeleted: true) ----
+    match /{col}/{docId} {
+      allow read, create, update: if canAccess() && col in [
+        'suppliers', 'customers', 'products', 'pricing', 'po_headers',
+        'po_lines', 'deliveries', 'contracts', 'specs', 'contacts',
+        'delivery_plans', 'file_storage', 'tasks', 'projects',
+        'activities', 'commissions'
+      ];
+      allow delete: if false;
+    }
+
+    // Default deny for everything else (including subcollections).
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

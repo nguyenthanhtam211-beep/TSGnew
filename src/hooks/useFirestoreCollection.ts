@@ -10,6 +10,22 @@ export function getItemKey(item: any, collectionName?: string): string {
 
   if (item.id) {
     rawKey = String(item.id);
+  } else if (collectionName === 'pricing') {
+    const priceCode = item["Mã giá bán"] || '';
+    const prodCode = item["Mã sản phẩm"] || item["Mã hàng"] || '';
+    const customer = item["RP_Khách hàng"] || item["Khách hàng"] || item["Giao đến"] || '';
+    rawKey = priceCode || (customer && prodCode ? `${customer}_${prodCode}` : (prodCode || item.id));
+  } else if (collectionName === 'contracts' && (item.contractNumber || item["Số hợp đồng"])) {
+    rawKey = String(item.contractNumber || item["Số hợp đồng"]);
+  } else if (collectionName === 'customers' && (item["Mã khách hàng"] || item["Mã KH"] || item.Customer_ID || item["Tên khách hàng"])) {
+    rawKey = String(item["Mã khách hàng"] || item["Mã KH"] || item.Customer_ID || item["Tên khách hàng"]);
+  } else if (collectionName === 'suppliers' && (item["Mã nhà cung cấp"] || item["Mã NCC"] || item["Tên nhà cung cấp"])) {
+    rawKey = String(item["Mã nhà cung cấp"] || item["Mã NCC"] || item["Tên nhà cung cấp"]);
+  } else if (collectionName === 'commissions') {
+    const comId = item.id || item["Mã hoa hồng"] || (item["Số đơn hàng"] ? `COM_${item["Số đơn hàng"]}_${item["Người thụ hưởng"] || ''}` : '');
+    rawKey = String(comId || '');
+  } else if (collectionName === 'delivery_plans' && (item["Mã kế hoạch"] || item["Kế hoạch"])) {
+    rawKey = String(item["Mã kế hoạch"] || item["Kế hoạch"]);
   } else if (collectionName === 'file_storage' && (item.fileId || item.file_id)) {
     rawKey = String(item.fileId || item.file_id);
   } else if (collectionName === 'specs' && item.specId) {
@@ -92,7 +108,9 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
 
     // 1. Subscribe to local reactive Data Engine (instant local updates)
     const unsubLocal = dbEngine.subscribe(collectionName as CollectionName, (updatedData) => {
-      if (Array.isArray(updatedData) && updatedData.length > 0) {
+      // An empty array is a valid state (e.g. last record deleted): dbEngine.getAll
+      // already merges fallback data and applies delete tombstones before notifying.
+      if (Array.isArray(updatedData)) {
         setData(updatedData);
       }
     });
@@ -110,7 +128,7 @@ export function useFirestoreCollection(collectionName: string, fallbackData: any
           });
           dbEngine.mergeFirestoreSnapshot(collectionName as CollectionName, docs);
           const currentAll = dbEngine.getAll(collectionName as CollectionName, fallbackData);
-          if (Array.isArray(currentAll) && currentAll.length > 0) {
+          if (Array.isArray(currentAll)) {
             setData(currentAll);
           }
         }

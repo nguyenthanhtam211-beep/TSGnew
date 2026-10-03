@@ -3,7 +3,7 @@ import {
   Menu, PanelLeftClose, PanelLeft, Search, Database, Bot, 
   HelpCircle, Settings, Maximize2, Minimize2, Bell, Sparkles,
   Command, CheckCircle2, RefreshCw, X, ArrowRight, ShieldCheck,
-  FileText, Truck, Users, Package, HardDrive
+  FileText, Truck, Users, Package, HardDrive, Scale
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import clsx from 'clsx';
@@ -92,6 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'po', title: 'Quản Lý Đơn Hàng PO Mua Bán', category: 'Logistics', icon: <FileText size={15} className="text-teal-500" />, tabId: 'po', shortcut: '⌘2' },
     { id: 'logistics', title: 'Kế Hoạch & Giao Hàng 360° (PXK)', category: 'Logistics', icon: <Truck size={15} className="text-orange-500" />, tabId: 'logistics', shortcut: '⌘3' },
     { id: 'pricing', title: 'Bảng Giá Niêm Yết & Đơn Giá Sản Phẩm (2026)', category: 'Thương Mại', icon: <Package size={15} className="text-emerald-500" />, tabId: 'pricing' },
+    { id: 'contracts', title: 'Quản Lý Hợp Đồng Kinh Tế & Phụ Lục (Mua/Bán)', category: 'Thương Mại', icon: <Scale size={15} className="text-blue-600" />, tabId: 'contracts' },
     { id: 'commissions', title: 'Quản Lý Hoa Hồng (3 Phương Thức: % LN, 1.000đ/kg, Khoán)', category: 'Thương Mại', icon: <Package size={15} className="text-purple-500" />, tabId: 'commissions' },
     { id: 'cust', title: 'Danh Sách Khách Hàng & Đối Tác', category: 'Thương Mại', icon: <Users size={15} className="text-sky-500" />, tabId: 'customers' },
     { id: 'prod', title: 'Sản Phẩm & Tiêu Chuẩn Specs', category: 'Thương Mại', icon: <Package size={15} className="text-purple-500" />, tabId: 'products' },

@@ -9,7 +9,7 @@
  * 5. 360° Relational Cross-Referencing: Direct query graph linking Suppliers, Customers, Products, POs, Pricing, Contracts & Specs.
  */
 
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getItemKey } from '../hooks/useFirestoreCollection';
 
@@ -224,11 +224,17 @@ class TSGDataEngine {
           const key = getItemKey(doc, colName);
           if (key) {
             const sanitizedKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
-            
-            // Only update if key exists in master collection or is an explicit user mod
-            if (colMap.has(sanitizedKey) || colMap.has(key) || userMods.has(sanitizedKey)) {
-              if (!userMods.has(sanitizedKey)) {
-                const targetKey = colMap.has(sanitizedKey) ? sanitizedKey : key;
+            const hasLocalMod = userMods.has(sanitizedKey) || userMods.has(key);
+
+            if (doc.isDeleted === true) {
+              if (!hasLocalMod) {
+                colMap.delete(sanitizedKey);
+                colMap.delete(key);
+              }
+            } else {
+              // Remote doc is active. If no pending local edit, merge or add it
+              if (!hasLocalMod) {
+                const targetKey = colMap.has(sanitizedKey) ? sanitizedKey : (colMap.has(key) ? key : sanitizedKey);
                 colMap.set(targetKey, { ...(colMap.get(targetKey) || {}), ...doc });
               }
             }
@@ -366,6 +372,10 @@ class TSGDataEngine {
     }
 
     this.notifySubscribers(colName);
+
+    // Non-blocking Background Batch Sync to Firestore
+    this.backgroundFirestoreBatchSync(colName, items);
+
     return { success: true, count };
   }
 
@@ -508,6 +518,35 @@ class TSGDataEngine {
       await Promise.race([firestoreWrite, timeoutPromise]);
     } catch (err) {
       console.warn(`Background Firestore sync for ${colName}/${docId}:`, err);
+    }
+  }
+
+  /**
+   * Non-blocking Firestore Batch Sync with Chunking
+   */
+  private async backgroundFirestoreBatchSync(colName: string, items: any[]) {
+    try {
+      if (!Array.isArray(items) || items.length === 0) return;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          if (item && typeof item === 'object') {
+            const key = getItemKey(item, colName);
+            if (key) {
+              const sanitizedKey = String(key).replace(/[/\\#?%[\]\s.]+/g, '_');
+              const docRef = doc(db, colName, sanitizedKey);
+              batch.set(docRef, { ...item, id: sanitizedKey }, { merge: true });
+            }
+          }
+        });
+        const batchCommit = batch.commit();
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000));
+        await Promise.race([batchCommit, timeoutPromise]);
+      }
+    } catch (err) {
+      console.warn(`Background Firestore batch sync warning for ${colName}:`, err);
     }
   }
 

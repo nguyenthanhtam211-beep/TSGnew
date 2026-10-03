@@ -1,1286 +1,35 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import HelpGuideModal from "./components/HelpGuideModal";
-import HelpGuideView from "./components/HelpGuideView";
-import { Toaster, toast } from 'react-hot-toast';
-import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Send, Upload, FileText, CheckCircle, CalendarDays, Calendar, Database, Package, Truck, CreditCard, ChevronRight, ChevronDown, ChevronUp, Sparkles, ChevronLeft, Menu, Loader2, Bot, PlusCircle, Users, BookUser, LayoutDashboard, Search, Camera, Settings, HelpCircle, Download, Columns, GripVertical, Eye, EyeOff, X, Filter, AlertTriangle, TrendingUp, Edit, Trash2, Check, HardDrive, ShieldCheck, Printer, Scale, Percent, Layers, DollarSign, ArrowUpRight, Tag, Building2 } from "lucide-react";
-import { motion } from "motion/react";
-import clsx from "clsx";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import Papa from "papaparse";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { parse, isBefore, startOfDay } from "date-fns";
-import { db, auth } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { ensureGoogleToken, openGoogleAuthTab } from "./lib/auth";
-import { useFirestoreCollection, getItemKey } from "./hooks/useFirestoreCollection";
-import dbEngine from "./lib/dbEngine";
-import { calculateDeliveryFinances, parseNumber, calculatePOLineFinances, parseDateToISO, formatDateForDisplay } from './lib/business-logic';
-import { SYSTEM_PROMPT } from "./prompt";
-import { sendGeminiPrompt } from "./lib/gemini";
-import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DATA, SUPPLIER_DATA, CONTACT_DATA, PRODUCT_DATA, DELIVERY_PLAN_DATA, INITIAL_SPECS_DATA } from "./data";
 import { 
-  DashboardView, CustomerView, SupplierView, SettingsView, ContactView, 
-  OCRView, TasksView, WorkflowView, DeliveryView, DeliveryPlanView, MasterCalendarView, LogisticsHubView, MemoryStorageModal, 
-  StorageView, SpecsView, ContractsView, CommissionView, ProductsView, ProductDetailModal, PODetailModal, 
-  ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights,
-  Header, Breadcrumbs, MobileBottomNav
-} from "./components";
-import { exportGenericTableToPDF } from './lib/pdf-exporter';
-import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
-
-interface NavItemConfig {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  iconBg?: string;
-  badge?: string | number;
-}
-
-interface NavGroupConfig {
-  id: string;
-  title: string;
-  badge?: string;
-  items: NavItemConfig[];
-}
-
-const FULL_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
-
-=== DỮ LIỆU HỆ THỐNG HIỆN TẠI ===
-[BẢNG GIÁ 2026]
-${PRICING_DATA}
-
-[PO HEADER]
-${PO_HEADER_DATA}
-
-[PO LINES]
-${PO_LINES_DATA}
-
-[GIAO HÀNG]
-${DELIVERY_DATA}
-=== KẾT THÚC ===`;
-
-function parseCSV(csvText: string) {
-  return Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true }).data;
-}
-
-export default function App() {
-  const [selectedProductDetails, setSelectedProductDetails] = useState<string | null>(null);
-  const [selectedPoDetails, setSelectedPoDetails] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  
-  // 2-Way Deep Linking Cross-Module Navigation States
-  const [targetCustomerId, setTargetCustomerId] = useState<string | null>(null);
-  const [targetSupplierId, setTargetSupplierId] = useState<string | null>(null);
-  const [targetContactId, setTargetContactId] = useState<string | null>(null);
-  
-  // Apple macOS Window & Sidebar States
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [menuSearchQuery, setMenuSearchQuery] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem("tsg_nav_collapsed_groups");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const toggleGroup = (groupId: string) => {
-    setCollapsedGroups(prev => {
-      const next = { ...prev, [groupId]: !prev[groupId] };
-      localStorage.setItem("tsg_nav_collapsed_groups", JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const handleToggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.warn("Fullscreen request error:", err);
-      });
-    } else {
-      document.exitFullscreen().catch(err => {
-        console.warn("Exit fullscreen error:", err);
-      });
-    }
-  };
-
-  const handleNavigateToCustomer = (customerId: string) => {
-    setTargetCustomerId(customerId);
-    setActiveTab("customers");
-  };
-
-  const handleNavigateToSupplier = (supplierId: string) => {
-    setTargetSupplierId(supplierId);
-    setActiveTab("suppliers");
-  };
-
-  const handleNavigateToContact = (contactId: string) => {
-    setTargetContactId(contactId);
-    setActiveTab("contacts");
-  };
-  
-  
-  const initialPricing = useMemo(() => parseCSV(PRICING_DATA), []);
-  const initialPOHeader = useMemo(() => parseCSV(PO_HEADER_DATA), []);
-  const initialPOLines = useMemo(() => parseCSV(PO_LINES_DATA), []);
-  const initialDelivery = useMemo(() => parseCSV(DELIVERY_DATA), []);
-  const initialCustomer = useMemo(() => parseCSV(CUSTOMER_DATA), []);
-  const initialSupplier = useMemo(() => parseCSV(SUPPLIER_DATA), []);
-  const initialContact = useMemo(() => parseCSV(CONTACT_DATA), []);
-  const initialProducts = useMemo(() => parseCSV(PRODUCT_DATA), []);
-  const initialDeliveryPlan = useMemo(() => parseCSV(DELIVERY_PLAN_DATA), []);
-
-  const pricingData = useFirestoreCollection('pricing', initialPricing);
-  const poHeaderData = useFirestoreCollection('po_headers', initialPOHeader);
-  const poLinesData = useFirestoreCollection('po_lines', initialPOLines);
-  const deliveryData = useFirestoreCollection('deliveries', initialDelivery);
-  const customerData = useFirestoreCollection('customers', initialCustomer);
-  const supplierData = useFirestoreCollection('suppliers', initialSupplier);
-  const contactData = useFirestoreCollection('contacts', initialContact);
-  const productData = useFirestoreCollection('products', initialProducts);
-  const deliveryPlanData = useFirestoreCollection('delivery_plans', initialDeliveryPlan);
-  const specsData = useFirestoreCollection('specs', INITIAL_SPECS_DATA);
-  const fileStorageData = useFirestoreCollection('file_storage', []);
-  const contractsData = useFirestoreCollection('contracts', []);
-  const commissionData = useFirestoreCollection('commissions', []);
-  const [googleToken, setGoogleToken] = useState<string | null>(() => {
-    return localStorage.getItem('google_access_token');
-  });
-
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'google_access_token') {
-        setGoogleToken(e.newValue);
-        if (e.newValue) {
-          toast.success('Đã đồng bộ Google Access Token từ Tab khác thành công!');
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('action') === 'connect_google') {
-      ensureGoogleToken([
-        'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/spreadsheets'
-      ], true).then((newToken) => {
-        if (newToken) {
-          setGoogleToken(newToken);
-          toast.success('🎉 Đã kết nối Google thành công trong Tab mới! Bạn có thể đóng tab này.', { duration: 10000 });
-        }
-      }).catch((err) => {
-        console.error('Auto connect error:', err);
-      });
-    }
-
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  const handleSignInGoogle = async (force: boolean = false) => {
-    try {
-      const token = await ensureGoogleToken([
-        'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/spreadsheets'
-      ], force);
-      if (token) {
-        setGoogleToken(token);
-        if (force) {
-          toast.success('Đã kết nối tài khoản Google thành công!');
-        }
-        return token;
-      }
-    } catch (error: any) {
-      console.error('Google Sign-In Error:', error);
-      if (force) {
-        toast.error('Không thể kết nối Google: ' + (error.message || error));
-      }
-    }
-    return null;
-  };
-
-  const handleCreateCalendarEvent = async (eventData: { summary: string, description: string, start: string, end: string, location?: string }) => {
-    let token = googleToken;
-    if (!token) {
-      token = await handleSignInGoogle();
-    }
-    
-    if (!token) return;
-
-    try {
-      const response = await fetch('/api/calendar/events', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(eventData)
-      });
-
-      const resText = await response.text();
-      let errorData: any = null;
-      try {
-        errorData = JSON.parse(resText);
-      } catch (e) {
-        // Not JSON
-      }
-
-      if (!response.ok) {
-        if (resText.includes('<!doctype') || resText.includes('<html')) {
-          throw new Error('Xác thực Google bị gián đoạn trong khung iframe. Vui lòng Mở ứng dụng trong Tab mới.');
-        }
-        throw new Error(errorData?.error || 'Failed to create calendar event');
-      }
-
-      toast.success('Đã thêm sự kiện vào Google Calendar!');
-    } catch (error) {
-      console.error('Calendar Event Error:', error);
-      toast.error('Lỗi khi thêm sự kiện vào Calendar.');
-    }
-  };
-
-  const enrichedPricingData = useMemo(() => {
-    return pricingData.map(row => {
-      const product = productData.find(p => p['Mã sản phẩm'] === row['Mã sản phẩm']);
-      if (product) {
-        return {
-          ...row,
-          'Tên sản phẩm': product['Tên sản phẩm'] || row['Tên sản phẩm'],
-          'ĐVT': product['Đơn Vị Tính'] || row['ĐVT'],
-          'Nhóm sản phẩm': product['Nhóm hàng'] || row['Nhóm sản phẩm'],
-        };
-      }
-      return row;
-    });
-  }, [pricingData, productData]);
-
-  const enrichedPoLinesData = useMemo(() => {
-    return poLinesData.map(row => {
-      let productCode = row['Mã của khách']?.split(',')[0];
-      const priceRow = pricingData.find(p => p['Mã giá bán'] === row['Mã giá bán']);
-      if (priceRow && priceRow['Mã sản phẩm']) {
-          productCode = priceRow['Mã sản phẩm'];
-      }
-      
-      const product = productData.find(p => p['Mã sản phẩm'] === productCode || p['Mã sản phẩm'] === row['Mã của khách']);
-      
-      const lineFinances = calculatePOLineFinances(row, pricingData);
-
-      // Calculate real-time delivery metrics dynamically from delivery slips
-      const lineId = row['STT'];
-      const associatedDeliveries = deliveryData.filter(d => !d.isDeleted && d['Chi tiết đơn hàng'] === lineId);
-      const totalDelivered = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
-      const ordered = parseNumber(row['Số lượng']);
-      const remaining = ordered - totalDelivered;
-      const progressPercent = ordered > 0 ? (totalDelivered / ordered) * 100 : 0;
-      const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
-      const isCompleted = totalDelivered >= ordered ? "1" : "0";
-
-      const enrichedRow = {
-        ...row,
-        'Số lượng': (ordered || 0).toLocaleString('en-US'),
-        'Đã giao': (totalDelivered || 0).toLocaleString('en-US'),
-        'Còn lại': (remaining || 0).toLocaleString('en-US'),
-        'Tiến độ sản phẩm': progressString,
-        'Tiến độ giao': progressString,
-        'Hoàn thành': isCompleted,
-        'Doanh thu': (lineFinances.revenue || 0).toLocaleString('en-US'),
-        'Đơn giá bán': (lineFinances.sellPrice || 0).toLocaleString('en-US'),
-      };
-
-      if (product) {
-        enrichedRow['Tên sản phẩm'] = product['Tên sản phẩm'] || row['Tên sản phẩm'];
-        enrichedRow['ĐVT'] = product['Đơn Vị Tính'] || row['ĐVT'];
-        enrichedRow['Nhóm hàng'] = product['Nhóm hàng'] || row['Nhóm hàng'];
-      }
-      return enrichedRow;
-    });
-  }, [poLinesData, pricingData, productData, deliveryData]);
-
-  const enrichedDeliveryPlanData = useMemo(() => {
-    return deliveryPlanData.map(row => {
-      const product = productData.find(p => p['Tên sản phẩm'] === row['Sản phẩm'] || p['Mã sản phẩm'] === row['Sản phẩm']);
-      if (product) {
-        return {
-          ...row,
-          'Sản phẩm': product['Tên sản phẩm'] || row['Sản phẩm']
-        };
-      }
-      return row;
-    });
-  }, [deliveryPlanData, productData]);
-
-  const enrichedDeliveryData = useMemo(() => {
-    return deliveryData.map(row => {
-      const finances = calculateDeliveryFinances(row, pricingData, poLinesData);
-      const poLine = poLinesData.find(l => !l.isDeleted && l['STT'] === row['Chi tiết đơn hàng']);
-      
-      let productCode = finances.priceCode !== 'N/A' ? finances.priceCode : (row['Mã sản phẩm'] || (poLine ? poLine['Mã của khách'] : ''));
-      const product = productData.find(p => p['Mã sản phẩm'] === productCode);
-
-      const qtyDeliveredThisSlip = parseNumber(row['Số lượng giao']);
-      const associatedDeliveries = deliveryData.filter(d => !d.isDeleted && d['Chi tiết đơn hàng'] === row['Chi tiết đơn hàng']);
-      const totalDeliveredForLine = associatedDeliveries.reduce((sum, d) => sum + parseNumber(d['Số lượng giao']), 0);
-      const qtyOrdered = poLine ? parseNumber(poLine['Số lượng']) : parseNumber(row['Số lượng đặt']);
-      
-      const remainingForLine = qtyOrdered - totalDeliveredForLine;
-      const progressPercent = qtyOrdered > 0 ? (totalDeliveredForLine / qtyOrdered) * 100 : 0;
-      const progressString = `${progressPercent.toFixed(1).replace('.0', '')}%`;
-
-      const enrichedRow = {
-        ...row,
-        'Số lượng đặt': (qtyOrdered || 0).toLocaleString('en-US'),
-        'Đã giao': (totalDeliveredForLine || 0).toLocaleString('en-US'),
-        'Còn lại': (remainingForLine || 0).toLocaleString('en-US'),
-        'Tiến độ giao': progressString,
-        'Đơn giá bán': (finances.sellPrice || 0).toLocaleString('en-US'),
-        'Đơn giá nhập': (finances.buyPrice || 0).toLocaleString('en-US'),
-        'Doanh thu': (finances.revenue || 0).toLocaleString('en-US'),
-        'Lợi nhuận gộp': (finances.profit || 0).toLocaleString('en-US'),
-        '% Lợi nhuận': `${(finances.margin || 0).toFixed(2)}%`,
-      };
-
-      if (product) {
-        enrichedRow['Tên sản phẩm'] = product['Tên sản phẩm'] || row['Tên sản phẩm'];
-        enrichedRow['ĐVT'] = product['Đơn Vị Tính'] || row['ĐVT'];
-        enrichedRow['Nhóm hàng'] = product['Nhóm hàng'] || row['Nhóm hàng'];
-      }
-      return enrichedRow;
-    });
-  }, [deliveryData, pricingData, productData, poLinesData]);
-
-  const enrichedPoHeaderData = useMemo(() => {
-    return poHeaderData.map((row, idx) => {
-      const poNum = row['Đơn hàng'];
-      const lines = enrichedPoLinesData.filter(l => !l.isDeleted && l['Số đơn hàng'] === poNum);
-      
-      const totalValue = lines.reduce((sum, l) => sum + parseNumber(l['Doanh thu']), 0);
-      
-      // Calculate overall status
-      const totalLines = lines.length;
-      const completedLines = lines.filter(l => l['Hoàn thành'] === "1").length;
-      
-      let status = row['Trạng Thái'] || 'Mới';
-      if (totalLines > 0) {
-        if (completedLines === totalLines) {
-          status = 'Hoàn thành';
-        } else if (completedLines > 0) {
-          status = 'Đang giao';
-        } else {
-          // Check if any delivery exists
-          const hasDeliveries = deliveryData.some(d => !d.isDeleted && lines.some(l => l['STT'] === d['Chi tiết đơn hàng']));
-          if (hasDeliveries) {
-            status = 'Đang xử lý';
-          }
-        }
-      }
-
-      return {
-        'STT': idx + 1,
-        ...row,
-        'Tổng giá trị đơn hàng': (totalValue || 0).toLocaleString('en-US'),
-        'Trạng Thái': status
-      };
-    });
-  }, [poHeaderData, enrichedPoLinesData, deliveryData]);
-
-
-  const handleAddToFirestore = async (colName: string, row: any) => {
-    try {
-      const cleanedRow: any = {};
-      Object.keys(row || {}).forEach(k => {
-        if (row[k] !== undefined) cleanedRow[k] = row[k];
-      });
-
-      await dbEngine.save(colName as any, cleanedRow);
-    } catch (err) {
-      console.error(`Failed to add to ${colName}`, err);
-    }
-  };
-
-  const handleBatchAddToFirestore = async (colName: string, rows: any[]) => {
-    if (!rows || rows.length === 0) return;
-    try {
-      for (const row of rows) {
-        const cleanedRow: any = {};
-        Object.keys(row || {}).forEach(k => {
-          if (row[k] !== undefined) cleanedRow[k] = row[k];
-        });
-        await dbEngine.save(colName as any, cleanedRow);
-      }
-    } catch (err) {
-      console.error(`Failed to batch add to ${colName}`, err);
-    }
-  };
-
-  const handleUpdateToFirestore = async (colName: string, row: any) => {
-    try {
-      const rawId = row.id || getItemKey(row, colName) || row['Mã sản phẩm'] || row['SKU'] || row['Mã hàng'];
-      if (!rawId) {
-        throw new Error("Không thể xác định ID của dòng dữ liệu");
-      }
-      
-      // Clean data: remove only transient summary/analytics calculations before saving
-      const dataToSave = { ...row };
-      
-      // Remove temporary runtime UI calculations, but NEVER delete Tên sản phẩm, ĐVT, or business keys
-      const transientFields = [
-        'id', 'Doanh thu dự kiến', 'Lợi nhuận dự kiến', 'Tiến độ', 'Số dòng',
-        'Doanh thu', 'Lợi nhuận gộp', 'Tiến độ giao', 'isOverdue', 'qtyOrdered', 
-        'qtyDelivered', 'remainingQty', 'currentRevenue', 'currentProfit', 'margin', 
-        'isDelayed', 'isReconciled'
-      ];
-      transientFields.forEach(field => delete dataToSave[field]);
-      
-      // Explicitly protect core product fields
-      if (row['Tên sản phẩm']) dataToSave['Tên sản phẩm'] = row['Tên sản phẩm'];
-      if (row['Mã sản phẩm']) dataToSave['Mã sản phẩm'] = row['Mã sản phẩm'];
-      if (row['Đơn Vị Tính']) dataToSave['Đơn Vị Tính'] = row['Đơn Vị Tính'];
-      
-      await dbEngine.save(colName as any, dataToSave);
-    } catch (err) {
-      console.error(`Failed to update ${colName}`, err);
-      throw err;
-    }
-  };
-
-  const handleDeleteFromFirestore = async (colName: string, row: any) => {
-    try {
-      const targetId = row.id || getItemKey(row, colName) || row['Mã sản phẩm'] || row['Mã hàng'] || row.Customer_ID || row['Mã nhà cung cấp'];
-      if (targetId) {
-        await dbEngine.delete(colName as any, targetId);
-      }
-      toast.success("Xóa thành công!");
-    } catch (err) {
-      console.error(`Failed to delete from ${colName}`, err);
-      toast.error("Lỗi khi xóa!");
-    }
-  };
-
-  const handleUploadToDrive = async (file: File, metadata: { documentType: string, documentNumber: string, fileName?: string }) => {
-    try {
-      const now = new Date();
-      const year = now.getFullYear().toString();
-      const month = (now.getMonth() + 1).toString().padStart(2, '0');
-      const fileId = `file_${Date.now()}`;
-      const fileNameToSave = metadata.fileName || file.name;
-
-      // 1. Kiểm tra mã token Google hiện tại mà KHÔNG ép mở popup
-      let token = googleToken || localStorage.getItem('google_access_token');
-
-      let driveData: { driveFileId?: string; driveLink?: string; downloadLink?: string; folderId?: string; folderLink?: string; folderPath?: string; fileName?: string } = {};
-
-      if (token) {
-        try {
-          // Tải trực tiếp lên Google Drive nếu đã có token
-          const uploadRes = await uploadFileDirectToGoogleDrive({
-            file,
-            fileName: fileNameToSave,
-            documentType: metadata.documentType,
-            documentNumber: metadata.documentNumber,
-            year,
-            month,
-            token
-          });
-          driveData = uploadRes;
-          toast.success('🎉 Đã lưu trữ bản scan vào Google Drive!');
-        } catch (driveErr: any) {
-          console.warn('Google Drive background upload skipped:', driveErr?.message || driveErr);
-          // Nếu token hết hạn thực sự, xóa để không gọi lại
-          if (driveErr?.message?.includes('hết hạn') || driveErr?.message?.includes('401') || driveErr?.message?.includes('403')) {
-            localStorage.removeItem('google_access_token');
-            setGoogleToken(null);
-          }
-        }
-      }
-
-      // 2. Luôn lưu thông tin tài liệu vào cơ sở dữ liệu hệ thống (Local Cache + Firestore)
-      await handleAddToFirestore('file_storage', {
-        id: fileId,
-        fileId,
-        driveFileId: driveData.driveFileId || `local_${fileId}`,
-        fileName: fileNameToSave,
-        mimeType: file.type,
-        documentType: metadata.documentType,
-        documentNumber: metadata.documentNumber,
-        uploadDate: now.toISOString(),
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
-        driveLink: driveData.driveLink || '',
-        downloadLink: driveData.downloadLink || '',
-        syncedToDrive: Boolean(driveData.driveFileId)
-      });
-
-      const folderPath = driveData.folderPath || `TSG_Business_Documents/${year}/${metadata.documentType || 'Chung'}/Thang_${month}`;
-      const folderLink = driveData.folderLink || (driveData.driveLink ? driveData.driveLink.substring(0, driveData.driveLink.lastIndexOf('/')) : '');
-
-      return {
-        ...driveData,
-        fileId,
-        fileName: fileNameToSave,
-        folderPath,
-        folderLink
-      };
-    } catch (error: any) {
-      console.warn('Background handleUploadToDrive error:', error);
-      return null;
-    }
-  };
-
-  const navGroups: NavGroupConfig[] = useMemo(() => [
-    {
-      id: "executive",
-      title: "Tổng Quan & Điều Hành",
-      badge: "2",
-      items: [
-        { id: "dashboard", label: "Bàn Làm Việc & Báo Cáo", icon: <LayoutDashboard size={15} />, iconBg: "bg-blue-500" },
-        { id: "workflow", label: "Quy Trình Nghiệp Vụ 5 Bước", icon: <TrendingUp size={15} />, iconBg: "bg-indigo-500" },
-      ]
-    },
-    {
-      id: "logistics",
-      title: "Kinh Doanh & Logistics",
-      badge: "2",
-      items: [
-        { id: "po", label: "Quản Lý Đơn Hàng PO", icon: <FileText size={15} />, iconBg: "bg-teal-500", badge: poHeaderData.length },
-        { id: "logistics", label: "Kế Hoạch & Giao Hàng 360°", icon: <Truck size={15} />, iconBg: "bg-orange-500", badge: deliveryData.length },
-      ]
-    },
-    {
-      id: "commercial",
-      title: "Thương Mại & Danh Mục",
-      badge: "3",
-      items: [
-        { id: "customers", label: "Khách Hàng & Đối Tác", icon: <Users size={15} />, iconBg: "bg-sky-500", badge: customerData.length },
-        { id: "pricing", label: "Bảng Giá, Hợp Đồng & Hoa Hồng", icon: <Package size={15} />, iconBg: "bg-emerald-500", badge: pricingData.length },
-        { id: "products", label: "Sản Phẩm & Tiêu Chuẩn Specs", icon: <Package size={15} />, iconBg: "bg-purple-500", badge: productData.length },
-      ]
-    },
-    {
-      id: "ai_storage",
-      title: "AI & Trung Tâm Lưu Trữ",
-      badge: "4",
-      items: [
-        { id: "ocr", label: "Quét OCR & Định Giá", icon: <Camera size={15} />, iconBg: "bg-indigo-600" },
-        { id: "assistant", label: "Trợ Lý AI Gemini", icon: <Bot size={15} />, iconBg: "bg-gradient-to-tr from-purple-500 to-indigo-500" },
-        { id: "storage", label: "Kho Tệp & Sổ Đối Soát", icon: <HardDrive size={15} />, iconBg: "bg-slate-500", badge: fileStorageData.length },
-        { id: "tasks", label: "Công Việc & Lịch Hạn", icon: <CheckCircle size={15} />, iconBg: "bg-green-600" },
-      ]
-    },
-    {
-      id: "system",
-      title: "Hệ Thống",
-      items: [
-        { id: "help", label: "Trợ Giúp & Hướng Dẫn", icon: <HelpCircle size={15} />, iconBg: "bg-blue-600", badge: "Cẩm nang" },
-        { id: "settings", label: "Cài Đặt Hệ Thống", icon: <Settings size={15} />, iconBg: "bg-slate-600" }
-      ]
-    }
-  ], [poHeaderData.length, deliveryData.length, customerData.length, pricingData.length, productData.length, fileStorageData.length]);
-
-  const TAB_TITLES: Record<string, string> = {
-    dashboard: "Bảng Điều Hành",
-    workflow: "Quy Trình Nghiệp Vụ",
-    customers: "Quản Lý Khách Hàng",
-    pricing: "Bảng Giá 2026",
-    po: "Đơn Hàng (PO)",
-    polines: "Chi Tiết Đơn Hàng",
-    delivery_plan: "Kế Hoạch Giao",
-    delivery: "Giao Hàng (PXK)",
-    profit_report: "Báo Cáo Lợi Nhuận",
-    products: "Sản Phẩm",
-    specs: "Tiêu Chuẩn Specs",
-    suppliers: "Nhà Cung Cấp",
-    contacts: "Danh Bạ",
-    assistant: "Trợ Lý AI",
-    ocr: "Quét OCR",
-    tasks: "Công Việc & Lịch",
-    storage: "Kho Lưu Trữ",
-    help: "Trợ Giúp & Hướng Dẫn",
-    settings: "Cài Đặt"
-  };
-
-  const navItemClick = (tab: string) => {
-    setActiveTab(tab);
-    setMobileMenuOpen(false);
-  };
-
-  return (
-    <div className="flex flex-col lg:flex-row min-h-[100dvh] h-[100dvh] bg-[#F8F9FB] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans print:bg-white print:h-auto print:block overflow-hidden">
-      <Toaster position="top-right" />
-
-      {/* Mobile Navigation Drawer - Apple iOS Light Sheet */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
-            onClick={() => setMobileMenuOpen(false)} 
-          />
-          <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] dark:bg-slate-900 flex flex-col text-slate-900 dark:text-slate-100 shadow-2xl h-full border-r border-slate-200/80 dark:border-slate-800 z-10 animate-in slide-in-from-left duration-200 pl-[max(env(safe-area-inset-left),0px)] pb-safe">
-            <div className="p-4 border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <MacTrafficLights onClose={() => setMobileMenuOpen(false)} />
-                <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-                <h2 className="text-xs font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase">TSG BUSINESS OS</h2>
-              </div>
-              <button 
-                onClick={() => setMobileMenuOpen(false)} 
-                className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 custom-scrollbar">
-              {navGroups.map((group, groupIdx) => {
-                const isGroupCollapsed = collapsedGroups[group.id];
-                const hasActiveItem = group.items.some(it => it.id === activeTab);
-                
-                return (
-                  <div key={group.id} className={clsx("space-y-1", groupIdx > 0 && "pt-2 border-t border-slate-200/60 dark:border-slate-800/60")}>
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.id)}
-                      className="w-full flex items-center justify-between px-2.5 py-1 text-[10.5px] font-extrabold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
-                    >
-                      <span className="flex items-center gap-1.5 truncate">
-                        <span>{group.title}</span>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {group.badge && (
-                          <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold tabular-nums">
-                            {group.badge}
-                          </span>
-                        )}
-                        {isGroupCollapsed && !hasActiveItem ? <ChevronRight size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
-                      </div>
-                    </button>
-
-                    {(!isGroupCollapsed || hasActiveItem) && (
-                      <div className="space-y-0.5 pl-0.5 animate-in fade-in duration-150">
-                        {group.items.map(item => (
-                          <NavItem
-                            key={item.id}
-                            icon={item.icon}
-                            iconBg={item.iconBg}
-                            label={item.label}
-                            badge={item.badge}
-                            isActive={activeTab === item.id}
-                            onClick={() => navItemClick(item.id)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-
-            <div className="p-3 border-t border-slate-200/60 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-center">
-              <p className="text-[10px] text-slate-400 font-medium">Tâm Sen Group • ERP Business OS</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Desktop macOS Sequoia Sidebar */}
-      <aside className={clsx(
-        "hidden lg:flex bg-[#F5F5F7]/95 dark:bg-slate-900/95 backdrop-blur-2xl border-r border-slate-200/60 dark:border-slate-800/60 flex-col text-slate-900 dark:text-slate-100 shadow-[1px_0_10px_rgba(0,0,0,0.02)] print:hidden relative z-20 shrink-0 select-none transition-all duration-200",
-        isSidebarCollapsed ? "w-16" : "w-64"
-      )}>
-        
-        {/* macOS Window Controls & Title */}
-        <div className="p-3.5 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/40 dark:bg-slate-900/40">
-          {/* Functional Apple Traffic Lights */}
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedProductDetails || selectedPoDetails) {
-                  setSelectedProductDetails(null);
-                  setSelectedPoDetails(null);
-                  toast.success("Đã đóng cửa sổ chi tiết", { icon: "🔴" });
-                } else if (activeTab !== "dashboard") {
-                  setActiveTab("dashboard");
-                  toast("Đã trở về Bảng Điều Hành", { icon: "🔴" });
-                }
-              }}
-              title="Đóng / Trở về Bảng Điều Hành (⌘W)"
-              className="w-3 h-3 rounded-full bg-[#FF5F56] hover:bg-[#FF3B30] active:bg-[#E0443E] border border-[#E0443E]/60 shadow-2xs flex items-center justify-center text-[9px] text-red-950/0 hover:text-red-950 font-bold transition-all cursor-pointer"
-            >
-              ×
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              title="Thu gọn / Mở rộng Sidebar (⌘M)"
-              className="w-3 h-3 rounded-full bg-[#FFBD2E] hover:bg-[#FF9500] active:bg-[#DEA123] border border-[#DEA123]/60 shadow-2xs flex items-center justify-center text-[9px] text-amber-950/0 hover:text-amber-950 font-bold transition-all cursor-pointer"
-            >
-              –
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleFullScreen}
-              title="Toàn màn hình / Thu phóng (⌃⌘F)"
-              className="w-3 h-3 rounded-full bg-[#27C93F] hover:bg-[#34C759] active:bg-[#1AAB29] border border-[#1AAB29]/60 shadow-2xs flex items-center justify-center text-[8px] text-green-950/0 hover:text-green-950 font-bold transition-all cursor-pointer"
-            >
-              ⤢
-            </button>
-          </div>
-
-          {!isSidebarCollapsed && (
-            <div className="flex items-center gap-2.5 animate-in fade-in duration-150">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#007AFF] to-[#5856D6] text-white flex items-center justify-center font-black text-xs shadow-sm shadow-blue-500/20">
-                TSG
-              </div>
-              <div>
-                <h1 className="text-xs font-bold text-slate-900 dark:text-white tracking-[-0.015em] leading-tight">TSG Business OS</h1>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Tâm Sen Group • ERP 2026</p>
-              </div>
-            </div>
-          )}
-
-          {!isSidebarCollapsed && (
-            <div className="mt-3 px-1">
-              <button
-                type="button"
-                onClick={() => setIsMemoryModalOpen(true)}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-emerald-50/90 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl text-[11px] font-semibold transition active:scale-[0.98] shadow-2xs cursor-pointer"
-                title="Xem trạng thái bộ nhớ lưu trữ và sao lưu dữ liệu"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Bộ nhớ: Đã lưu an toàn</span>
-                </div>
-                <span className="text-[9.5px] font-mono font-bold bg-white/90 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 tabular-nums">13 CSDL</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Apple Source List Navigation */}
-        <nav className="flex-1 overflow-y-auto py-2 space-y-2.5 custom-scrollbar px-2">
-          {!isSidebarCollapsed && (
-            <div className="px-1 mb-1.5">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
-                <input
-                  type="text"
-                  value={menuSearchQuery}
-                  onChange={(e) => setMenuSearchQuery(e.target.value)}
-                  placeholder="Tìm nhanh tính năng..."
-                  className="w-full pl-7 pr-7 py-1 bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.05] dark:hover:bg-white/[0.08] focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-blue-400 rounded-xl text-[11px] outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400"
-                />
-                {menuSearchQuery && (
-                  <button
-                    onClick={() => setMenuSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {navGroups.map((group, groupIdx) => {
-            const q = menuSearchQuery.toLowerCase().trim();
-            const filteredItems = q 
-              ? group.items.filter(it => it.label.toLowerCase().includes(q) || it.id.toLowerCase().includes(q))
-              : group.items;
-
-            if (q && filteredItems.length === 0) return null;
-
-            const isGroupCollapsed = collapsedGroups[group.id];
-            const hasActiveItem = group.items.some(it => it.id === activeTab);
-            const shouldShowItems = isSidebarCollapsed || (!isGroupCollapsed || hasActiveItem || Boolean(q));
-
-            return (
-              <div key={group.id} className={clsx("space-y-0.5", groupIdx > 0 && "pt-2 border-t border-slate-200/60 dark:border-slate-800/60")}>
-                {!isSidebarCollapsed && (
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.id)}
-                    className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.03] cursor-pointer select-none"
-                  >
-                    <span className="truncate">{group.title}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {group.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold tabular-nums">
-                          {group.badge}
-                        </span>
-                      )}
-                      {isGroupCollapsed && !hasActiveItem && !q ? (
-                        <ChevronRight size={12} className="text-slate-400" />
-                      ) : (
-                        <ChevronDown size={12} className="text-slate-400" />
-                      )}
-                    </div>
-                  </button>
-                )}
-
-                {shouldShowItems && (
-                  <div className="space-y-0.5">
-                    {filteredItems.map(item => (
-                      <NavItem
-                        key={item.id}
-                        icon={item.icon}
-                        iconBg={item.iconBg}
-                        label={item.label}
-                        badge={item.badge}
-                        isCollapsed={isSidebarCollapsed}
-                        isActive={activeTab === item.id}
-                        onClick={() => setActiveTab(item.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* Main Content Area with Header */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Unified Glassmorphism Header */}
-        <Header
-          activeTab={activeTab}
-          onNavigate={navItemClick}
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          subTab={
-            activeTab === 'contracts' ? 'contracts' :
-            activeTab === 'commissions' ? 'commissions' :
-            activeTab === 'specs' ? 'specs' :
-            activeTab === 'polines' ? 'polines' :
-            activeTab === 'delivery_plan' ? 'plan' :
-            activeTab === 'delivery' ? 'delivery' :
-            activeTab === 'reconcile' ? 'reconcile' :
-            undefined
-          }
-          itemContext={
-            selectedPoDetails ? { label: `PO #${selectedPoDetails}`, id: selectedPoDetails, type: 'po' } :
-            selectedProductDetails ? { label: selectedProductDetails, id: selectedProductDetails, type: 'product' } :
-            targetCustomerId && activeTab === 'customers' ? { label: `Khách: ${targetCustomerId}`, id: targetCustomerId } :
-            null
-          }
-          onOpenMemoryModal={() => setIsMemoryModalOpen(true)}
-          onOpenHelpModal={() => setIsHelpModalOpen(true)}
-          onToggleFullscreen={handleToggleFullScreen}
-          onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          dbCount={13}
-          isSyncing={false}
-        />
-
-        {/* Main Content Viewport */}
-        <main className="flex-1 flex flex-col overflow-y-auto min-h-0 print:overflow-visible print:h-auto print:block relative pb-24 lg:pb-6 pl-[max(env(safe-area-inset-left),0px)] pr-[max(env(safe-area-inset-right),0px)]">
-        {activeTab === "dashboard" && (
-          <DashboardView 
-            poData={poHeaderData} 
-            deliveryData={enrichedDeliveryData} 
-            poLinesData={enrichedPoLinesData} 
-            customersData={customerData} 
-            commissionData={commissionData}
-          />
-        )}
-        {activeTab === "contracts" && (
-          <ContractsView
-            contractsData={contractsData}
-            pricingData={pricingData}
-            customerData={customerData}
-            supplierData={supplierData}
-            onAddContract={async (c) => await handleAddToFirestore("contracts", c)}
-            onUpdateContract={async (c) => await handleUpdateToFirestore("contracts", c)}
-            onDeleteContract={async (c) => await handleDeleteFromFirestore("contracts", c)}
-          />
-        )}
-        {activeTab === "commissions" && (
-          <CommissionView
-            commissionData={commissionData}
-            customerData={customerData}
-            contactData={contactData}
-            poHeaderData={poHeaderData}
-            onAddCommission={async (c) => await handleAddToFirestore("commissions", c)}
-            onUpdateCommission={async (c) => await handleUpdateToFirestore("commissions", c)}
-            onDeleteCommission={async (c) => await handleDeleteFromFirestore("commissions", c)}
-          />
-        )}
-        {activeTab === "workflow" && (
-          <WorkflowView 
-            pricingData={pricingData}
-            poHeaderData={poHeaderData}
-            poLinesData={enrichedPoLinesData}
-            deliveryData={enrichedDeliveryData}
-            customerData={customerData}
-            supplierData={supplierData}
-            productData={productData}
-            deliveryPlanData={enrichedDeliveryPlanData}
-            onProductClick={(val) => setSelectedProductDetails(val)}
-            onPoClick={(val) => setSelectedPoDetails(val)}
-          />
-        )}
-        {activeTab === "assistant" && <AssistantView />}
-        {activeTab === "tasks" && <TasksView deliveryPlanData={enrichedDeliveryPlanData} poLinesData={enrichedPoLinesData} contacts={contactData} />}
-        {activeTab === "ocr" && (
-          <OCRView 
-            pricingData={pricingData}
-            contractsData={contractsData}
-            productData={productData}
-            poHeaders={poHeaderData}
-            poLines={enrichedPoLinesData}
-            deliveryPlans={enrichedDeliveryPlanData}
-            onAddPOHeader={async (row) => await handleAddToFirestore("po_headers", row)}
-            onAddPOLines={async (rows) => { await handleBatchAddToFirestore("po_lines", rows); }}
-            onAddDelivery={async (rows) => { await handleBatchAddToFirestore("deliveries", rows); }}
-            onUpdatePOLines={async (rows) => { for (const r of rows) await handleUpdateToFirestore("po_lines", r); }}
-            onUpdateDeliveryPlan={async (rows) => { for (const r of rows) await handleUpdateToFirestore("delivery_plans", r); }}
-            onUploadToDrive={handleUploadToDrive}
-          />
-        )}
-        {activeTab === "customers" && (
-          <CustomerView 
-            initialData={customerData} 
-            contacts={contactData} 
-            targetCustomerId={targetCustomerId}
-            onClearTargetCustomer={() => setTargetCustomerId(null)}
-            onNavigateToSupplier={handleNavigateToSupplier}
-            onNavigateToContact={handleNavigateToContact}
-          />
-        )}
-        {activeTab === "suppliers" && (
-          <SupplierView 
-            initialData={supplierData} 
-            contacts={contactData} 
-            targetSupplierId={targetSupplierId}
-            onClearTargetSupplier={() => setTargetSupplierId(null)}
-            onNavigateToCustomer={handleNavigateToCustomer}
-            onNavigateToContact={handleNavigateToContact}
-          />
-        )}
-        {activeTab === "contacts" && (
-          <ContactView 
-            contacts={contactData} 
-            customers={customerData} 
-            suppliers={supplierData} 
-            products={productData}
-            poHeaders={poHeaderData}
-            deliveries={deliveryData}
-            targetContactId={targetContactId}
-            onClearTargetContact={() => setTargetContactId(null)}
-            onNavigateToCustomer={handleNavigateToCustomer}
-            onNavigateToSupplier={handleNavigateToSupplier}
-          />
-        )}
-        {activeTab === "pricing" && <TableView pricingData={pricingData} contractsData={contractsData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} title="Bảng giá 2026 (Đối chiếu từ Hợp đồng)" data={pricingData} onEdit={(row) => handleUpdateToFirestore("pricing", row)} onDelete={(row) => handleDeleteFromFirestore("pricing", row)} onProductClick={(val) => setSelectedProductDetails(val)} onPoClick={(val) => setSelectedPoDetails(val)} specsData={specsData} />}
-        {activeTab === "po" && (
-          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
-            title="Đơn hàng (PO_Header)" 
-            data={enrichedPoHeaderData} 
-            showAddButton={true} 
-            onAdd={(row) => handleAddToFirestore("po_headers", row)} 
-            onEdit={(row) => handleUpdateToFirestore("po_headers", row)} 
-            onDelete={(row) => handleDeleteFromFirestore("po_headers", row)} 
-            onProductClick={(val) => setSelectedProductDetails(val)} 
-            onPoClick={(val) => setSelectedPoDetails(val)} 
-            customers={customerData}
-            poLines={poLinesData}
-           
-          />
-        )}
-        {activeTab === "polines" && (
-          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
-            title="Chi tiết đơn (PO_Lines)" 
-            data={enrichedPoLinesData} 
-            showAddButton={true} 
-            onAdd={(row) => handleAddToFirestore("po_lines", row)} 
-            onEdit={(row) => handleUpdateToFirestore("po_lines", row)} 
-            onDelete={(row) => handleDeleteFromFirestore("po_lines", row)} 
-            onProductClick={(val) => setSelectedProductDetails(val)} 
-            onPoClick={(val) => setSelectedPoDetails(val)} 
-            poLines={poLinesData}
-            customers={customerData}
-          />
-        )}
-        {activeTab === "profit_report" && (
-          <TableView pricingData={pricingData} products={productData} suppliers={supplierData} poHeaders={poHeaderData} 
-            title="Báo cáo Lợi nhuận (Profit lines)" 
-            data={enrichedPoLinesData} 
-            showAddButton={false} 
-            onProductClick={(val) => setSelectedProductDetails(val)} 
-            onPoClick={(val) => setSelectedPoDetails(val)} 
-            poLines={poLinesData}
-            customers={customerData}
-          />
-        )}
-        {(activeTab === "logistics" || activeTab === "calendar" || activeTab === "delivery_plan" || activeTab === "delivery" || activeTab === "reconcile") && (
-          <LogisticsHubView 
-            initialSubTab={
-              activeTab === "delivery_plan" ? "plan" :
-              activeTab === "delivery" ? "delivery" :
-              activeTab === "reconcile" ? "reconcile" : "calendar"
-            }
-            deliveryPlans={enrichedDeliveryPlanData}
-            poLines={enrichedPoLinesData}
-            poHeaders={poHeaderData}
-            deliveries={enrichedDeliveryData}
-            products={productData}
-            customers={customerData}
-            suppliers={supplierData}
-            pricingData={pricingData}
-            onAddPlan={async (row) => await handleAddToFirestore("delivery_plans", row)}
-            onUpdatePlan={async (row) => await handleUpdateToFirestore("delivery_plans", row)}
-            onDeletePlan={async (row) => await handleDeleteFromFirestore("delivery_plans", row)}
-            onAddDelivery={async (row) => await handleAddToFirestore("deliveries", row)}
-            onEditDelivery={async (row) => await handleUpdateToFirestore("deliveries", row)}
-            onDeleteDelivery={async (row) => await handleDeleteFromFirestore("deliveries", row)}
-            onPoClick={(val) => setSelectedPoDetails(val)}
-            onProductClick={(val) => setSelectedProductDetails(val)}
-            onCreateCalendarEvent={handleCreateCalendarEvent}
-          />
-        )}
-        {activeTab === "products" && (
-          <ProductsView 
-            productData={productData}
-            pricingData={pricingData}
-            poLinesData={enrichedPoLinesData}
-            poHeaderData={poHeaderData}
-            deliveryData={enrichedDeliveryData}
-            deliveryPlanData={enrichedDeliveryPlanData}
-            specsData={specsData}
-            contractsData={contractsData}
-            customerData={customerData}
-            supplierData={supplierData}
-            onAddProduct={async (row) => await handleAddToFirestore("products", row)}
-            onEditProduct={async (row) => await handleUpdateToFirestore("products", row)}
-            onDeleteProduct={async (row) => await handleDeleteFromFirestore("products", row)}
-            onSelectProductDetails={(val) => setSelectedProductDetails(val)}
-            onSelectPoDetails={(val) => setSelectedPoDetails(val)}
-          />
-        )}
-        {activeTab === "specs" && (
-          <div className="p-3 sm:p-5 lg:p-8">
-            <SpecsView 
-              specsData={specsData}
-              productData={productData}
-              customerData={customerData}
-              onAdd={(row) => handleAddToFirestore("specs", row)}
-              onEdit={(row) => handleUpdateToFirestore("specs", row)}
-              onDelete={(row) => handleDeleteFromFirestore("specs", row)}
-            />
-          </div>
-        )}
-        {activeTab === "storage" && (
-          <div className="p-3 sm:p-5 lg:p-8">
-            <StorageView 
-              files={fileStorageData}
-              allData={{
-                pricingData,
-                poHeaderData,
-                poLinesData,
-                deliveryData: enrichedDeliveryData,
-                customerData,
-                supplierData,
-                contactData,
-                productData,
-                deliveryPlanData: enrichedDeliveryPlanData,
-                specsData,
-                contractsData,
-                commissionData,
-                fileStorageData
-              }}
-              onUpload={handleUploadToDrive}
-              onDelete={(id) => handleDeleteFromFirestore("file_storage", { fileId: id })}
-              onUpdateFile={(file) => handleUpdateToFirestore("file_storage", file)}
-              onPoClick={(val) => setSelectedPoDetails(val)}
-              onProductClick={(val) => setSelectedProductDetails(val)}
-            />
-          </div>
-        )}
-        {activeTab === "help" && (
-          <div className="w-full flex-1">
-            <HelpGuideView onNavigateTab={(tab) => setActiveTab(tab)} />
-          </div>
-        )}
-        {activeTab === "settings" && (
-          <div className="p-3 sm:p-5 lg:p-8">
-            <SettingsView />
-          </div>
-        )}
-        </main>
-      </div>
-
-      {/* Help Guide Modal */}
-      <HelpGuideModal
-        isOpen={isHelpModalOpen}
-        onClose={() => setIsHelpModalOpen(false)}
-        onNavigateTab={(tab) => {
-          setActiveTab(tab);
-          setIsHelpModalOpen(false);
-        }}
-      />
-
-      {/* Memory & Storage Manager Modal */}
-      <MemoryStorageModal
-        isOpen={isMemoryModalOpen}
-        onClose={() => setIsMemoryModalOpen(false)}
-        allData={{
-          pricingData,
-          poHeaderData,
-          poLinesData,
-          deliveryData: enrichedDeliveryData,
-          customerData,
-          supplierData,
-          contactData,
-          productData,
-          deliveryPlanData: enrichedDeliveryPlanData,
-          specsData,
-          contractsData,
-          commissionData,
-          fileStorageData
-        }}
-      />
-
-      {/* Mobile Floating Bottom Dock (Thumb-friendly Apple iOS Navigation) */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        onNavigate={navItemClick}
-        onOpenMenu={() => setMobileMenuOpen(true)}
-        isMenuOpen={mobileMenuOpen}
-        deliveryCount={deliveryData.length}
-        poCount={poHeaderData.length}
-      />
-
-      {selectedProductDetails && (
-        <ProductDetailModal 
-            pricingData={pricingData}
-            productNameOrId={selectedProductDetails} 
-            onClose={() => setSelectedProductDetails(null)} 
-            productData={productData}
-            poLinesData={enrichedPoLinesData}
-            deliveryPlanData={enrichedDeliveryPlanData}
-            deliveryData={enrichedDeliveryData}
-            specsData={specsData}
-            contractsData={contractsData}
-            customerData={customerData}
-            supplierData={supplierData}
-            onPoClick={(val) => setSelectedPoDetails(val)}
-        />
-      )}
-
-      {selectedPoDetails && (
-        <PODetailModal
-            poNumber={selectedPoDetails}
-            onClose={() => setSelectedPoDetails(null)}
-            poHeaderData={poHeaderData}
-            poLinesData={enrichedPoLinesData}
-            deliveryData={enrichedDeliveryData}
-            deliveryPlanData={enrichedDeliveryPlanData}
-            productData={productData}
-            pricingData={pricingData}
-            onProductClick={(val) => setSelectedProductDetails(val)}
-            onAddPOLine={(row) => handleAddToFirestore("po_lines", row)}
-        />
-      )}
-    </div>
-  );
-}
-
-function NavItem({ 
-  icon, 
-  iconBg = "bg-blue-500", 
-  label, 
-  isActive, 
-  isCollapsed = false,
-  badge,
-  badgeColor,
-  onClick 
-}: { 
-  icon: React.ReactNode, 
-  iconBg?: string, 
-  label: string, 
-  isActive: boolean, 
-  isCollapsed?: boolean,
-  badge?: string | number,
-  badgeColor?: string,
-  onClick: () => void 
-}) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.97 }}
-      onClick={onClick}
-      title={isCollapsed ? `${label}${badge !== undefined && badge !== null ? ` (${badge})` : ''}` : undefined}
-      className={clsx(
-        "relative flex items-center rounded-xl text-xs transition-all duration-150 cursor-pointer group select-none text-left",
-        isCollapsed 
-          ? "w-10 h-10 mx-auto justify-center p-0 mb-1" 
-          : "w-full gap-2.5 px-2.5 py-1.5",
-        isActive 
-          ? "text-[#007AFF] dark:text-blue-400 font-bold" 
-          : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.04] font-medium"
-      )}
-    >
-      {/* Sliding Active Pill Background with Motion layoutId */}
-      {isActive && (
-        <motion.div
-          layoutId="active-sidebar-pill"
-          className="absolute inset-0 bg-blue-500/12 dark:bg-blue-500/25 border border-blue-500/25 dark:border-blue-400/30 rounded-xl shadow-2xs -z-0"
-          transition={{ type: "spring", stiffness: 450, damping: 32 }}
-        />
-      )}
-
-      {/* Icon */}
-      <div className={clsx(
-        "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-150 group-hover:scale-105 z-10",
-        isActive 
-          ? "bg-[#007AFF] text-white shadow-xs shadow-blue-500/30" 
-          : `${iconBg} text-white shadow-2xs`
-      )}>
-        {icon}
-      </div>
-
-      {/* Expanded Label & Badges */}
-      {!isCollapsed && (
-        <div className="flex-1 flex items-center justify-between min-w-0 z-10">
-          <span className="truncate tracking-[-0.012em] font-semibold">{label}</span>
-          {badge !== undefined && badge !== null && (
-            <span className={clsx(
-              "text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-full tabular-nums shrink-0 ml-1.5",
-              isActive 
-                ? "bg-blue-600 text-white shadow-2xs" 
-                : badgeColor || "bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-slate-300/80"
-            )}>
-              {badge}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Collapsed Hover Tooltip */}
-      {isCollapsed && (
-        <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150 z-50 flex items-center gap-1.5 backdrop-blur-md">
-          <span>{label}</span>
-          {badge !== undefined && badge !== null && (
-            <span className="px-1.5 py-0.2 text-[9.5px] font-mono font-bold bg-blue-600 text-white rounded-full tabular-nums">
-              {badge}
-            </span>
-          )}
-        </div>
-      )}
-    </motion.button>
-  );
-}
-
+  GripVertical, Search, Download, PlusCircle, Trash2, Columns, X, 
+  Printer, UploadCloud, FileText, CheckCircle, Upload, Tag, 
+  ChevronRight, AlertTriangle, ChevronLeft, ChevronsLeft, ChevronsRight, 
+  Package, Scale, Percent, Users, Layers, Building2, ExternalLink, 
+  Eye, Edit3, Clock, ArrowUpDown, Check, Plus,
+  TrendingUp, DollarSign, Image as ImageIcon, Share2, RefreshCw, ArrowUpRight, Filter, Edit
+} from 'lucide-react';
+import { 
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, 
+  useSensor, useSensors 
+} from '@dnd-kit/core';
+import { 
+  SortableContext, sortableKeyboardCoordinates, 
+  verticalListSortingStrategy, useSortable, arrayMove 
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { parse, isBefore, startOfDay } from 'date-fns';
+import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'motion/react';
+import clsx from 'clsx';
+import { 
+  calculatePOLineFinances, calculateDeliveryFinances, parseNumber, 
+  parseDateToISO, formatDateForDisplay 
+} from '../lib/business-logic';
+import { exportGenericTableToPDF } from '../lib/pdf-exporter';
+import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
+import { 
+  ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal, MacTrafficLights 
+} from './index';
 
 function SortableColumnItem({ id, label, isVisible, onToggleVisibility }: { id: string; label: string; isVisible: boolean; onToggleVisibility: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -1320,14 +69,16 @@ function TableView({
   onProductClick, 
   onPoClick,
   customers = [],
-  categories = ["Nội địa", "Xuất khẩu", "Gia công", "FOC", "Khác"],
+  categories = ["Xuất khẩu", "Nội địa", "Đặt hàng mẫu", "Đơn hàng bù"],
   poLines = [],
   pricingData = [],
   specsData = [],
   poHeaders = [],
   suppliers = [],
   products = [],
-  contractsData = []
+  contractsData = [],
+  fileStorageData = [],
+  onNavigateTab
 }: { 
   title: string, 
   data: any[], 
@@ -1345,7 +96,9 @@ function TableView({
   poHeaders?: any[],
   suppliers?: any[],
   products?: any[],
-  contractsData?: any[]
+  contractsData?: any[],
+  fileStorageData?: any[],
+  onNavigateTab?: (tabId: string) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1354,6 +107,14 @@ function TableView({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileUploadModalPO, setFileUploadModalPO] = useState<any>(null);
+  const [showPOFileUploadModal, setShowPOFileUploadModal] = useState(false);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedPricingCustomer, setSelectedPricingCustomer] = useState<string>('all');
+  const [selectedPricingGroup, setSelectedPricingGroup] = useState<string>('all');
 
   const isPOHeaderTable = useMemo(() => title.includes("Đơn hàng (PO_Header)"), [title]);
   const isPOLineTable = useMemo(() => title.includes("Chi tiết đơn (PO_Lines)") || title.includes("Báo cáo Lợi nhuận"), [title]);
@@ -1583,12 +344,21 @@ function TableView({
       'Số lượng', 'Số lượng đặt', 'Số lượng giao', 'Thành tiền dòng', 'Thành tiền'
     ];
     
-    const excludeCols = ['id', 'isDeleted', 'createdAt', 'updatedAt', 'deletedAt', 'Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 'Lợi nhuận (1)', 'Bản sao Kích thước'];
+    const excludeCols = [
+      'id', 'isDeleted', 'createdAt', 'updatedAt', 'deletedAt', 
+      'Các mục mẹ 2', 'Tiến độ sản phẩm', 'Tiến độ đơn hàng', 'Đơn vị nhận hàng', 
+      'Lợi nhuận (1)', 'Bản sao Kích thước',
+      '_userModified', 'Drive_File_Id', 'File_Size', 'File_Type', 'File_Updated_At'
+    ];
     if (isPOLineTable && title.includes("Chi tiết đơn")) {
       excludeCols.push('Đơn giá nhập', 'Lợi nhuận', 'Lợi nhuận dòng');
     }
     
-    const validKeys = Array.from(allKeysSet).filter(h => !excludeCols.includes(h));
+    const validKeys = Array.from(allKeysSet).filter(h => {
+      if (excludeCols.includes(h)) return false;
+      if (h.startsWith('_')) return false; // Filter any internal system properties
+      return true;
+    });
     
     // Sort so priority keys come first in logical order
     validKeys.sort((a, b) => {
@@ -1746,8 +516,40 @@ function TableView({
     return columnOrder.filter(col => !hiddenColumns.has(col) && headers.includes(col));
   }, [columnOrder, hiddenColumns, headers]);
 
+  const pricingCustomers = useMemo(() => {
+    if (!isPricingTable) return [];
+    const custs = new Set<string>();
+    data.forEach(r => {
+      const c = r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng'];
+      if (c) custs.add(String(c).trim());
+    });
+    return Array.from(custs).sort();
+  }, [isPricingTable, data]);
+
+  const pricingGroups = useMemo(() => {
+    if (!isPricingTable) return [];
+    const groups = new Set<string>();
+    data.forEach(r => {
+      const g = r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại'];
+      if (g) groups.add(String(g).trim());
+    });
+    return Array.from(groups).sort();
+  }, [isPricingTable, data]);
+
   const filteredData = useMemo(() => {
     return data.filter(row => {
+      // Pricing Table Specific Filters (By Customer & Product Group)
+      if (isPricingTable) {
+        if (selectedPricingCustomer !== 'all') {
+          const cust = String(row['Giao đến'] || row['RP_Khách hàng'] || row['Khách hàng'] || '').trim();
+          if (cust !== selectedPricingCustomer) return false;
+        }
+        if (selectedPricingGroup !== 'all') {
+          const grp = String(row['Nhóm sản phẩm'] || row['Nhóm hàng'] || row['Phân loại'] || '').trim();
+          if (grp !== selectedPricingGroup) return false;
+        }
+      }
+
       // Column Filters match
       for (const [col, activeFilters] of Object.entries(columnFilters)) {
         if (activeFilters && activeFilters.size > 0) {
@@ -1778,7 +580,7 @@ function TableView({
       }
       return false;
     });
-  }, [data, searchTerm, columnFilters]);
+  }, [data, searchTerm, columnFilters, isPricingTable, selectedPricingCustomer, selectedPricingGroup, products]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1811,6 +613,43 @@ function TableView({
   const summaries = useMemo(() => {
     if (!data || data.length === 0) return null;
     
+    // Custom KPIs for Pricing Catalog (No total profit summing)
+    if (isPricingTable) {
+      const uniqueProducts = new Set<string>();
+      const currentCusts = new Set<string>();
+      const currentGroups = new Set<string>();
+
+      filteredData.forEach(r => {
+        const prod = r['Tên sản phẩm'] || r['Sản phẩm'] || r['Mã sản phẩm'];
+        if (prod) uniqueProducts.add(String(prod));
+        const cust = r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng'];
+        if (cust) currentCusts.add(String(cust));
+        const grp = r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại'];
+        if (grp) currentGroups.add(String(grp));
+      });
+
+      return [
+        { 
+          label: 'Tổng số sản phẩm / Đơn giá', 
+          value: `${filteredData.length} đơn giá (${uniqueProducts.size} SKU)`,
+          color: 'bg-blue-600',
+          icon: <Package size={15} />
+        },
+        { 
+          label: 'Phân loại nhóm hàng', 
+          value: `${currentGroups.size > 0 ? currentGroups.size : pricingGroups.length} nhóm sản phẩm`,
+          color: 'bg-indigo-600',
+          icon: <Layers size={15} />
+        },
+        { 
+          label: 'Khách hàng áp dụng', 
+          value: `${currentCusts.size > 0 ? currentCusts.size : pricingCustomers.length} khách hàng`,
+          color: 'bg-emerald-600',
+          icon: <Users size={15} />
+        }
+      ];
+    }
+
     const moneyCols = headers.filter(h => h.includes('Tổng giá trị') || h.includes('Doanh thu') || h.includes('Thành tiền') || h.includes('Lợi nhuận'));
     const statusCols = headers.filter(h => h === 'Trạng Thái' || h === 'Status' || h === 'Trạng thái');
 
@@ -1862,7 +701,7 @@ function TableView({
     });
 
     return metrics.slice(0, 4);
-  }, [data, headers, filteredData]);
+  }, [data, headers, filteredData, isPricingTable, pricingGroups.length, pricingCustomers.length]);
 
 
 
@@ -1940,13 +779,89 @@ function TableView({
       }
     }
 
-    // Files
+    // Files (PDF / Images / Google Drive Documents)
     if (header === 'Tệp đơn hàng' || header.includes('Tệp') || strVal.endsWith('.pdf') || strVal.endsWith('.jpg') || strVal.endsWith('.png')) {
+      const directDriveUrl = row['Drive_File_Url'] || row['File_Link'] || '';
+      const storageMatch = (fileStorageData || []).find((f: any) => 
+        (row['Đơn hàng'] && f.documentNumber === row['Đơn hàng']) ||
+        (strVal && f.fileName === strVal)
+      );
+      const driveUrl = directDriveUrl || storageMatch?.driveLink || '';
+      const isPdf = strVal.toLowerCase().endsWith('.pdf');
+      const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(strVal);
+
       return (
-         <div className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 cursor-pointer w-max">
-           <FileText size={14} />
-           <span className="truncate max-w-[150px] font-medium" title={strVal}>{strVal}</span>
-         </div>
+        <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+          {strVal ? (
+            <div className="flex items-center gap-1.5 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/70 px-2 py-1 rounded-lg transition-all">
+              {isPdf ? (
+                <FileText size={14} className="text-rose-600 shrink-0" />
+              ) : (
+                <ImageIcon size={14} className="text-blue-600 shrink-0" />
+              )}
+              <span className="truncate max-w-[130px] font-bold text-xs text-blue-900" title={strVal}>
+                {strVal}
+              </span>
+
+              {driveUrl && (
+                <>
+                  <a
+                    href={driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-blue-200/70 text-blue-700 rounded transition-colors"
+                    title="Mở file trên Google Drive"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(driveUrl);
+                        toast.success('Đã sao chép link chia sẻ Google Drive!');
+                      } catch {
+                        toast.error('Không thể tự động chép link');
+                      }
+                    }}
+                    className="p-1 hover:bg-blue-200/70 text-blue-700 rounded transition-colors cursor-pointer"
+                    title="Sao chép link chia sẻ Google Drive"
+                  >
+                    <Share2 size={12} />
+                  </button>
+                </>
+              )}
+
+              {isPOHeaderTable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFileUploadModalPO(row);
+                    setShowPOFileUploadModal(true);
+                  }}
+                  className="p-1 hover:bg-blue-200/70 text-blue-600 rounded transition-colors cursor-pointer"
+                  title="Cập nhật hoặc đổi file mới (PDF/Ảnh)"
+                >
+                  <RefreshCw size={11} />
+                </button>
+              )}
+            </div>
+          ) : isPOHeaderTable ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFileUploadModalPO(row);
+                setShowPOFileUploadModal(true);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-dashed border-blue-300 px-2 py-1 rounded-lg transition-all cursor-pointer"
+            >
+              <UploadCloud size={12} />
+              <span>+ Đính kèm PDF/Ảnh</span>
+            </button>
+          ) : (
+            <span className="text-gray-400 italic text-xs">-</span>
+          )}
+        </div>
       );
     }
 
@@ -2009,15 +924,55 @@ function TableView({
       // Proceed without confirmation since window.confirm is blocked in iframes
     }
 
+    let finalData = { ...formData };
+
+    // Tự động tải tệp lên Google Drive & tạo link chia sẻ nếu có tệp đính kèm
+    if (uploadedFile && isPOHeaderTable) {
+      const uploadToast = toast.loading('Đang tải tệp lên Google Drive & tạo link chia sẻ...');
+      try {
+        const now = new Date();
+        const year = now.getFullYear().toString();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const fileExt = uploadedFile.name.substring(uploadedFile.name.lastIndexOf('.'));
+        const poNum = String(finalData['Đơn hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
+        const cust = String(finalData['Khách hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
+        const standardizedName = `PO_${poNum}_${cust}${fileExt}`;
+
+        const uploadRes = await uploadFileDirectToGoogleDrive({
+          file: uploadedFile,
+          fileName: standardizedName,
+          documentType: 'Don_Hang_PO',
+          documentNumber: String(finalData['Đơn hàng'] || ''),
+          year,
+          month
+        });
+
+        const driveLink = uploadRes.shareLink || uploadRes.driveLink;
+        finalData['Tệp đơn hàng'] = standardizedName;
+        finalData['Drive_File_Url'] = driveLink;
+        finalData['File_Link'] = driveLink;
+        finalData['Drive_File_Id'] = uploadRes.driveFileId;
+        finalData['File_Type'] = uploadedFile.type;
+        finalData['File_Size'] = uploadedFile.size;
+        finalData['File_Updated_At'] = now.toISOString();
+
+        toast.success('🎉 Đã lưu trữ tệp lên Google Drive & tạo link chia sẻ!', { id: uploadToast });
+      } catch (driveErr: any) {
+        console.warn('Drive upload error:', driveErr);
+        toast.error(driveErr.message || 'Lỗi tải lên Drive, đang lưu dữ liệu...', { id: uploadToast });
+      }
+    }
+
     if (editingRow) {
       if (onEdit) {
         const toastId = toast.loading('Đang cập nhật...');
         try {
-          await onEdit(formData);
+          await onEdit(finalData);
           toast.success('Đã cập nhật dữ liệu!', { id: toastId });
           setIsEditModalOpen(false);
           setEditingRow(null);
           setFormData({});
+          setUploadedFile(null);
         } catch (err) {
           toast.error('Có lỗi xảy ra khi cập nhật!', { id: toastId });
         }
@@ -2026,10 +981,11 @@ function TableView({
       if (onAdd) {
         const toastId = toast.loading('Đang thêm mới...');
         try {
-          await onAdd(formData);
+          await onAdd(finalData);
           toast.success('Đã thêm mới dữ liệu!', { id: toastId });
           setIsModalOpen(false);
           setFormData({});
+          setUploadedFile(null);
         } catch (err) {
           toast.error('Có lỗi xảy ra khi thêm mới!', { id: toastId });
         }
@@ -2038,8 +994,31 @@ function TableView({
   };
 
   return (
-    <div className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-hidden relative pb-24 lg:pb-8 bg-[#F5F5F7]">
+    <div className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-8 bg-[#F5F5F7] min-h-0">
       
+      {/* Subtab Switcher: Pricing vs Contracts */}
+      {isPricingTable && (
+        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold border border-slate-300/60 shadow-2xs w-fit mb-3">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs font-bold"
+          >
+            <Package size={14} className="text-emerald-600" />
+            <span>Bảng Giá Niêm Yết 2026 ({filteredData.length})</span>
+          </button>
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('contracts')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+            >
+              <Scale size={14} className="text-blue-600" />
+              <span>Hợp Đồng & Phụ Lục ({contractsData?.length || 0}) ↗</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Apple macOS Table Title & Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 flex-shrink-0 relative">
         <div className="flex items-center gap-3">
@@ -2167,11 +1146,34 @@ function TableView({
 
           {showAddButton && (
             <button 
-              onClick={() => setIsModalOpen(true)} 
+              onClick={() => {
+                setUploadedFile(null);
+                setFormData({
+                  'Phân loại': categories[0] || 'Xuất khẩu',
+                  'Khách hàng': customerList[0] || 'Thăng Long',
+                  'Trạng Thái': 'Mới',
+                  'Tổng giá trị đơn hàng': 0
+                });
+                setIsModalOpen(true);
+              }} 
               className="flex items-center gap-1.5 bg-[#007AFF] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] active:bg-[#0051A8] transition-all shadow-xs"
             >
               <PlusCircle size={15} />
               <span>Thêm mới</span>
+            </button>
+          )}
+
+          {isPOHeaderTable && (
+            <button
+              onClick={() => {
+                setFileUploadModalPO(data[0] || null);
+                setShowPOFileUploadModal(true);
+              }}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              title="Cập nhật chứng từ PO bằng file PDF hoặc Hình ảnh lên Google Drive (kèm link chia sẻ)"
+            >
+              <UploadCloud size={15} />
+              <span>⚡ Cập nhật file PO (PDF/Ảnh)</span>
             </button>
           )}
         </div>
@@ -2217,10 +1219,127 @@ function TableView({
             ))}
           </div>
         )}
+
+        {/* Pricing Table Custom Filter Section (By Customer & By Product Group) */}
+        {isPricingTable && (
+          <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/60">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package size={14} className="text-blue-600" /> Phân Loại Danh Mục Đơn Giá & Khách Hàng
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Lọc nhanh theo Khách hàng và Nhóm sản phẩm để tra cứu đơn giá mua/bán chính xác
+                </p>
+              </div>
+
+              {onNavigateTab && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('contracts')}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Scale size={13} />
+                    <span>Hợp Đồng Mua / Bán ↗</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('commissions')}
+                    className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Percent size={13} />
+                    <span>Hoa Hồng (3 Cách) ↗</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {/* Filter By Customer */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                  <Users size={12} className="text-sky-600" /> Theo Khách hàng ({pricingCustomers.length}):
+                </span>
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPricingCustomer('all')}
+                    className={clsx(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                      selectedPricingCustomer === 'all'
+                        ? "bg-blue-600 text-white shadow-2xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    Tất cả ({data.length})
+                  </button>
+                  {pricingCustomers.map(c => {
+                    const count = data.filter(r => (r['Giao đến'] || r['RP_Khách hàng'] || r['Khách hàng']) === c).length;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSelectedPricingCustomer(c)}
+                        className={clsx(
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                          selectedPricingCustomer === c
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {c} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Filter By Product Group */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                  <Layers size={12} className="text-indigo-600" /> Theo Nhóm hàng ({pricingGroups.length}):
+                </span>
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPricingGroup('all')}
+                    className={clsx(
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                      selectedPricingGroup === 'all'
+                        ? "bg-indigo-600 text-white shadow-2xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    Tất cả nhóm ({data.length})
+                  </button>
+                  {pricingGroups.map(g => {
+                    const count = data.filter(r => (r['Nhóm sản phẩm'] || r['Nhóm hàng'] || r['Phân loại']) === g).length;
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setSelectedPricingGroup(g)}
+                        className={clsx(
+                          "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0",
+                          selectedPricingGroup === g
+                            ? "bg-indigo-600 text-white shadow-2xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        )}
+                      >
+                        {g} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Apple Inset-Grouped Table Container */}
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] flex-1 overflow-hidden flex flex-col min-h-[360px]">
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-black/[0.06] md:flex-1 md:overflow-hidden flex flex-col md:min-h-[360px]">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-auto flex-1">
           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
@@ -2316,6 +1435,7 @@ function TableView({
                   <tr 
                     key={rowId} 
                     onClick={() => {
+                      setUploadedFile(null);
                       setEditingRow(row);
                       setFormData({ ...row });
                       setIsEditModalOpen(true);
@@ -2359,7 +1479,7 @@ function TableView({
         </div>
 
         {/* Mobile Apple Inset-Grouped Card Feed */}
-        <div className="md:hidden overflow-y-auto flex-1 space-y-2.5 p-2.5 bg-[#F5F5F7]">
+        <div className="md:hidden space-y-2.5 p-2.5 bg-[#F5F5F7]">
           {paginatedData.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 text-center text-slate-400 border border-black/[0.06] text-xs">
               Không có dữ liệu phù hợp với bộ lọc.
@@ -2534,9 +1654,24 @@ function TableView({
                         )}
 
                         {contractNum && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateTab?.('contracts');
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 px-2 py-0.5 rounded border border-indigo-200/60 transition-colors cursor-pointer"
+                            title="Bấm để chuyển sang xem chi tiết Hợp đồng"
+                          >
                             <FileText size={10} />
-                            <span>HĐ: {contractNum}</span>
+                            <span>HĐ: {contractNum} ↗</span>
+                          </button>
+                        )}
+
+                        {(row["Thiếu chứng từ gốc"] || (!row.driveLink && !row["File chứng từ"] && !row["Ảnh BBGH"] && (row["Trạng thái"] === "Đã giao" || row["Trạng Thái"] === "Đã giao" || row["Số PXK"]))) && (
+                          <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded" title="Chưa đính kèm file scan BBGH/PXK gốc">
+                            <AlertTriangle size={10} className="text-amber-500 shrink-0" />
+                            <span>Thiếu chứng từ gốc</span>
                           </span>
                         )}
                       </div>
@@ -2641,7 +1776,15 @@ function TableView({
             <div className="p-6 overflow-y-auto flex-1">
               <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {headers.filter(h => {
-                  if (h === 'STT' || h === 'id') return false;
+                  if (h === 'STT' || h === 'id' || h === 'isDeleted' || h.startsWith('_')) return false;
+
+                  // Technical metadata fields that are handled automatically in the background
+                  const technicalFields = [
+                    '_userModified', 'Drive_File_Id', 'Drive_File_Url', 'File_Link', 
+                    'File_Size', 'File_Type', 'File_Updated_At', 'Drive_Folder_Id', 'Chi tiết đơn hàng'
+                  ];
+                  if (technicalFields.includes(h)) return false;
+
                   if (isPOLineTable) {
                     const allowedFields = [
                       'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
@@ -2649,7 +1792,24 @@ function TableView({
                     ];
                     return allowedFields.includes(h);
                   }
+
+                  if (isPOHeaderTable) {
+                    const allowedHeaderFields = [
+                      'Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng',
+                      'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'
+                    ];
+                    return allowedHeaderFields.includes(h);
+                  }
+
                   return true;
+                }).sort((a, b) => {
+                  if (isPOHeaderTable) {
+                    const order = ['Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng', 'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'];
+                    const ia = order.indexOf(a);
+                    const ib = order.indexOf(b);
+                    if (ia !== -1 && ib !== -1) return ia - ib;
+                  }
+                  return 0;
                 }).map(h => {
                   // Common inputs based on field names
                   if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {
@@ -2799,22 +1959,107 @@ function TableView({
                     );
                   }
 
-                  if (h === 'Tệp đơn hàng') {
+                  if (h === 'Tệp đơn hàng' || h === 'Tệp đính kèm' || h === 'File') {
+                    const currentVal = formData[h] || '';
                     return (
-                      <div key={h} className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium text-gray-700">{h}</label>
-                        <div className="relative group">
-                          <input 
-                            type="text" 
-                            placeholder="Tên tệp đính kèm..."
-                            className="border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all w-full"
-                            value={formData[h] || ''}
-                            onChange={(e) => handleTextChange(e, h)}
-                          />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-                             <Upload size={16} />
+                      <div key={h} className="flex flex-col gap-1.5 col-span-1 sm:col-span-2">
+                        <label className="text-sm font-medium text-gray-700 flex items-center justify-between">
+                          <span>{h}</span>
+                          {uploadedFile && (
+                            <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle size={13} /> Sẵn sàng đính kèm
+                            </span>
+                          )}
+                        </label>
+                        
+                        <input
+                          type="file"
+                          ref={addFileInputRef}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setUploadedFile(file);
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                [h]: file.name
+                              }));
+                              toast.success(`Đã chọn tệp: ${file.name}`);
+                            }
+                          }}
+                        />
+
+                        {uploadedFile || currentVal ? (
+                          <div className="flex items-center justify-between p-3 bg-blue-50/80 border border-blue-200 rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <FileText size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-blue-950 truncate" title={uploadedFile ? uploadedFile.name : currentVal}>
+                                  {uploadedFile ? uploadedFile.name : currentVal}
+                                </p>
+                                <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                  {uploadedFile ? `${(uploadedFile.size / 1024).toFixed(1)} KB • Tệp tải lên` : 'Tệp chứng từ đính kèm'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => addFileInputRef.current?.click()}
+                                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                              >
+                                <Upload size={13} />
+                                Đổi tệp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadedFile(null);
+                                  setFormData((prev: any) => ({ ...prev, [h]: '' }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Xóa tệp"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div
+                            onClick={() => addFileInputRef.current?.click()}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                const file = e.dataTransfer.files[0];
+                                setUploadedFile(file);
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  [h]: file.name
+                                }));
+                                toast.success(`Đã chọn tệp: ${file.name}`);
+                              }
+                            }}
+                            className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50/70 hover:bg-blue-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:border-blue-300 transition-all">
+                              <Upload size={18} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700">
+                                Nhấp để chọn tệp hoặc kéo thả vào đây
+                              </p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">
+                                Hỗ trợ PDF, Word (.docx), Excel (.xlsx), Hình ảnh scan (.png, .jpg)
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -2937,7 +2182,15 @@ function TableView({
             <div className="flex-1 overflow-auto p-6 space-y-4">
               <form id="edit-form-side" onSubmit={handleSubmit} className="space-y-4">
                 {headers.filter(h => {
-                  if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT') return false;
+                  if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT' || h.startsWith('_')) return false;
+
+                  // Technical metadata fields that are handled automatically in the background
+                  const technicalFields = [
+                    '_userModified', 'Drive_File_Id', 'Drive_File_Url', 'File_Link', 
+                    'File_Size', 'File_Type', 'File_Updated_At', 'Drive_Folder_Id', 'Chi tiết đơn hàng'
+                  ];
+                  if (technicalFields.includes(h)) return false;
+
                   if (isPOLineTable) {
                     const allowedFields = [
                       'Số đơn hàng', 'Đơn hàng', 'Mã giá bán', 'Tên sản phẩm', 'Sản phẩm',
@@ -2945,7 +2198,24 @@ function TableView({
                     ];
                     return allowedFields.includes(h);
                   }
+
+                  if (isPOHeaderTable) {
+                    const allowedHeaderFields = [
+                      'Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng',
+                      'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'
+                    ];
+                    return allowedHeaderFields.includes(h);
+                  }
+
                   return true;
+                }).sort((a, b) => {
+                  if (isPOHeaderTable) {
+                    const order = ['Phân loại', 'Khách hàng', 'Đơn hàng', 'Ngày đặt hàng', 'Tổng giá trị đơn hàng', 'Trạng Thái', 'Tệp đơn hàng', 'Ghi chú'];
+                    const ia = order.indexOf(a);
+                    const ib = order.indexOf(b);
+                    if (ia !== -1 && ib !== -1) return ia - ib;
+                  }
+                  return 0;
                 }).map(h => {
                   // Reuse logic for edit form
                   if (h === 'Ngày đặt hàng' || h === 'Ngày giao' || h.includes('Ngày')) {
@@ -3111,6 +2381,111 @@ function TableView({
                     );
                   }
 
+                  if (h === 'Tệp đơn hàng' || h === 'Tệp đính kèm' || h === 'File') {
+                    const currentVal = formData[h] || '';
+                    return (
+                      <div key={h} className="space-y-1.5 col-span-1 sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center justify-between">
+                          <span>{h}</span>
+                          {uploadedFile && (
+                            <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle size={13} /> Sẵn sàng đính kèm
+                            </span>
+                          )}
+                        </label>
+                        
+                        <input
+                          type="file"
+                          ref={editFileInputRef}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              setUploadedFile(file);
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                [h]: file.name
+                              }));
+                              toast.success(`Đã chọn tệp: ${file.name}`);
+                            }
+                          }}
+                        />
+
+                        {uploadedFile || currentVal ? (
+                          <div className="flex items-center justify-between p-3 bg-blue-50/80 border border-blue-200 rounded-xl">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <FileText size={18} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-blue-950 truncate" title={uploadedFile ? uploadedFile.name : currentVal}>
+                                  {uploadedFile ? uploadedFile.name : currentVal}
+                                </p>
+                                <p className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                  {uploadedFile ? `${(uploadedFile.size / 1024).toFixed(1)} KB • Tệp tải lên` : 'Tệp chứng từ đính kèm'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => editFileInputRef.current?.click()}
+                                className="px-2.5 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1"
+                              >
+                                <Upload size={13} />
+                                Đổi tệp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUploadedFile(null);
+                                  setFormData((prev: any) => ({ ...prev, [h]: '' }));
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Xóa tệp"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => editFileInputRef.current?.click()}
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                const file = e.dataTransfer.files[0];
+                                setUploadedFile(file);
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  [h]: file.name
+                                }));
+                                toast.success(`Đã chọn tệp: ${file.name}`);
+                              }
+                            }}
+                            className="border-2 border-dashed border-gray-300 hover:border-blue-500 bg-gray-50/70 hover:bg-blue-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:border-blue-300 transition-all">
+                              <Upload size={18} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700">
+                                Nhấp để chọn tệp hoặc kéo thả vào đây
+                              </p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">
+                                Hỗ trợ PDF, Word (.docx), Excel (.xlsx), Hình ảnh scan (.png, .jpg)
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={h} className="space-y-1.5">
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{h}</label>
@@ -3166,7 +2541,7 @@ function TableView({
                 </button>
                 <button 
                   onClick={() => { setIsEditModalOpen(false); setEditingRow(null); }}
-                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -3175,193 +2550,28 @@ function TableView({
           </motion.div>
         </div>
       )}
+
+      {/* PO File Upload & Drive Sync Modal */}
+      {isPOHeaderTable && (
+        <POFileUploadModal
+          isOpen={showPOFileUploadModal}
+          onClose={() => {
+            setShowPOFileUploadModal(false);
+            setFileUploadModalPO(null);
+          }}
+          poHeader={fileUploadModalPO || data[0] || null}
+          allPOHeaders={data}
+          onSelectPO={(po) => setFileUploadModalPO(po)}
+          onUpdatePOHeader={async (updated) => {
+            if (onEdit) {
+              await onEdit(updated);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function AssistantView() {
-  const INITIAL_MESSAGE = { role: "model", content: "Xin chào! Tôi là TSG Business Assistant. Bạn có thể tra cứu giá, xem báo cáo tổng quan, phân tích lợi nhuận hoặc gửi ảnh/PDF Đơn hàng PO, Phiếu xuất kho để tôi xử lý giúp bạn." };
-  
-  const [messages, setMessages] = useState<{role: string, content: string, file?: File}[]>([
-    INITIAL_MESSAGE
-  ]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
-
-  const handleSendPrompt = async (promptText: string, fileAttachment?: File) => {
-    if ((!promptText.trim() && !fileAttachment) || isLoading) return;
-
-    const newMessages = [...messages, { role: "user", content: promptText, file: fileAttachment || undefined }];
-    setMessages(newMessages);
-    setInput("");
-    const fileToSend = fileAttachment || selectedFile;
-    setSelectedFile(null);
-    setIsLoading(true);
-
-    try {
-      const responseText = await sendGeminiPrompt({
-        prompt: promptText,
-        systemInstruction: FULL_SYSTEM_PROMPT,
-        history: newMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
-        file: fileToSend || undefined
-      });
-      
-      setMessages(prev => [...prev, { role: "model", content: responseText }]);
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: "model", content: `❌ Lỗi xử lý Trợ lý AI: ${err.message}` }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSendPrompt(input, selectedFile || undefined);
-  };
-
-  const handleClearChat = () => {
-    setMessages([INITIAL_MESSAGE]);
-    setSelectedFile(null);
-    setInput("");
-  };
-
-  const quickPrompts = [
-    "📊 Báo cáo tổng quan",
-    "💰 Tra giá TH130/07 cho Thăng Long",
-    "📦 Trạng thái đơn 26/KHVT/0600",
-    "⚠️ Sự cố giao hàng",
-    "💰 Phân tích lợi nhuận theo NCC"
-  ];
-
-  return (
-    <div className="flex flex-col h-full bg-slate-50 relative">
-      {/* Header */}
-      <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
-            <Bot size={20} />
-          </div>
-          <div>
-            <h2 className="font-semibold text-slate-800 text-base leading-tight">Trợ lý Vận hành TSG</h2>
-            <p className="text-xs text-slate-500">Được hỗ trợ bởi Gemini 3.6 Flash</p>
-          </div>
-        </div>
-        <button
-          onClick={handleClearChat}
-          className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-all font-medium"
-          title="Xóa lịch sử trò chuyện"
-        >
-          Xóa trò chuyện
-        </button>
-      </div>
-      
-      {/* Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={clsx("flex gap-3 md:gap-4 max-w-4xl mx-auto", msg.role === "user" ? "flex-row-reverse" : "")}>
-            <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold shadow-xs", msg.role === "user" ? "bg-blue-600 text-white" : "bg-slate-800 text-white")}>
-              {msg.role === "user" ? "BẠN" : <Bot size={18} />}
-            </div>
-            <div className={clsx("flex flex-col gap-2 max-w-[85%] md:max-w-[80%]", msg.role === "user" ? "items-end" : "items-start")}>
-              {msg.file && (
-                <div className="bg-slate-100 text-slate-700 rounded-lg p-2.5 text-xs flex items-center gap-2 border border-slate-200 shadow-2xs">
-                  <FileText size={15} className="text-blue-600" />
-                  <span className="truncate max-w-xs font-medium">{msg.file.name}</span>
-                </div>
-              )}
-              {msg.content && (
-                <div className={clsx("rounded-2xl px-5 py-3.5 text-[14.5px] leading-relaxed shadow-xs transition-all duration-200", msg.role === "user" ? "bg-blue-600 text-white rounded-tr-xs" : "bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs")}>
-                  {msg.role === "user" ? (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  ) : (
-                    <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-strong:text-slate-900 prose-table:text-xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {isLoading && (
-          <div className="flex gap-4 max-w-4xl mx-auto">
-            <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-              <Bot size={18} />
-            </div>
-            <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-600 flex items-center gap-2.5 shadow-2xs text-sm">
-              <Loader2 size={16} className="animate-spin text-blue-600" />
-              <span>Đang truy xuất dữ liệu & suy luận...</span>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Action Chips & Input Area */}
-      <div className="p-3 md:p-4 bg-white border-t border-slate-200 space-y-3">
-        {/* Quick Prompts */}
-        <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
-          <span className="text-slate-400 font-medium flex-shrink-0">Gợi ý nhanh:</span>
-          {quickPrompts.map((qp, qpIdx) => (
-            <button
-              key={qpIdx}
-              type="button"
-              onClick={() => handleSendPrompt(qp)}
-              disabled={isLoading}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border border-slate-200 rounded-full font-medium transition-all whitespace-nowrap flex-shrink-0 disabled:opacity-50 cursor-pointer"
-            >
-              {qp}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex items-end gap-2.5 relative">
-          <label className="cursor-pointer p-3 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors flex-shrink-0 border border-slate-200 bg-slate-50" title="Tải lên tài liệu (PO, PXK, Ảnh/PDF)">
-            <input type="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} accept="image/*,application/pdf" />
-            <Upload size={18} />
-          </label>
-          <div className="flex-1 relative">
-             {selectedFile && (
-               <div className="absolute bottom-full mb-2 left-0 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 border border-blue-200 shadow-xs">
-                 <FileText size={14} />
-                 <span className="truncate max-w-[200px]">{selectedFile.name}</span>
-                 <button type="button" onClick={() => setSelectedFile(null)} className="ml-1 hover:text-blue-900 text-sm font-bold">&times;</button>
-               </div>
-             )}
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Nhập câu hỏi hoặc yêu cầu cho Trợ lý TSG (VD: Báo cáo tổng quan, Tra giá...)..."
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[48px] max-h-32 text-slate-800 placeholder-slate-400"
-              rows={input.split('\n').length > 1 ? Math.min(input.split('\n').length, 4) : 1}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={(!input.trim() && !selectedFile) || isLoading}
-            className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0 shadow-xs flex items-center justify-center cursor-pointer"
-          >
-            <Send size={18} />
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
+export default TableView;
+export { TableView };

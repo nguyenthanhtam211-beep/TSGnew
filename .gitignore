@@ -7,3 +7,12 @@ coverage/
 .env*
 !.env.example
 push.command
+
+# Business data & local databases (keep out of git; store in Google Drive instead)
+backups/
+dev.db
+*.db
+*.xlsx
+sheet_analysis_dump.json
+sheet_gviz.csv
+*.tar.gz

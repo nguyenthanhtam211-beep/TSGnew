@@ -4,7 +4,7 @@ import {
   AlertTriangle, ArrowUpRight, DollarSign, Download, Eye, Edit3, 
   Trash2, Sparkles, Scale, Building2, User, ChevronRight, FileCheck,
   Paperclip, Tag, ArrowRight, ShieldCheck, Upload, Camera, Loader2,
-  Bot, Zap, Check, Layers, RefreshCw, CheckSquare
+  Bot, Zap, Check, Layers, RefreshCw, CheckSquare, Package, X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
@@ -59,6 +59,7 @@ interface ContractsViewProps {
   onAddContract?: (contract: ContractItem) => Promise<void>;
   onUpdateContract?: (contract: ContractItem) => Promise<void>;
   onDeleteContract?: (contract: ContractItem) => Promise<void>;
+  onNavigateToPricing?: () => void;
 }
 
 export default function ContractsView({
@@ -68,7 +69,8 @@ export default function ContractsView({
   supplierData = [],
   onAddContract,
   onUpdateContract,
-  onDeleteContract
+  onDeleteContract,
+  onNavigateToPricing
 }: ContractsViewProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'customer' | 'supplier' | 'audit'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -472,36 +474,71 @@ export default function ContractsView({
 
   return (
     <div className="flex-1 bg-[#F5F5F7] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
+      {/* Subtab Segmented Control: Pricing vs Contracts */}
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-black/[0.06] px-3 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0">
+          {onNavigateToPricing && (
+            <button
+              type="button"
+              onClick={onNavigateToPricing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+            >
+              <Package size={14} className="text-emerald-600" />
+              <span>Bảng Giá Niêm Yết 2026</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-2xs font-bold"
+          >
+            <Scale size={14} className="text-blue-600" />
+            <span>Hợp Đồng & Phụ Lục ({contractsData.length})</span>
+          </button>
+        </div>
+
+        {onNavigateToPricing && (
+          <button
+            type="button"
+            onClick={onNavigateToPricing}
+            className="hidden md:flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 px-2.5 py-1 rounded-lg transition-all"
+          >
+            <Package size={12} />
+            <span>Xem Bảng Giá ({pricingData.length} mã) ↗</span>
+          </button>
+        )}
+      </div>
+
       {/* Top Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-black/[0.06] px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-black/[0.06] px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
               Pháp lý & Bảng Giá
             </span>
-            <h1 className="text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
+            <h1 className="text-base sm:text-xl font-bold text-[#1D1D1F] dark:text-white tracking-tight">Hợp Đồng & Phụ Lục Kinh Tế</h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
             Quét OCR hợp đồng, tóm tắt điều khoản AI, trích xuất bảng đơn giá cam kết và đối chiếu chéo Bảng Giá 2026
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => {
               setIsOcrModalOpen(true);
               if (!ocrContractResult) handleLoadSampleContract('ThangLong');
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all"
           >
-            <Sparkles size={15} className="animate-pulse" />
-            <span>Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá</span>
+            <Sparkles size={14} className="animate-pulse" />
+            <span className="hidden sm:inline">Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá</span>
+            <span className="sm:hidden">Quét OCR HĐ</span>
           </button>
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-2xs active:scale-95 transition-all"
+            className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold shadow-2xs active:scale-95 transition-all"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             <span>Thêm HĐ</span>
           </button>
         </div>
@@ -706,96 +743,98 @@ export default function ContractsView({
                   })}
                 </div>
 
-                {/* Desktop Table (Visible on sm and above) */}
-                <table className="hidden sm:table w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06] z-10">
-                    <tr>
-                      <th className="py-3 px-4">Số Hợp Đồng</th>
-                      <th className="py-3 px-4">Đối Tác</th>
-                      <th className="py-3 px-4">Loại HĐ</th>
-                      <th className="py-3 px-4">Ngày Ký</th>
-                      <th className="py-3 px-4">Thời Hạn</th>
-                      <th className="py-3 px-4 text-right">Giá Trị (VNĐ)</th>
-                      <th className="py-3 px-4 text-center">Trạng Thái</th>
-                      <th className="py-3 px-4 text-center">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04]">
-                    {filteredContracts.map((contract, index) => {
-                      const isSelected = selectedContract?.id === contract.id;
-                      return (
-                        <tr
-                          key={contract.id || index}
-                          onClick={() => setSelectedContract(contract)}
-                          className={clsx(
-                            "hover:bg-blue-50/50 cursor-pointer transition-colors",
-                            isSelected ? "bg-blue-50/70" : ""
-                          )}
-                        >
-                          <td className="py-3 px-4 font-mono font-bold text-blue-600">
-                            {contract.contractNumber}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <CompanyLogo name={contract.partnerName} size="sm" />
-                              <div>
-                                <p className="font-bold text-slate-900 truncate max-w-[180px]">{contract.partnerName}</p>
-                                <span className="text-[10px] text-slate-400">{contract.partnerType}</span>
+                {/* Desktop Table (Visible on sm and above with horizontal scroll) */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 bg-[#F5F5F7] text-slate-500 font-semibold border-b border-black/[0.06] z-10">
+                      <tr>
+                        <th className="py-3 px-4">Số Hợp Đồng</th>
+                        <th className="py-3 px-4">Đối Tác</th>
+                        <th className="py-3 px-4">Loại HĐ</th>
+                        <th className="py-3 px-4">Ngày Ký</th>
+                        <th className="py-3 px-4">Thời Hạn</th>
+                        <th className="py-3 px-4 text-right">Giá Trị (VNĐ)</th>
+                        <th className="py-3 px-4 text-center">Trạng Thái</th>
+                        <th className="py-3 px-4 text-center">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04]">
+                      {filteredContracts.map((contract, index) => {
+                        const isSelected = selectedContract?.id === contract.id;
+                        return (
+                          <tr
+                            key={contract.id || index}
+                            onClick={() => setSelectedContract(contract)}
+                            className={clsx(
+                              "hover:bg-blue-50/50 cursor-pointer transition-colors",
+                              isSelected ? "bg-blue-50/70" : ""
+                            )}
+                          >
+                            <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                              {contract.contractNumber}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <CompanyLogo name={contract.partnerName} size="sm" />
+                                <div>
+                                  <p className="font-bold text-slate-900 truncate max-w-[180px]">{contract.partnerName}</p>
+                                  <span className="text-[10px] text-slate-400">{contract.partnerType}</span>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[11px]">
-                              {contract.contractType}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-slate-600">
-                            {formatDateForDisplay(contract.signDate)}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600">
-                            {formatDateForDisplay(contract.expirationDate) || 'Vô thời hạn'}
-                          </td>
-                          <td className="py-3 px-4 text-right font-bold text-slate-900">
-                            {contract.totalValue ? formatVND(contract.totalValue) : 'Theo đơn đặt'}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={clsx(
-                              "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
-                              contract.status === 'Hiệu lực' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                              contract.status === 'Hết hạn' ? "bg-red-50 text-red-700 border border-red-200" :
-                              "bg-amber-50 text-amber-700 border border-amber-200"
-                            )}>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[11px]">
+                                {contract.contractType}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {formatDateForDisplay(contract.signDate)}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {formatDateForDisplay(contract.expirationDate) || 'Vô thời hạn'}
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-slate-900">
+                              {contract.totalValue ? formatVND(contract.totalValue) : 'Theo đơn đặt'}
+                            </td>
+                            <td className="py-3 px-4 text-center">
                               <span className={clsx(
-                                "w-1.5 h-1.5 rounded-full",
-                                contract.status === 'Hiệu lực' ? "bg-emerald-500" :
-                                contract.status === 'Hết hạn' ? "bg-red-500" : "bg-amber-500"
-                              )} />
-                              {contract.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-                              <button
-                                onClick={() => handleOpenEdit(contract)}
-                                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                title="Chỉnh sửa"
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(contract)}
-                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                title="Xóa"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                                contract.status === 'Hiệu lực' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                contract.status === 'Hết hạn' ? "bg-red-50 text-red-700 border border-red-200" :
+                                "bg-amber-50 text-amber-700 border border-amber-200"
+                              )}>
+                                <span className={clsx(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  contract.status === 'Hiệu lực' ? "bg-emerald-500" :
+                                  contract.status === 'Hết hạn' ? "bg-red-500" : "bg-amber-500"
+                                )} />
+                                {contract.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handleOpenEdit(contract)}
+                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                  title="Chỉnh sửa"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(contract)}
+                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                  title="Xóa"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </div>
@@ -1017,8 +1056,14 @@ export default function ContractsView({
 
       {/* Mobile Detail Modal Sheet */}
       {isMobileDetailOpen && selectedContract && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 border border-black/[0.08]">
+        <div 
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setIsMobileDetailOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 border border-black/[0.08]"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
               <div className="flex items-center gap-3">
                 <MacTrafficLights onClose={() => setIsMobileDetailOpen(false)} />
@@ -1028,16 +1073,25 @@ export default function ContractsView({
                   Chi Tiết Hợp Đồng
                 </h3>
               </div>
-              <button
-                onClick={() => {
-                  setIsMobileDetailOpen(false);
-                  handleOpenEdit(selectedContract);
-                }}
-                className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1"
-              >
-                <Edit3 size={13} />
-                Sửa
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsMobileDetailOpen(false);
+                    handleOpenEdit(selectedContract);
+                  }}
+                  className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1"
+                >
+                  <Edit3 size={13} />
+                  Sửa
+                </button>
+                <button
+                  onClick={() => setIsMobileDetailOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
+                  aria-label="Đóng"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -1203,10 +1257,16 @@ export default function ContractsView({
 
       {/* Add / Edit Contract Modal - Apple macOS Window Style */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[90vh] flex flex-col">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Apple Header */}
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
+            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
               <div className="flex items-center gap-3">
                 <MacTrafficLights onClose={() => setIsModalOpen(false)} />
                 <div className="h-4 w-px bg-black/[0.08]" />
@@ -1215,6 +1275,14 @@ export default function ContractsView({
                   {editingContract ? 'Cập Nhật Hợp Đồng' : 'Thêm Hợp Đồng Mới'}
                 </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
+                aria-label="Đóng"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             {/* Modal Body */}
@@ -1464,10 +1532,16 @@ export default function ContractsView({
 
       {/* AI Contract OCR & Price Cross-Reference Modal */}
       {isOcrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[92vh] flex flex-col">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsOcrModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[92vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
+            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
               <div className="flex items-center gap-3">
                 <MacTrafficLights onClose={() => setIsOcrModalOpen(false)} />
                 <div className="h-4 w-px bg-black/[0.08]" />
@@ -1476,9 +1550,19 @@ export default function ContractsView({
                   <span>Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)</span>
                 </h3>
               </div>
-              <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200/50">
-                Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-block text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200/50">
+                  Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsOcrModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
+                  aria-label="Đóng"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}

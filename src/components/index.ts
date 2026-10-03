@@ -17,6 +17,8 @@ export { default as ContractsView } from "./ContractsView";
 export { default as CommissionView } from "./CommissionView";
 export { default as ProductsView } from "./ProductsView";
 export { default as FactoryManagementView } from "./FactoryManagementView";
+export { default as TableView } from "./TableView";
+export { default as AssistantView } from "./AssistantView";
 
 // Navigation & Layout Shell (Milestone M2)
 export { default as Breadcrumbs, Breadcrumbs as BreadcrumbNav } from "./Breadcrumbs";

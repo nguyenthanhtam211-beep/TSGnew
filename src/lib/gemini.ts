@@ -8,7 +8,7 @@ import { GoogleGenAI } from '@google/genai';
 const STORAGE_KEY_GEMINI = 'gemini_api_key';
 
 export function getStoredGeminiKey(): string {
-  return localStorage.getItem(STORAGE_KEY_GEMINI) || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  return localStorage.getItem(STORAGE_KEY_GEMINI) || '';
 }
 
 export function setStoredGeminiKey(key: string): void {

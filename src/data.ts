@@ -1553,3 +1553,96 @@ export const INITIAL_SPECS_DATA = [
     ]
   }
 ];
+
+export const INITIAL_CONTRACTS_DATA = [
+  {
+    id: "contract_177_tltl",
+    contractNumber: "177/HĐ-TLTL",
+    title: "Hợp đồng mua bán bao bì carton & vỏ hộp thuốc lá năm 2026",
+    partnerName: "Công ty TNHH MTV Thuốc lá Thăng Long",
+    partnerType: "Khách hàng",
+    contractType: "Bán hàng",
+    signDate: "2026-01-15",
+    effectiveDate: "2026-01-15",
+    expirationDate: "2026-12-31",
+    totalValue: 580000000,
+    paymentTerms: "Chuyển khoản trong vòng 30 ngày kể từ ngày nhận đủ hóa đơn GTGT hợp lệ",
+    deliveryTerms: "Giao hàng theo từng đợt tại kho bên mua - KCN Thạch Thất, Hà Nội",
+    aiExecutiveSummary: "• Hợp đồng nguyên tắc cung ứng bao bì carton và vỏ hộp thuốc lá Thăng Long năm 2026.\n• Đơn giá ký kết cố định trong 12 tháng, làm căn cứ áp bảng giá niêm yết Gsp_082.\n• Điều khoản thanh toán 30 ngày chuyển khoản sau đối soát hóa đơn GTGT.\n• Cam kết bảo hành chất lượng in ấn và định lượng giấy 100% theo tiêu chuẩn Specs ký duyệt.",
+    status: "Hiệu lực",
+    attachmentName: "177_HD_TLTL_2026_Signed.pdf",
+    attachmentUrl: "https://drive.google.com/drive/search?q=177/H%C4%90-TLTL",
+    products: [
+      { productCode: "TH130/07", productName: "Thùng Thăng Long Bao cứng TH130/07", unit: "Cái", contractPrice: 12155, quantity: 50000, notes: "Khớp mã Gsp_082" },
+      { productCode: "TH25/07", productName: "Thùng Thăng Long bao mềm TH25/07", unit: "Cái", contractPrice: 10861, quantity: 30000, notes: "Khớp mã Gsp_083" },
+      { productCode: "TH211/05", productName: "Thùng Thăng Long Slim bao cứng TH211/05", unit: "Cái", contractPrice: 16756, quantity: 20000, notes: "Khớp mã Gsp_084" }
+    ]
+  },
+  {
+    id: "contract_102_tlbs",
+    contractNumber: "102/HĐ2026-TLBS-TS",
+    title: "Hợp đồng mua bán thùng carton chịu lực Bắc Sơn",
+    partnerName: "Công ty Thuốc lá Bắc Sơn",
+    partnerType: "Khách hàng",
+    contractType: "Bán hàng",
+    signDate: "2026-01-20",
+    effectiveDate: "2026-01-20",
+    expirationDate: "2026-12-31",
+    totalValue: 420000000,
+    paymentTerms: "Thanh toán theo từng lệnh PO trong vòng 15 ngày sau đối soát công nợ",
+    deliveryTerms: "Giao tại kho bên bán (FOB Kho TSG Hà Nội)",
+    aiExecutiveSummary: "• Hợp đồng mua bán bao bì carton chịu lực 5 lớp đặc chủng cho nhà máy Bắc Sơn.\n• Đơn giá tính theo xuất xưởng (FOB); bên mua tự chịu trách nhiệm điều xe vận tải.\n• Đối soát công nợ định kỳ vào ngày 25 hàng tháng.",
+    status: "Hiệu lực",
+    attachmentName: "102_HD2026_TLBS_TS.pdf",
+    attachmentUrl: "https://drive.google.com/drive/search?q=102/H%C4%902026-TLBS-TS",
+    products: [
+      { productCode: "C5-15", productName: " Thùng V5 (Red-XK)", unit: "Cái", contractPrice: 15600, quantity: 40000, notes: "Khớp mã Gsp_088" },
+      { productCode: "C5-16", productName: " Thùng Laguna (Red-XK) ", unit: "Cái", contractPrice: 15600, quantity: 30000, notes: "Khớp mã Gsp_089" }
+    ]
+  },
+  {
+    id: "contract_01_tlth",
+    contractNumber: "01/HĐ-TLTH",
+    title: "Hợp đồng kinh tế cung ứng nhãn bao & thùng carton",
+    partnerName: "Công ty Thuốc lá Thanh Hóa",
+    partnerType: "Khách hàng",
+    contractType: "Bán hàng",
+    signDate: "2026-02-01",
+    effectiveDate: "2026-02-01",
+    expirationDate: "2026-12-31",
+    totalValue: 340000000,
+    paymentTerms: "Thanh toán chuyển khoản sau 45 ngày kể từ ngày ký biên bản giao nhận PXK",
+    deliveryTerms: "Giao hàng tận kho Nhà máy Thuốc lá Thanh Hóa, TP. Thanh Hóa",
+    aiExecutiveSummary: "• Hợp đồng cung ứng nhãn bao và thùng carton đóng gói cho các dòng sản phẩm thuốc lá Thanh Hóa.\n• Cơ chế đơn giá đã bao gồm chi phí vận chuyển đến kho nhà máy Thanh Hóa.\n• Thời hạn thanh toán 45 ngày; bên mua có quyền phạt 0.05%/ngày nếu bên bán giao chậm tiến độ PO.",
+    status: "Hiệu lực",
+    attachmentName: "01_HD_TLTH_2026_Scan.pdf",
+    attachmentUrl: "https://drive.google.com/drive/search?q=01/H%C4%90-TLTH",
+    products: [
+      { productCode: "LGTPS - 002-95", productName: "Lưỡi gà trắng 95mm x 800m x 210gsm", unit: "Cuộn", contractPrice: 493671, quantity: 1500, notes: "Khớp mã Gsp_093" },
+      { productCode: "TH25/07", productName: "Thùng Thăng Long bao mềm TH25/07", unit: "Cái", contractPrice: 11021, quantity: 25000, notes: "Giao Thanh Hóa" }
+    ]
+  },
+  {
+    id: "contract_30_tltl",
+    contractNumber: "30/HĐ-TLTL",
+    title: "Hợp đồng cung ứng nguyên liệu lưỡi gà trắng 2026",
+    partnerName: "Công ty TNHH MTV Thuốc lá Thăng Long",
+    partnerType: "Khách hàng",
+    contractType: "Bán hàng",
+    signDate: "2026-01-14",
+    effectiveDate: "2026-01-14",
+    expirationDate: "2026-12-31",
+    totalValue: 850000000,
+    paymentTerms: "Chuyển khoản 30 ngày kể từ ngày nhận hóa đơn GTGT",
+    deliveryTerms: "Giao tận kho Thăng Long - Thạch Thất",
+    aiExecutiveSummary: "• Cung ứng nguyên liệu lưỡi gà trắng các bản 71mm, 83mm, 91mm, 95mm, 98mm theo định lượng chuẩn 210gsm - 230gsm.",
+    status: "Hiệu lực",
+    attachmentName: "30_HD_TLTL_2026.pdf",
+    attachmentUrl: "https://drive.google.com/drive/search?q=30/H%C4%90-TLTL",
+    products: [
+      { productCode: "LGTPS - 002-71", productName: "Lưỡi gà trắng 71mm x 800m x 210gsm", unit: "Cuộn", contractPrice: 366012, quantity: 2000, notes: "Khớp mã Gsp_090" },
+      { productCode: "LGTPS - 002-83", productName: "Lưỡi gà trắng 83mm x 800m x 210gsm", unit: "Cuộn", contractPrice: 431197, quantity: 1000, notes: "Khớp mã Gsp_091" }
+    ]
+  }
+];
+
