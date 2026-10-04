@@ -14,7 +14,9 @@ import {
   CockpitTableToolbar, 
   CockpitPagination, 
   CockpitTableEmptyState, 
-  CockpitBadge 
+  CockpitBadge,
+  Modal,
+  Button
 } from './ui';
 
 export type CommissionMethod = 'profit_percent' | 'weight_rate' | 'monthly_lump_sum';
@@ -608,7 +610,7 @@ export default function CommissionView({
   };
 
   return (
-    <div className="flex-1 bg-[#F8FAFA] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
+    <div className="flex-1 bg-canvas text-ink flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
       {/* Top Cockpit Toolbar */}
       <div className="px-4 sm:px-6 lg:px-8 pt-4">
         <CockpitTableToolbar
@@ -1086,33 +1088,31 @@ export default function CommissionView({
       </div>
 
       {/* Add / Edit Modal (With 3 Methods & Full Manual Override) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08]">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center shrink-0">
-                  <Receipt size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingCommission ? 'Cập Nhật Phiếu Hoa Hồng' : 'Lập Phiếu Hoa Hồng Mới (3 Phương Thức)'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Quản lý định mức chi trả & theo dõi thanh toán</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Đóng"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCommission} className="flex-1 overflow-y-auto p-6 space-y-4">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingCommission ? 'Cập Nhật Phiếu Hoa Hồng' : 'Lập Phiếu Hoa Hồng Mới (3 Phương Thức)'}
+        subtitle="Quản lý định mức chi trả & theo dõi thanh toán"
+        size="xl"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              variant="secondary"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="commission-form"
+            >
+              Lưu Phiếu Hoa Hồng
+            </Button>
+          </div>
+        }
+      >
+        <form id="commission-form" onSubmit={handleSaveCommission} className="space-y-4">
               {/* 3 Methods Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1">
@@ -1522,26 +1522,8 @@ export default function CommissionView({
                 />
               </div>
 
-              {/* Buttons */}
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-purple-500/20 active:scale-95 transition-all"
-                >
-                  Lưu Phiếu Hoa Hồng
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }

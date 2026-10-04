@@ -13,7 +13,9 @@ import {
   CockpitTableToolbar,
   CockpitPagination,
   CockpitBadge,
-  CockpitTableEmptyState
+  CockpitTableEmptyState,
+  Modal,
+  Button
 } from './ui';
 
 interface SpecParameter {
@@ -649,141 +651,141 @@ export default function SpecsView({
       )}
 
       {/* 4. MODAL XEM CHI TIẾT SPEC & BẢNG THÔNG SỐ NHANH */}
-      {selectedDetailSpec && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[9998] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-black/[0.08]">
-            {/* Header: Dark / Slate Navy Background */}
-            <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/50 flex items-start justify-between">
-              <div>
-                <span className="inline-block px-3 py-1 bg-blue-50/95 border border-blue-200/80 text-blue-700 rounded-md text-xs font-mono font-bold tracking-tight shadow-2xs">
-                  {selectedDetailSpec['Mã Spec']} - v{selectedDetailSpec['Phiên bản'] || '1.0'}
-                </span>
-                <h3 className="font-bold text-xl sm:text-2xl text-white mt-2 leading-tight tracking-tight">
-                  {selectedDetailSpec['Tên tiêu chuẩn']}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                  Khách hàng: <span className="text-white font-semibold">{selectedDetailSpec['Khách hàng']}</span> | SP: <span className="text-slate-200">{selectedDetailSpec['Sản phẩm liên kết']}</span>
-                </p>
-              </div>
-              <button 
-                onClick={() => setSelectedDetailSpec(null)}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-                title="Đóng"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 sm:p-7 overflow-y-auto space-y-6 flex-1 text-xs">
-              {/* Section 1: Table Bảng chỉ tiêu kỹ thuật */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 text-sm">
-                  <Layers size={18} className="text-blue-600" /> 
-                  <span>BẢNG CHỈ TIÊU KỸ THUẬT CHI TIẾT</span>
-                </h4>
-                <div className="bg-[#F8FAFC] rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
-                          <th className="py-3 px-4 w-1/3">CHỈ TIÊU</th>
-                          <th className="py-3 px-3 text-center w-20">ĐVT</th>
-                          <th className="py-3 px-4 w-1/4">TIÊU CHUẨN MẪU</th>
-                          <th className="py-3 px-3 text-center">DUNG SAI</th>
-                          <th className="py-3 px-4">PHƯƠNG PHÁP THỬ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/70 text-xs">
-                        {(selectedDetailSpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-white/80 transition-colors">
-                            <td className="py-3 px-4 font-bold text-slate-900">{p.criterion}</td>
-                            <td className="py-3 px-3 text-center font-mono text-slate-600 font-medium">{p.unit}</td>
-                            <td className="py-3 px-4 font-bold text-blue-700 text-sm font-sans">{p.standard}</td>
-                            <td className="py-3 px-3 text-center text-slate-600 font-medium">{p.tolerance || '-'}</td>
-                            <td className="py-3 px-4 text-slate-600 font-medium">{p.testMethod || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Box Quy cách đóng gói & Bảo quản */}
-              {selectedDetailSpec['Quy cách đóng gói'] && (
-                <div className="bg-blue-50/60 border border-blue-100/90 p-4 sm:p-5 rounded-2xl space-y-1">
-                  <h5 className="font-bold text-blue-950 text-xs sm:text-sm">Quy cách đóng gói & Bảo quản:</h5>
-                  <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">{selectedDetailSpec['Quy cách đóng gói']}</p>
-                </div>
-              )}
-
-              {/* Section 3: Bản vẽ CAD / Thiết kế đính kèm */}
-              {selectedDetailSpec['Hình ảnh thiết kế'] && (
-                <div className="space-y-2">
-                  <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wide">Bản vẽ CAD / Thiết kế đính kèm:</h5>
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200/80 overflow-hidden p-3 flex items-center justify-center max-h-80 shadow-2xs">
-                    <img 
-                      src={selectedDetailSpec['Hình ảnh thiết kế']} 
-                      className="rounded-xl max-h-72 object-cover w-full" 
-                      alt="CAD Design preview" 
-                      referrerPolicy="no-referrer" 
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 bg-[#F8FAFC] border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
-              <span className="text-xs text-slate-600">
-                Người duyệt: <strong className="text-slate-900">{selectedDetailSpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</strong>
+      <Modal
+        open={Boolean(selectedDetailSpec)}
+        onClose={() => setSelectedDetailSpec(null)}
+        title={selectedDetailSpec ? `${selectedDetailSpec['Mã Spec']} - ${selectedDetailSpec['Tên tiêu chuẩn']}` : 'Chi Tiết Spec'}
+        subtitle={selectedDetailSpec ? `Khách hàng: ${selectedDetailSpec['Khách hàng']} | SP: ${selectedDetailSpec['Sản phẩm liên kết']}` : undefined}
+        size="2xl"
+        maximizable
+        footer={
+          selectedDetailSpec && (
+            <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-3">
+              <span className="text-xs text-ink-muted">
+                Người duyệt: <strong className="text-ink">{selectedDetailSpec['Người phê duyệt'] || 'Ban Giám Đốc TSG'}</strong>
               </span>
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
-                <button
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setSelectedDetailSpec(null)}
+                >
+                  Đóng
+                </Button>
+                <Button
+                  variant="primary"
                   onClick={() => {
                     handlePrintSpec(selectedDetailSpec);
                     setSelectedDetailSpec(null);
                   }}
-                  className="px-5 py-2.5 bg-[#007AFF] hover:bg-[#0062CC] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 active:scale-95 transition-all w-full sm:w-auto"
+                  icon={<Printer size={15} />}
                 >
-                  <Printer size={15} /> In Phiếu Kỹ Thuật (TDS)
-                </button>
+                  In Phiếu Kỹ Thuật (TDS)
+                </Button>
               </div>
             </div>
+          )
+        }
+      >
+        {selectedDetailSpec && (
+          <div className="space-y-6 text-xs">
+            {/* Section 1: Table Bảng chỉ tiêu kỹ thuật */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 text-sm">
+                <Layers size={18} className="text-blue-600" /> 
+                <span>BẢNG CHỈ TIÊU KỸ THUẬT CHI TIẾT</span>
+              </h4>
+              <div className="bg-[#F8FAFC] rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/90 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
+                        <th className="py-3 px-4 w-1/3">CHỈ TIÊU</th>
+                        <th className="py-3 px-3 text-center w-20">ĐVT</th>
+                        <th className="py-3 px-4 w-1/4">TIÊU CHUẨN MẪU</th>
+                        <th className="py-3 px-3 text-center">DUNG SAI</th>
+                        <th className="py-3 px-4">PHƯƠNG PHÁP THỬ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/70 text-xs">
+                      {(selectedDetailSpec['Thông số kỹ thuật'] || []).map((p: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-white/80 transition-colors">
+                          <td className="py-3 px-4 font-bold text-slate-900">{p.criterion}</td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-600 font-medium">{p.unit}</td>
+                          <td className="py-3 px-4 font-bold text-blue-700 text-sm font-sans">{p.standard}</td>
+                          <td className="py-3 px-3 text-center text-slate-600 font-medium">{p.tolerance || '-'}</td>
+                          <td className="py-3 px-4 text-slate-600 font-medium">{p.testMethod || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Box Quy cách đóng gói & Bảo quản */}
+            {selectedDetailSpec['Quy cách đóng gói'] && (
+              <div className="bg-blue-50/60 border border-blue-100/90 p-4 sm:p-5 rounded-2xl space-y-1">
+                <h5 className="font-bold text-blue-950 text-xs sm:text-sm">Quy cách đóng gói & Bảo quản:</h5>
+                <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">{selectedDetailSpec['Quy cách đóng gói']}</p>
+              </div>
+            )}
+
+            {/* Section 3: Bản vẽ CAD / Thiết kế đính kèm */}
+            {selectedDetailSpec['Hình ảnh thiết kế'] && (
+              <div className="space-y-2">
+                <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wide">Bản vẽ CAD / Thiết kế đính kèm:</h5>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200/80 overflow-hidden p-3 flex items-center justify-center max-h-80 shadow-2xs">
+                  <img 
+                    src={selectedDetailSpec['Hình ảnh thiết kế']} 
+                    className="rounded-xl max-h-72 object-cover w-full" 
+                    alt="CAD Design preview" 
+                    referrerPolicy="no-referrer" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* 5. MODAL THIẾT LẬP / SỬA SPECS CHUYÊN SÂU ISO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 my-auto">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-6 flex justify-between items-center shrink-0 border-b border-slate-800">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600/30 border border-blue-400/40 rounded-2xl flex items-center justify-center text-blue-300 shadow-lg">
-                  <ShieldCheck size={26} />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-lg leading-tight">
-                    {editingRow ? `Hiệu Chỉnh Spec Kỹ Thuật (${formData['Mã Spec']})` : "Thiết Lập Định Chuẩn ISO Sản Phẩm Mới"}
-                  </h3>
-                  <p className="text-blue-300 text-xs mt-0.5 font-medium">
-                    Quy chuẩn kiểm soát chất lượng QA/QC ISO 9001:2015 - TSG Business OS
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all"
-              >
-                <X size={20} />
-              </button>
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingRow ? `Hiệu Chỉnh Spec Kỹ Thuật (${formData['Mã Spec']})` : "Thiết Lập Định Chuẩn ISO Sản Phẩm Mới"}
+        subtitle="Quy chuẩn kiểm soát chất lượng QA/QC ISO 9001:2015 - TSG Business OS"
+        size="2xl"
+        maximizable
+        footer={
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between w-full">
+            <div className="flex gap-1.5">
+              {['Nháp', 'Đã phê duyệt', 'Hết hiệu lực'].map(status => (
+                <button
+                  key={status} type="button"
+                  onClick={() => setFormData({...formData, 'Trạng thái': status as any})}
+                  className={clsx(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer",
+                    formData['Trạng thái'] === status ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                  )}
+                >
+                  {status}
+                </button>
+              ))}
             </div>
-            
-            {/* Modal Body Form */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                Hủy bỏ
+              </Button>
+              <Button variant="primary" type="submit" form="spec-form" icon={<Save size={15} />}>
+                {editingRow ? "Cập Nhật Spec" : "Lưu & Phê Duyệt ISO"}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {/* Modal Body Form */}
+        <form id="spec-form" onSubmit={handleSubmit} className="space-y-6">
               {/* Preset Buttons for Quick Autofill */}
               <div className="bg-blue-50/70 p-4 rounded-2xl border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
@@ -1006,36 +1008,8 @@ export default function SpecsView({
                 </div>
               </div>
 
-              {/* Modal Footer Controls */}
-              <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row gap-3 items-center justify-between">
-                <div className="flex gap-2 w-full sm:w-auto">
-                  {['Nháp', 'Đã phê duyệt', 'Hết hiệu lực'].map(status => (
-                    <button
-                      key={status} type="button"
-                      onClick={() => setFormData({...formData, 'Trạng thái': status as any})}
-                      className={clsx(
-                        "px-3 py-1.5 rounded-xl text-xs font-bold transition-all border",
-                        formData['Trạng thái'] === status ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
-                      )}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex gap-3 w-full sm:w-auto justify-end">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all">
-                    Hủy bỏ
-                  </button>
-                  <button type="submit" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
-                    <Save size={16} /> {editingRow ? "Cập Nhật Spec" : "Lưu & Phê Duyệt ISO"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }
