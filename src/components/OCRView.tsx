@@ -19,6 +19,8 @@ import {
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
 import { generateSmartDocumentFileName } from '../lib/documentNaming';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 export interface OCRItem {
   index: number;
@@ -1330,111 +1332,93 @@ export default function OCRView({
 
       {/* Confirmation Modal */}
       {showConfirmModal && ocrResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <CheckCircle className="text-blue-600" size={20} />
-                <span>Xác Nhận Nhập Dữ Liệu Đa Bảng</span>
-              </h3>
-              <button
+        <Modal
+          open={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          title="Xác Nhận Nhập Dữ Liệu Đa Bảng"
+          icon={<CheckCircle className="text-blue-600" size={20} />}
+          size="md"
+          footer={
+            <div className="flex items-center justify-end gap-3 w-full">
+              <Button
+                variant="secondary"
                 onClick={() => setShowConfirmModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-slate-700">
-              <p className="leading-relaxed">
-                Hệ thống sẽ lưu dữ liệu bóc tách và tự động đồng bộ sang các bảng liên quan:
-              </p>
-
-              <div className="bg-[#F5F5F7] p-3.5 rounded-2xl space-y-2 border border-slate-200/60 font-medium">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Loại chứng từ:</span>
-                  <span className="font-bold text-slate-900 uppercase">{ocrResult.documentType}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Số chứng từ:</span>
-                  <span className="font-mono font-bold text-blue-700">{ocrResult.documentNumber || "Chưa có"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Số PO liên kết:</span>
-                  <span className="font-mono font-bold text-slate-800">{ocrResult.documentReference || "Không có"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Số dòng hàng hóa:</span>
-                  <span className="font-bold text-slate-900">{ocrResult.items.length} dòng</span>
-                </div>
-                <div className="flex items-center justify-between border-t border-slate-200 pt-1.5">
-                  <span className="text-slate-600 font-bold">Tổng doanh thu:</span>
-                  <span className="font-mono font-bold text-emerald-700">{formatMoney(documentFinancials.totalRevenue)} đ</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded-xl border border-blue-200/80 text-[11px] text-blue-800 space-y-1">
-                <p className="font-bold">🔄 Tự động đồng bộ đa bảng:</p>
-                <ul className="list-disc list-inside space-y-0.5 text-blue-700">
-                  <li>Ghi nhận vào sổ Giao hàng / Đơn hàng</li>
-                  <li>Cập nhật tiến độ giao và số lượng còn lại trong Chi tiết Đơn hàng (PO Lines)</li>
-                  <li>Cập nhật trạng thái Kế hoạch giao hàng (Delivery Plans)</li>
-                  <li>Lưu tệp chứng từ scan vào Thư mục Google Drive `TSG_Business_Documents`</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
               >
                 Kiểm tra lại
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => executeSaveToSystem()}
-                className="px-5 py-2.5 bg-[#007AFF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
               >
                 Xác Nhận & Lưu Toàn Bộ
-              </button>
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-xs text-slate-700">
+            <p className="leading-relaxed">
+              Hệ thống sẽ lưu dữ liệu bóc tách và tự động đồng bộ sang các bảng liên quan:
+            </p>
+
+            <div className="bg-[#F5F5F7] p-3.5 rounded-2xl space-y-2 border border-slate-200/60 font-medium">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Loại chứng từ:</span>
+                <span className="font-bold text-slate-900 uppercase">{ocrResult.documentType}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Số chứng từ:</span>
+                <span className="font-mono font-bold text-blue-700">{ocrResult.documentNumber || "Chưa có"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Số PO liên kết:</span>
+                <span className="font-mono font-bold text-slate-800">{ocrResult.documentReference || "Không có"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Số dòng hàng hóa:</span>
+                <span className="font-bold text-slate-900">{ocrResult.items.length} dòng</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200 pt-1.5">
+                <span className="text-slate-600 font-bold">Tổng doanh thu:</span>
+                <span className="font-mono font-bold text-emerald-700">{formatMoney(documentFinancials.totalRevenue)} đ</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50 rounded-xl border border-blue-200/80 text-[11px] text-blue-800 space-y-1">
+              <p className="font-bold">🔄 Tự động đồng bộ đa bảng:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                <li>Ghi nhận vào sổ Giao hàng / Đơn hàng</li>
+                <li>Cập nhật tiến độ giao và số lượng còn lại trong Chi tiết Đơn hàng (PO Lines)</li>
+                <li>Cập nhật trạng thái Kế hoạch giao hàng (Delivery Plans)</li>
+                <li>Lưu tệp chứng từ scan vào Thư mục Google Drive `TSG_Business_Documents`</li>
+              </ul>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     
       {/* 🌟 DEDICATED PRICE & CONTRACT SELECTOR MODAL */}
+      {/* 🌟 DEDICATED PRICE & CONTRACT SELECTOR MODAL */}
       {activePriceSelectIdx !== null && ocrResult && ocrResult.items[activePriceSelectIdx] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div 
-            ref={pricePopoverRef}
-            className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
-          >
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <Tag size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                    Chọn Bảng Giá & Hợp Đồng Căn Cứ (2026)
-                  </h3>
-                  <p className="text-xs text-slate-500 truncate max-w-md">
-                    Áp dụng cho dòng #{activePriceSelectIdx + 1}: <strong className="text-slate-800">{ocrResult.items[activePriceSelectIdx]?.name || ocrResult.items[activePriceSelectIdx]?.code || "Sản phẩm"}</strong>
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
+        <Modal
+          open={activePriceSelectIdx !== null}
+          onClose={() => setActivePriceSelectIdx(null)}
+          title="Chọn Bảng Giá & Hợp Đồng Căn Cứ (2026)"
+          subtitle={`Áp dụng cho dòng #${activePriceSelectIdx + 1}: ${ocrResult.items[activePriceSelectIdx]?.name || ocrResult.items[activePriceSelectIdx]?.code || "Sản phẩm"}`}
+          icon={<Tag size={20} className="text-blue-600" />}
+          size="lg"
+          footer={
+            <div className="flex items-center justify-between w-full text-xs text-slate-500">
+              <span>Tìm thấy <strong>{filteredPricingOptions.length}</strong> kết quả bảng giá 2026</span>
+              <Button
+                variant="secondary"
                 onClick={() => setActivePriceSelectIdx(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
               >
-                <X size={18} />
-              </button>
+                Đóng
+              </Button>
             </div>
+          }
+        >
+          <div className="space-y-4">
 
             {/* Search Input */}
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
@@ -1521,19 +1505,8 @@ export default function OCRView({
               )}
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
-              <span>Tìm thấy <strong>{filteredPricingOptions.length}</strong> kết quả bảng giá 2026</span>
-              <button
-                type="button"
-                onClick={() => setActivePriceSelectIdx(null)}
-                className="px-4 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
-              >
-                Đóng
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

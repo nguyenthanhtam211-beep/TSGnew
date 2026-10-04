@@ -31,6 +31,8 @@ import {
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
 import { parseNumber } from "../lib/business-logic";
+import { Modal } from "./ui/Modal";
+import { Button } from "./ui/Button";
 
 interface MasterCalendarViewProps {
   deliveryPlans: any[];
@@ -1284,145 +1286,132 @@ export default function MasterCalendarView({
       )}
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* DAY DETAIL POPUP MODAL (When clicking on a cell in Month Grid) */}
       {/* ========================================================================= */}
       {selectedDayDetail && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <CalendarDays className="text-[#007AFF]" size={20} />
-                  <span>Chi Tiết Giao Hàng Ngày {selectedDayDetail.dateSlash}</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {selectedDayDetail.plans.length} chuyến xe điều phối
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedDayDetail(null)}
-                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {selectedDayDetail.plans.length === 0 ? (
-              <div className="py-8 text-center space-y-3 bg-[#FBFBFD] rounded-xl border border-dashed border-slate-200">
-                <CalendarDays className="mx-auto text-slate-300" size={36} />
-                <p className="text-sm font-medium text-slate-500">Chưa có lịch giao hàng nào trong ngày {selectedDayDetail.dateSlash}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const dateToUse = selectedDayDetail.dateSlash;
-                    setSelectedDayDetail(null);
-                    handleOpenAddPlan(dateToUse);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-sm transition"
-                >
-                  <Plus size={14} />
-                  <span>+ Lên Lịch Giao Cho Ngày Này</span>
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                {selectedDayDetail.plans.map((item, idx) => {
-                  const gCal = getGoogleCalendarUrl(item);
-                  return (
-                    <div key={idx} className="p-3.5 bg-[#FBFBFD] rounded-xl border border-slate-200/80 space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 text-sm">{item.customer}</span>
-                        <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                          {item.poNumber}
-                        </span>
-                      </div>
-
-                      <div className="text-slate-600 font-medium">{item.product}</div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                        <div>
-                          <span className="text-slate-400 mr-1">Số lượng:</span>
-                          <strong className="text-slate-900 tabular-nums">{item.quantity.toLocaleString("vi-VN")} {item.unit}</strong>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
-                          item.status === "Đã giao" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                        }`}>
-                          {item.status}
-                        </span>
-                      </div>
-
-                      <div className="pt-1.5 flex items-center justify-between border-t border-slate-100">
-                        <a
-                          href={gCal}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline text-[11px]"
-                        >
-                          <ExternalLink size={11} />
-                          <span>Thêm vào Google Calendar</span>
-                        </a>
-                        {item.notes && <span className="text-slate-400 italic text-[11px]">{item.notes}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-              <button
-                type="button"
+        <Modal
+          open={!!selectedDayDetail}
+          onClose={() => setSelectedDayDetail(null)}
+          title={`Chi Tiết Giao Hàng Ngày ${selectedDayDetail.dateSlash}`}
+          subtitle={`${selectedDayDetail.plans.length} chuyến xe điều phối`}
+          icon={<CalendarDays className="text-[#007AFF]" size={20} />}
+          size="lg"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <Button
+                variant="subtle"
                 onClick={() => {
                   const dateToUse = selectedDayDetail.dateSlash;
                   setSelectedDayDetail(null);
                   handleOpenAddPlan(dateToUse);
                 }}
-                className="inline-flex items-center gap-1.5 text-[#007AFF] hover:text-blue-700 font-semibold text-xs py-2 px-3 hover:bg-blue-50 rounded-xl transition"
+                icon={<Plus size={14} />}
               >
-                <Plus size={14} />
-                <span>Thêm chuyến cho ngày này</span>
-              </button>
-              <button
-                type="button"
+                Thêm chuyến cho ngày này
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => setSelectedDayDetail(null)}
-                className="px-5 py-2 bg-slate-900 text-white font-semibold rounded-xl text-xs hover:bg-slate-800 transition"
               >
                 Đóng
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          {selectedDayDetail.plans.length === 0 ? (
+            <div className="py-8 text-center space-y-3 bg-[#FBFBFD] rounded-xl border border-dashed border-slate-200">
+              <CalendarDays className="mx-auto text-slate-300" size={36} />
+              <p className="text-sm font-medium text-slate-500">Chưa có lịch giao hàng nào trong ngày {selectedDayDetail.dateSlash}</p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  const dateToUse = selectedDayDetail.dateSlash;
+                  setSelectedDayDetail(null);
+                  handleOpenAddPlan(dateToUse);
+                }}
+                icon={<Plus size={14} />}
+              >
+                Lên Lịch Giao Cho Ngày Này
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {selectedDayDetail.plans.map((item, idx) => {
+                const gCal = getGoogleCalendarUrl(item);
+                return (
+                  <div key={idx} className="p-3.5 bg-[#FBFBFD] rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-sm">{item.customer}</span>
+                      <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                        {item.poNumber}
+                      </span>
+                    </div>
+
+                    <div className="text-slate-600 font-medium">{item.product}</div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 mr-1">Số lượng:</span>
+                        <strong className="text-slate-900 tabular-nums">{item.quantity.toLocaleString("vi-VN")} {item.unit}</strong>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
+                        item.status === "Đã giao" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+
+                    <div className="pt-1.5 flex items-center justify-between border-t border-slate-100">
+                      <a
+                        href={gCal}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline text-[11px]"
+                      >
+                        <ExternalLink size={11} />
+                        <span>Thêm vào Google Calendar</span>
+                      </a>
+                      {item.notes && <span className="text-slate-400 italic text-[11px]">{item.notes}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
       )}
 
       {/* ========================================================================= */}
       {/* MANUAL ADD DELIVERY SCHEDULE MODAL */}
       {/* ========================================================================= */}
       {isAddPlanModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 text-[#007AFF] rounded-xl">
-                  <CalendarPlus size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Bổ Sung Lịch Giao Hàng Thủ Công</h3>
-                  <p className="text-xs text-slate-400">Điều phối xe và chuyến giao hàng trực tiếp lên lịch</p>
-                </div>
-              </div>
-              <button
-                type="button"
+        <Modal
+          open={isAddPlanModalOpen}
+          onClose={() => setIsAddPlanModalOpen(false)}
+          title="Bổ Sung Lịch Giao Hàng Thủ Công"
+          subtitle="Điều phối xe và chuyến giao hàng trực tiếp lên lịch"
+          icon={<CalendarPlus size={20} className="text-[#007AFF]" />}
+          size="md"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button
+                variant="secondary"
                 onClick={() => setIsAddPlanModalOpen(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition"
               >
-                <X size={18} />
-              </button>
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveNewPlan}
+                icon={<Check size={14} />}
+              >
+                Lưu Lịch Giao
+              </Button>
             </div>
-
-            {/* Modal Form Body */}
-            <div className="space-y-3.5 text-xs">
+          }
+        >
+          <div className="space-y-3.5 text-xs">
               {/* Ngày giao & PO Source */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -1594,26 +1583,7 @@ export default function MasterCalendarView({
               </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsAddPlanModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold rounded-xl text-xs transition"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveNewPlan}
-                className="px-5 py-2 bg-[#007AFF] hover:bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-sm flex items-center gap-1.5 transition"
-              >
-                <Check size={14} />
-                <span>Lưu Lịch Giao</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

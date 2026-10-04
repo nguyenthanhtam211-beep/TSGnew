@@ -36,6 +36,8 @@ import MasterCalendarView from './MasterCalendarView';
 import DeliveryPlanView from './DeliveryPlanView';
 import DeliveryView from './DeliveryView';
 import { parseNumber } from '../lib/business-logic';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 interface LogisticsHubProps {
   initialSubTab?: 'calendar' | 'plan' | 'delivery' | 'reconcile';
@@ -1006,73 +1008,93 @@ export default function LogisticsHubView({
       )}
 
       {/* 🌟 UNIFIED DISPATCH PLAN MODAL (2-STEP ENTERPRISE FLOW) */}
-      {isQuickPlanOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header with Stepper */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-[#FBFBFD]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                  <ClipboardList size={22} />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    <span>Lập Kế Hoạch Điều Độ Giao Hàng</span>
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {quickPlanStep === 'select_po' 
-                      ? 'Bước 1: Chọn đơn đặt hàng (PO) cần lên lịch phân bổ xe' 
-                      : 'Bước 2: Cấu hình ngày giao, số lượng và đội xe phụ trách'}
-                  </p>
-                </div>
+      <Modal
+        open={isQuickPlanOpen}
+        onClose={() => setIsQuickPlanOpen(false)}
+        title="Lập Kế Hoạch Điều Độ Giao Hàng"
+        subtitle={quickPlanStep === 'select_po' 
+          ? 'Bước 1: Chọn đơn đặt hàng (PO) cần lên lịch phân bổ xe' 
+          : 'Bước 2: Cấu hình ngày giao, số lượng và đội xe phụ trách'}
+        size="2xl"
+        maximizable
+        footer={
+          quickPlanStep === 'select_po' ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs text-slate-500">
+                Chọn đơn hàng PO từ bảng để tiếp tục lập kế hoạch
               </div>
-
-              {/* Stepper Indicator */}
-              <div className="hidden sm:flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setQuickPlanStep('select_po')}
-                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
-                    quickPlanStep === 'select_po'
-                      ? 'bg-white text-teal-700 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 cursor-pointer'
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">1</span>
-                  <span>Chọn PO</span>
-                  {quickPlanForm.poNumber && <Check size={12} className="text-teal-600" />}
-                </button>
-                <ChevronRight size={12} className="text-slate-400" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (quickPlanForm.poNumber || quickPlanForm.customer) {
-                      setQuickPlanStep('details');
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
-                    quickPlanStep === 'details'
-                      ? 'bg-white text-teal-700 font-bold shadow-2xs'
-                      : quickPlanForm.poNumber ? 'text-slate-600 hover:text-slate-900 cursor-pointer' : 'text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
-                  <span>Chuyến xe & Số lượng</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => setIsQuickPlanOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition cursor-pointer"
               >
-                <X size={20} />
-              </button>
+                Đóng
+              </Button>
             </div>
+          ) : (
+            <div className="flex items-center justify-between w-full">
+              <Button
+                variant="secondary"
+                onClick={() => setQuickPlanStep('select_po')}
+                icon={<ChevronLeft size={14} />}
+              >
+                Quay lại Bảng Chọn PO
+              </Button>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              {quickPlanStep === 'select_po' ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsQuickPlanOpen(false)}
+                >
+                  Hủy Bỏ
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  form="quick-plan-form"
+                >
+                  Lưu Kế Hoạch Điều Độ
+                </Button>
+              </div>
+            </div>
+          )
+        }
+      >
+        <div className="space-y-4">
+          {/* Stepper Indicator */}
+          <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl mb-4 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setQuickPlanStep('select_po')}
+              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                quickPlanStep === 'select_po'
+                  ? 'bg-white text-teal-700 font-bold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 cursor-pointer'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">1</span>
+              <span>Chọn PO</span>
+              {quickPlanForm.poNumber && <Check size={12} className="text-teal-600" />}
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => {
+                if (quickPlanForm.poNumber || quickPlanForm.customer) {
+                  setQuickPlanStep('details');
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                quickPlanStep === 'details'
+                  ? 'bg-white text-teal-700 font-bold shadow-xs'
+                  : quickPlanForm.poNumber ? 'text-slate-600 hover:text-slate-900 cursor-pointer' : 'text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center font-bold">2</span>
+              <span>Chuyến xe & Số lượng</span>
+            </button>
+          </div>
+
+          {quickPlanStep === 'select_po' ? (
                 /* ================= STEP 1: PO SELECTION TABLE ================= */
                 <div className="space-y-4">
                   {/* Search and Filter Tabs */}
@@ -1439,56 +1461,8 @@ export default function LogisticsHubView({
                   </div>
                 </form>
               )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between shrink-0 bg-[#FBFBFD]">
-              {quickPlanStep === 'select_po' ? (
-                <>
-                  <div className="text-xs text-slate-500">
-                    Chọn đơn hàng PO từ bảng để tiếp tục lập kế hoạch
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsQuickPlanOpen(false)}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    Đóng
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setQuickPlanStep('select_po')}
-                    className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <ChevronLeft size={14} />
-                    <span>Quay lại Bảng Chọn PO</span>
-                  </button>
-
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickPlanOpen(false)}
-                      className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                    >
-                      Hủy Bỏ
-                    </button>
-                    <button
-                      type="submit"
-                      form="quick-plan-form"
-                      className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer"
-                    >
-                      Lưu Kế Hoạch Điều Độ
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

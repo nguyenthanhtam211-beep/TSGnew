@@ -36,6 +36,8 @@ import { motion } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import dbEngine from '../lib/dbEngine';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 export interface StorageFile {
   id?: string;
@@ -1244,164 +1246,89 @@ export default function StorageView({
 
       {/* Upload File Modal */}
       {selectedFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <HardDrive className="text-blue-600" size={18} />
-                <span>Đính Kèm Chứng Từ Vào Google Drive</span>
-              </h3>
-              <button 
-                onClick={() => setSelectedFile(null)} 
-                disabled={isUploading}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="bg-[#FBFBFD] p-3 rounded-2xl border border-slate-200 text-xs space-y-1">
-                <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Tệp Đã Chọn</p>
-                <p className="font-bold text-slate-900 truncate">{selectedFile.name}</p>
-                <p className="text-slate-400 font-mono text-[11px]">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Loại Chứng Từ</label>
-                <select
-                  value={uploadDocType}
-                  onChange={(e) => setUploadDocType(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
-                >
-                  <option value="PXK">Phiếu xuất kho / Biên bản giao hàng</option>
-                  <option value="PO">Đơn đặt hàng (PO)</option>
-                  <option value="HD">Hợp đồng & Phụ lục</option>
-                  <option value="INVOICE">Hóa đơn VAT</option>
-                  <option value="SPEC">Tiêu chuẩn kỹ thuật Specs</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Số Chứng Từ / Số PO</label>
-                <input 
-                  type="text" 
-                  placeholder="VD: 26/PXK/16 hoặc 26/KHVT/0600"
-                  value={uploadDocNum}
-                  onChange={(e) => setUploadDocNum(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none"
-                />
-              </div>
-
-              <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 text-[11px] text-blue-700 space-y-1">
-                <p className="font-bold">📁 Cây Thư Mục Lưu Trữ Tự Động:</p>
-                <p className="font-mono text-[10.5px]">TSG_Business_Documents / 2026 / {uploadDocType} / Thang_04</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
+        <Modal
+          open={!!selectedFile}
+          onClose={() => !isUploading && setSelectedFile(null)}
+          title="Đính Kèm Chứng Từ Vào Google Drive"
+          icon={<HardDrive className="text-blue-600" size={18} />}
+          size="sm"
+          footer={
+            <div className="flex items-center justify-end gap-2.5 w-full">
+              <Button
+                variant="secondary"
                 onClick={() => setSelectedFile(null)}
                 disabled={isUploading}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
               >
                 Hủy bỏ
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleConfirmUpload}
                 disabled={isUploading}
-                className="px-4 py-2 bg-[#007AFF] hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                loading={isUploading}
+                icon={!isUploading ? <Upload size={14} /> : undefined}
               >
-                {isUploading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Đang tải lên Drive...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload size={14} />
-                    <span>Tải Lên & Lưu Trữ</span>
-                  </>
-                )}
-              </button>
+                {isUploading ? 'Đang tải lên Drive...' : 'Tải Lên & Lưu Trữ'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <div className="bg-[#FBFBFD] p-3 rounded-2xl border border-slate-200 text-xs space-y-1">
+              <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Tệp Đã Chọn</p>
+              <p className="font-bold text-slate-900 truncate">{selectedFile.name}</p>
+              <p className="text-slate-400 font-mono text-[11px]">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Loại Chứng Từ</label>
+              <select
+                value={uploadDocType}
+                onChange={(e) => setUploadDocType(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
+              >
+                <option value="PXK">Phiếu xuất kho / Biên bản giao hàng</option>
+                <option value="PO">Đơn đặt hàng (PO)</option>
+                <option value="HD">Hợp đồng & Phụ lục</option>
+                <option value="INVOICE">Hóa đơn VAT</option>
+                <option value="SPEC">Tiêu chuẩn kỹ thuật Specs</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Số Chứng Từ / Số PO</label>
+              <input 
+                type="text" 
+                placeholder="VD: 26/PXK/16 hoặc 26/KHVT/0600"
+                value={uploadDocNum}
+                onChange={(e) => setUploadDocNum(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none"
+              />
+            </div>
+
+            <div className="p-3 bg-blue-50/60 rounded-2xl border border-blue-100 text-[11px] text-blue-700 space-y-1">
+              <p className="font-bold">📁 Cây Thư Mục Lưu Trữ Tự Động:</p>
+              <p className="font-mono text-[10.5px]">TSG_Business_Documents / 2026 / {uploadDocType} / Thang_04</p>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL XEM TRƯỚC VÀ TẢI TỆP (DOCUMENT PREVIEW & DIRECT DOWNLOAD MODAL) */}
       {/* ========================================================================= */}
       {previewFile && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-[#FBFBFD]">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
-                  {getFileIcon(previewFile.mimeType)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-mono">
-                      {previewFile.documentType || 'Chứng từ'}
-                    </span>
-                    {(previewFile.documentNumber || previewFile.docNumber) && (
-                      <span className="text-xs font-bold text-slate-800 font-mono">
-                        #{previewFile.documentNumber || previewFile.docNumber}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate max-w-md mt-0.5" title={previewFile.fileName}>
-                    {previewFile.fileName}
-                  </h3>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewFile(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-2xl transition cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body / Viewer */}
-            <div className="flex-1 bg-slate-900 p-2 sm:p-4 overflow-hidden flex flex-col items-center justify-center min-h-[460px]">
-              {(previewFile.driveFileId || previewFile.fileId) && !String(previewFile.driveFileId || previewFile.fileId).startsWith('local_') ? (
-                <iframe
-                  src={`https://drive.google.com/file/d/${previewFile.driveFileId || previewFile.fileId}/preview`}
-                  className="w-full h-full min-h-[460px] rounded-xl border border-slate-800 bg-white"
-                  title={previewFile.fileName}
-                  allow="autoplay"
-                />
-              ) : (
-                <div className="text-center p-8 space-y-4 text-white">
-                  <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center mx-auto text-blue-400">
-                    <FileText size={32} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-bold text-lg">{previewFile.fileName}</p>
-                    <p className="text-sm text-slate-400">
-                      Tệp chứng từ được lưu trữ an toàn trong kho dữ liệu TSG Business OS
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadFile(previewFile)}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <Download size={16} />
-                    <span>Tải Về Máy Tính Ngay</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer with Actions */}
-            <div className="p-4 sm:p-5 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+        <Modal
+          open={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          title={previewFile.fileName}
+          subtitle={`#${previewFile.documentNumber || previewFile.docNumber || ''} • ${previewFile.documentType || 'Chứng từ'}`}
+          icon={getFileIcon(previewFile.mimeType)}
+          size="2xl"
+          maximizable
+          bodyClassName="!p-0 !overflow-hidden bg-slate-900 min-h-[460px] flex flex-col items-center justify-center"
+          footer={
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
               <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
                 <span>📁 {previewFile.folderPath || 'TSG_Business_Documents'}</span>
                 {(previewFile.customer || previewFile.partnerName) && (
@@ -1424,18 +1351,45 @@ export default function StorageView({
                     <span>Mở Trên Google Drive</span>
                   </a>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   onClick={() => handleDownloadFile(previewFile)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  icon={<Download size={14} />}
                 >
-                  <Download size={15} />
-                  <span>⬇ Tải Tệp Về Máy Tính</span>
-                </button>
+                  Tải Tệp Về Máy Tính
+                </Button>
               </div>
             </div>
-          </div>
-        </div>
+          }
+        >
+          {(previewFile.driveFileId || previewFile.fileId) && !String(previewFile.driveFileId || previewFile.fileId).startsWith('local_') ? (
+            <iframe
+              src={`https://drive.google.com/file/d/${previewFile.driveFileId || previewFile.fileId}/preview`}
+              className="w-full h-full min-h-[460px] border-none bg-white"
+              title={previewFile.fileName}
+              allow="autoplay"
+            />
+          ) : (
+            <div className="text-center p-8 space-y-4 text-white">
+              <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center mx-auto text-blue-400">
+                <FileText size={32} />
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-lg">{previewFile.fileName}</p>
+                <p className="text-sm text-slate-400">
+                  Tệp chứng từ được lưu trữ an toàn trong kho dữ liệu TSG Business OS
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => handleDownloadFile(previewFile)}
+                icon={<Download size={15} />}
+              >
+                Tải Về Máy Tính Ngay
+              </Button>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );
