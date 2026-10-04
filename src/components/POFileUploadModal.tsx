@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
+import { Modal, Button } from './ui';
 
 interface POFileUploadModalProps {
   isOpen: boolean;
@@ -203,40 +204,44 @@ export function POFileUploadModal({
   const isImg = (name: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
-      <div 
-        className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto transition-all"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="px-5 py-4 bg-white border-b border-black/[0.06] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <UploadCloud size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-display">
-                Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                  Google Drive Ready
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Lưu trữ đám mây Google Drive an toàn & tự động tạo đường link chia sẻ
-              </p>
-            </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh"
+      subtitle="Lưu trữ đám mây Google Drive an toàn & tự động tạo đường link chia sẻ"
+      size="xl"
+      footer={
+        <div className="flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center gap-2 text-[11px] text-ink-muted">
+            <FolderOpen size={14} className="text-slate-400" />
+            <span>Thư mục Drive: <strong>TSG_Business_Documents / Don_Hang_PO</strong></span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <X size={18} />
-          </button>
-        </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={onClose}
+            >
+              {uploadResult ? 'Hoàn tất' : 'Hủy bỏ'}
+            </Button>
 
-        {/* Modal Body */}
-        <div className="p-5 sm:p-6 space-y-5">
+            {!uploadResult && (
+              <Button
+                variant="primary"
+                disabled={!selectedFile || isUploading}
+                onClick={handleUploadAndSave}
+                loading={isUploading}
+                icon={!isUploading ? <UploadCloud size={14} /> : undefined}
+              >
+                ⚡ Tải Lên Drive & Cập Nhật PO
+              </Button>
+            )}
+          </div>
+        </div>
+      }
+    >
+      {/* Modal Body */}
+      <div className="space-y-5">
           {/* Target PO Selection / Card */}
           <div className="bg-blue-50/70 p-4 rounded-xl border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -495,46 +500,6 @@ export function POFileUploadModal({
             </div>
           )}
         </div>
-
-        {/* Modal Footer */}
-        <div className="px-5 py-4 bg-[#F9FAFB] border-t border-slate-200 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
-            <FolderOpen size={14} className="text-slate-400" />
-            <span>Thư mục Drive: <strong>TSG_Business_Documents / Don_Hang_PO</strong></span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer"
-            >
-              {uploadResult ? 'Hoàn tất' : 'Hủy bỏ'}
-            </button>
-
-            {!uploadResult && (
-              <button
-                type="button"
-                disabled={!selectedFile || isUploading}
-                onClick={handleUploadAndSave}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Đang tải lên Drive...</span>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud size={14} />
-                    <span>⚡ Tải Lên Drive & Cập Nhật PO</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
