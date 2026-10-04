@@ -21,7 +21,7 @@ import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, form
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
-import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
+import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat, Modal, Drawer, Button, IconButton, StatusBadge } from './ui';
 
 export const getSupplierLogo = (s: any) => {
   if (!s) return '';
@@ -614,7 +614,7 @@ export default function SupplierView({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
+    <div className="flex-1 overflow-y-auto bg-canvas min-h-screen text-ink-1 font-sans">
       <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
         {/* Hallmark Enterprise Header */}
@@ -1270,33 +1270,15 @@ export default function SupplierView({
       </div>
 
       {/* Supplier Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <Factory size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Hồ sơ nhà cung cấp & điều khoản thương mại</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingSupplier ? 'Chỉnh sửa nhà cung cấp' : 'Thêm nhà cung cấp mới'}
+        subtitle="Hồ sơ nhà cung cấp & điều khoản thương mại"
+        icon={<Factory size={16} />}
+        size="lg"
+      >
+        <form onSubmit={handleSave} className="p-6 space-y-4 text-xs sm:text-sm">
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-1">Mã nhà cung cấp *</label>
@@ -1462,54 +1444,34 @@ export default function SupplierView({
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                <button 
+              <div className="pt-3 border-t border-line flex justify-end gap-2.5">
+                <Button 
                   type="button" 
+                  variant="ghost"
                   onClick={() => setIsModalOpen(false)} 
-                  className="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                 >
                   Hủy
-                </button>
-                <button 
+                </Button>
+                <Button 
                   type="submit" 
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] rounded-xl shadow-xs transition-all"
+                  variant="primary"
                 >
                   {editingSupplier ? 'Lưu' : 'Thêm'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Supplier Contact Modal */}
-      {isContactModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <Users size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingContact ? 'Chỉnh sửa đầu mối nhà cung cấp' : 'Thêm đầu mối cung ứng'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Thông tin liên lạc đại diện nhà cung cấp</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsContactModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveContact} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+      <Modal
+        open={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        title={editingContact ? 'Chỉnh sửa đầu mối nhà cung cấp' : 'Thêm đầu mối cung ứng'}
+        subtitle="Thông tin liên lạc đại diện nhà cung cấp"
+        icon={<Users size={16} />}
+        size="md"
+      >
+        <form onSubmit={handleSaveContact} className="p-5 space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1">Nhà cung cấp liên kết</label>
                 <select
@@ -1600,63 +1562,44 @@ export default function SupplierView({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                <button 
+              <div className="pt-3 border-t border-line flex justify-end gap-2.5">
+                <Button 
                   type="button" 
+                  variant="ghost"
                   onClick={() => setIsContactModalOpen(false)} 
-                  className="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                 >
                   Hủy
-                </button>
-                <button 
+                </Button>
+                <Button 
                   type="submit" 
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] rounded-xl shadow-xs transition-all"
+                  variant="primary"
                 >
                   {editingContact ? 'Lưu' : 'Thêm'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Supplier Detail Modal */}
-      {selectedSupplierDetail && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className={clsx(
-            "bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
-            isSupplierModalMaximized ? "max-w-6xl h-[94vh]" : "max-w-3xl max-h-[88vh]"
-          )}>
-            <div className="px-6 py-4 border-b border-black/[0.06] flex justify-between items-center bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <CompanyLogo 
-                  name={selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"]} 
-                  size="md" 
-                  className="rounded-xl shadow-2xs shrink-0" 
-                  logoUrl={getSupplierLogo(selectedSupplierDetail)} 
-                  logoFit={selectedSupplierDetail.logoFit} 
-                />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 font-display truncate">
-                    {cleanCompanyName(selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"])}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {selectedSupplierDetail["Mã nhà cung cấp"]} • {selectedSupplierDetail["Loại hình"] || "Nhà sản xuất"} • {selectedSupplierDetail["Nhóm hàng"] || "Cung ứng"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedSupplierDetail(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer shrink-0"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
+      <Modal
+        open={Boolean(selectedSupplierDetail)}
+        onClose={() => setSelectedSupplierDetail(null)}
+        title={selectedSupplierDetail ? cleanCompanyName(selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"]) : ''}
+        subtitle={selectedSupplierDetail ? `${selectedSupplierDetail["Mã nhà cung cấp"]} • ${selectedSupplierDetail["Loại hình"] || "Nhà sản xuất"} • ${selectedSupplierDetail["Nhóm hàng"] || "Cung ứng"}` : ''}
+        icon={selectedSupplierDetail ? (
+          <CompanyLogo 
+            name={selectedSupplierDetail["Tên Nhà Cung Cấp"] || selectedSupplierDetail["Mã nhà cung cấp"]} 
+            size="sm" 
+            className="rounded-lg shadow-2xs" 
+            logoUrl={getSupplierLogo(selectedSupplierDetail)} 
+            logoFit={selectedSupplierDetail.logoFit} 
+          />
+        ) : undefined}
+        size="xl"
+        maximizable
+      >
+        {selectedSupplierDetail && (
+          <div className="p-6 space-y-5 text-xs sm:text-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100">
                   <span className="text-[11px] text-slate-400 font-medium block">Tên pháp lý</span>
@@ -1774,41 +1717,25 @@ export default function SupplierView({
                   )}
                 </div>
               </div>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Supplier Contact Detail Inspector Modal */}
-      {selectedContactDetail && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-xl bg-purple-100 text-purple-800 font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">
-                  {getAvatarInitials(selectedContactDetail["Tên"] || "")}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 font-display truncate">
-                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{formatContactFullName(selectedContactDetail["Tên"] || "")}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedContactDetail(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer shrink-0"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <Modal
+        open={Boolean(selectedContactDetail)}
+        onClose={() => setSelectedContactDetail(null)}
+        title={selectedContactDetail ? `${selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}${formatContactFullName(selectedContactDetail["Tên"] || "")}` : ''}
+        subtitle={selectedContactDetail ? `${selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • ${selectedContactDetail["Công ty"]}` : ''}
+        icon={selectedContactDetail ? (
+          <div className="h-6 w-6 rounded-md bg-purple-100 text-purple-800 font-bold flex items-center justify-center text-xs shadow-2xs">
+            {getAvatarInitials(selectedContactDetail["Tên"] || "")}
+          </div>
+        ) : undefined}
+        size="xl"
+      >
+        {selectedContactDetail && (
+          <div className="flex flex-col md:flex-row min-h-[500px]">
               <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-slate-100 p-5 overflow-y-auto space-y-4 bg-slate-50/50">
                 <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kênh kết nối</span>
@@ -2041,9 +1968,8 @@ export default function SupplierView({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Google Drive Master Sync Modal */}
       <GoogleDriveSyncModal
