@@ -22,7 +22,7 @@ import { PRICING_DATA, PO_LINES_DATA, PO_HEADER_DATA, DELIVERY_DATA, CUSTOMER_DA
 import { 
   DashboardView, MemoryStorageModal, 
   ProductDetailModal, PODetailModal, POFileUploadModal, 
-  ProductHoverCard, ProductCombobox, PricingCombobox, MacTrafficLights,
+  ProductHoverCard, ProductCombobox, PricingCombobox,
   Header, Breadcrumbs, MobileBottomNav
 } from "./components";
 import { uploadFileDirectToGoogleDrive } from './lib/driveSync';
@@ -45,6 +45,7 @@ const FactoryManagementView = React.lazy(() => import("./components/FactoryManag
 const TableView = React.lazy(() => import("./components/TableView"));
 const AssistantView = React.lazy(() => import("./components/AssistantView"));
 const HelpGuideView = React.lazy(() => import("./components/HelpGuideView"));
+const UIPreview = React.lazy(() => import("./UIPreview"));
 
 function ViewLoadingFallback() {
   return (
@@ -132,7 +133,10 @@ export default function App() {
     return true;
   };
 
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") || "dashboard";
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -1246,6 +1250,9 @@ export default function App() {
           <div className="p-3 sm:p-5 lg:p-8">
             <SettingsView />
           </div>
+        )}
+        {activeTab === "ui-preview" && (
+          <UIPreview />
         )}
         </Suspense>
         </main>

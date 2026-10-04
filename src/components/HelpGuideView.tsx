@@ -32,7 +32,6 @@ import {
   X
 } from "lucide-react";
 import clsx from "clsx";
-import MacTrafficLights from "./MacTrafficLights";
 
 interface HelpGuideViewProps {
   onNavigateTab?: (tab: string) => void;

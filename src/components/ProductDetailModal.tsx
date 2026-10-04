@@ -33,7 +33,6 @@ import {
   FileCheck
 } from 'lucide-react';
 import clsx from 'clsx';
-import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';

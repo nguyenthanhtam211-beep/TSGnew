@@ -8,7 +8,6 @@ import {
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
-import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import { 

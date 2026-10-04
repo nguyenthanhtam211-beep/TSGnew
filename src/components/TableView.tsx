@@ -28,7 +28,7 @@ import {
 import { exportGenericTableToPDF } from '../lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
 import { 
-  ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal, MacTrafficLights 
+  ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal 
 } from './index';
 
 function SortableColumnItem({ id, label, isVisible, onToggleVisibility }: { id: string; label: string; isVisible: boolean; onToggleVisibility: (id: string) => void }) {

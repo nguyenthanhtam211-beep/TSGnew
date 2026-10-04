@@ -32,7 +32,6 @@ import { ProductHoverCard } from "./ProductHoverCard";
 import { findPriceRecord, getSellPriceFromRecord, getBuyPriceFromRecord, parseNumber } from "../lib/business-logic";
 import GoogleSheetsSyncModal from "./GoogleSheetsSyncModal";
 import { generateStructuredPDFReport } from "../lib/pdf-exporter";
-import MacTrafficLights from "./MacTrafficLights";
 
 interface DeliveryViewProps {
   deliveryData: any[];

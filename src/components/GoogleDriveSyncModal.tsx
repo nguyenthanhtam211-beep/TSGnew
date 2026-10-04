@@ -12,7 +12,6 @@ import {
   MASTER_SHEET_TITLE, DriveSyncPayload
 } from '../lib/driveSync';
 import { ensureGoogleToken, openGoogleAuthTab, getStoredGoogleToken } from '../lib/auth';
-import MacTrafficLights from './MacTrafficLights';
 
 interface GoogleDriveSyncModalProps {
   isOpen: boolean;

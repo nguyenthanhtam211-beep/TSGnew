@@ -42,7 +42,6 @@ import { ProductHoverCard } from './ProductHoverCard';
 import { ProductCombobox } from './ProductCombobox';
 import { PricingCombobox } from './PricingCombobox';
 import clsx from 'clsx';
-import MacTrafficLights from './MacTrafficLights';
 import { parseNumber } from '../lib/business-logic';
 import { CustomChartTooltip } from './CustomChartTooltip';
 import { RECHARTS_PALETTE } from '../lib/design-tokens';

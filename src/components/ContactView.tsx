@@ -17,7 +17,6 @@ import { getItemKey } from '../hooks/useFirestoreCollection';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import { toast } from 'react-hot-toast';
-import MacTrafficLights from './MacTrafficLights';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 
 interface ContactViewProps {

@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
-import MacTrafficLights from './MacTrafficLights';
 import { formatVND, parseNumber, formatDateForDisplay, parseDateToISO, findPriceRecord } from '../lib/business-logic';
 import { processContractOCR } from '../lib/gemini';
 import { registerAndUploadDriveDocument, getDriveFolderPath, formatShortFileName } from '../lib/driveSync';

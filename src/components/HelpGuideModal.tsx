@@ -33,7 +33,6 @@ import {
   Globe2
 } from 'lucide-react';
 import clsx from 'clsx';
-import MacTrafficLights from './MacTrafficLights';
 
 interface HelpGuideModalProps {
   isOpen: boolean;

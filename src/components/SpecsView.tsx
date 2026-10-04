@@ -9,7 +9,6 @@ import {
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
-import MacTrafficLights from './MacTrafficLights';
 import {
   CockpitTableToolbar,
   CockpitPagination,

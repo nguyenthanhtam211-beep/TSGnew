@@ -22,7 +22,6 @@ import dbEngine from '../lib/dbEngine';
 import { getAvatarInitials, isExecutive } from './ContactView';
 import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, formatShortCompanyName } from '../utils/formatters';
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
-import MacTrafficLights from './MacTrafficLights';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
 import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';

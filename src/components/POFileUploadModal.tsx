@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
-import MacTrafficLights from './MacTrafficLights';
 
 interface POFileUploadModalProps {
   isOpen: boolean;

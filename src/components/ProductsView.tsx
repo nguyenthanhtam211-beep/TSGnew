@@ -11,7 +11,6 @@ import clsx from 'clsx';
 import { toast } from 'react-hot-toast';
 import { formatVND, parseNumber, getDefaultSpecs } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
-import MacTrafficLights from './MacTrafficLights';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
 import { 
   CockpitTableToolbar, 

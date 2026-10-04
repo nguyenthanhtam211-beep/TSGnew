@@ -18,7 +18,6 @@ import {
 } from '../lib/business-logic';
 import { ProductHoverCard } from './ProductHoverCard';
 import { processDocumentOCR } from '../lib/gemini';
-import MacTrafficLights from './MacTrafficLights';
 import { generateSmartDocumentFileName } from '../lib/documentNaming';
 
 export interface OCRItem {

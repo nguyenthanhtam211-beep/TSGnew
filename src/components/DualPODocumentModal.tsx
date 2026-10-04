@@ -8,7 +8,6 @@ import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
-import MacTrafficLights from "./MacTrafficLights";
 import { parseNumber, getSupplierShortCode, getDefaultSpecs } from "../lib/business-logic";
 
 interface DualPODocumentModalProps {
