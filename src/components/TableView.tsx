@@ -1554,6 +1554,13 @@ function TableView({
                   <tr 
                     key={rowId} 
                     onClick={() => {
+                      if (isPricingTable && onProductClick) {
+                        const prodKey = row['Tên sản phẩm'] || row['Mã sản phẩm'] || row['Tên hàng hoá'] || '';
+                        if (prodKey) {
+                          onProductClick(prodKey);
+                          return;
+                        }
+                      }
                       setUploadedFile(null);
                       setEditingRow(row);
                       setFormData({ ...row });
@@ -1717,6 +1724,13 @@ function TableView({
                 <div
                   key={rowId}
                   onClick={() => {
+                    if (isPricingTable && onProductClick) {
+                      const prodKey = row['Tên sản phẩm'] || row['Mã sản phẩm'] || row['Tên hàng hoá'] || '';
+                      if (prodKey) {
+                        onProductClick(prodKey);
+                        return;
+                      }
+                    }
                     setEditingRow(row);
                     setFormData({ ...row });
                     setIsEditModalOpen(true);

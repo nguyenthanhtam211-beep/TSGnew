@@ -43,6 +43,7 @@ const CommissionView = React.lazy(() => import("./components/CommissionView"));
 const ProductsView = React.lazy(() => import("./components/ProductsView"));
 const FactoryManagementView = React.lazy(() => import("./components/FactoryManagementView"));
 const TableView = React.lazy(() => import("./components/TableView"));
+const PricingView = React.lazy(() => import("./components/PricingView"));
 const AssistantView = React.lazy(() => import("./components/AssistantView"));
 const HelpGuideView = React.lazy(() => import("./components/HelpGuideView"));
 const UIPreview = React.lazy(() => import("./UIPreview"));
@@ -1094,20 +1095,22 @@ export default function App() {
           />
         )}
         {activeTab === "pricing" && (
-          <TableView 
+          <PricingView 
             pricingData={pricingData} 
             contractsData={contractsData} 
             products={productData} 
             suppliers={supplierData} 
             poHeaders={poHeaderData} 
+            poLinesData={enrichedPoLinesData}
+            deliveryData={enrichedDeliveryData}
+            deliveryPlanData={enrichedDeliveryPlanData}
+            customerData={customerData}
             title="Bảng giá 2026 (Phân loại theo Khách hàng & Nhóm hàng)" 
-            data={pricingData} 
-            showAddButton={true}
-            onAdd={(row) => handleAddToFirestore("pricing", row)}
-            onEdit={(row) => handleUpdateToFirestore("pricing", row)} 
-            onDelete={(row) => handleDeleteFromFirestore("pricing", row)} 
-            onProductClick={(val) => setSelectedProductDetails(val)} 
-            onPoClick={(val) => setSelectedPoDetails(val)} 
+            onAddPrice={(row) => handleAddToFirestore("pricing", row)}
+            onEditPrice={(row) => handleUpdateToFirestore("pricing", row)} 
+            onDeletePrice={(row) => handleDeleteFromFirestore("pricing", row)} 
+            onSelectProductDetails={(val) => setSelectedProductDetails(val)} 
+            onSelectPoDetails={(val) => setSelectedPoDetails(val)} 
             specsData={specsData} 
             onNavigateTab={(tab) => setActiveTab(tab)}
           />

@@ -18,6 +18,7 @@ export { default as CommissionView } from "./CommissionView";
 export { default as ProductsView } from "./ProductsView";
 export { default as FactoryManagementView } from "./FactoryManagementView";
 export { default as TableView } from "./TableView";
+export { default as PricingView } from "./PricingView";
 export { default as MobilePricingCatalog } from "./MobilePricingCatalog";
 export { default as AssistantView } from "./AssistantView";
 
