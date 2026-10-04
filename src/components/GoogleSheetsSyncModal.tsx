@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileSpreadsheet, ExternalLink, RefreshCw, CheckCircle2, AlertCircle, Database, BarChart3, Copy, Check, Sparkles, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ensureGoogleToken, clearStoredGoogleToken, openGoogleAuthTab } from '../lib/auth';
+import { Modal, Button } from './ui';
 
 interface GoogleSheetsSyncModalProps {
   isOpen: boolean;
@@ -136,29 +137,22 @@ OPTIONS (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-slate-100 my-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 text-white relative">
-          <button 
-            onClick={onClose}
-            className="absolute top-5 right-5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
-          >
-            <X size={18} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/15 rounded-xl backdrop-blur-md">
-              <FileSpreadsheet size={28} className="text-emerald-100" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold tracking-tight">Đồng bộ Google Sheets (BI & Looker Studio / BigQuery)</h3>
-              <p className="text-emerald-100 text-xs mt-1">Chuẩn hóa dữ liệu phẳng, tự động ép kiểu Ngày/Số tương thích 100% với Looker Studio & BigQuery</p>
-            </div>
-          </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Đồng bộ Google Sheets (BI & Looker Studio / BigQuery)"
+      subtitle="Chuẩn hóa dữ liệu phẳng, tự động ép kiểu Ngày/Số tương thích 100% với Looker Studio & BigQuery"
+      size="xl"
+      footer={
+        <div className="flex items-center justify-between w-full text-xs text-ink-muted">
+          <span>* Định dạng tự động hóa dữ liệu phẳng cho BI Dashboard</span>
+          <Button variant="secondary" onClick={onClose}>
+            Đóng
+          </Button>
         </div>
-
-        {/* Content Body */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+      }
+    >
+      <div className="space-y-6">
           {/* Action Buttons */}
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
@@ -322,19 +316,7 @@ OPTIONS (
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>* Định dạng tự động hóa dữ liệu phẳng cho BI Dashboard</span>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
-          >
-            Đóng
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

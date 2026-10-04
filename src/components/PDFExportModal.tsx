@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { FileText, Download, Printer, X, Sparkles, Layout, Table, CheckCircle2, RefreshCw, BarChart3, ShieldCheck, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { exportElementToPDF, generateStructuredPDFReport } from '../lib/pdf-exporter';
+import { Modal, Button } from './ui';
 
 interface PDFExportModalProps {
   isOpen: boolean;
@@ -102,29 +103,40 @@ export default function PDFExportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 my-8 animate-in fade-in zoom-in-95 duration-200">
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Xuất Báo Cáo PDF Chuyên Nghiệp"
+      subtitle="Xuất trực tiếp thành file .PDF chuẩn vector & độ phân giải cao"
+      size="xl"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <Button
+            variant="secondary"
+            onClick={handleDirectPrint}
+            icon={<Printer size={15} />}
           >
-            <X size={18} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/15 rounded-xl backdrop-blur-md">
-              <FileText size={26} className="text-blue-100" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold tracking-tight">Xuất Báo Báo PDF Chuyên Nghiệp</h3>
-              <p className="text-blue-100 text-xs mt-1">Xuất trực tiếp thành file .PDF chuẩn vector & độ phân giải cao</p>
-            </div>
+            Mở Hộp Thoại In
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleGenerateAndDownload}
+              disabled={isGenerating}
+              loading={isGenerating}
+              icon={!isGenerating ? <Download size={15} /> : undefined}
+            >
+              {isGenerating ? "Đang tạo File PDF..." : "Tải Xuống File PDF"}
+            </Button>
           </div>
         </div>
-
-        {/* Modal Body */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+      }
+    >
+      <div className="space-y-6">
           {/* Formats Selection */}
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
@@ -294,47 +306,6 @@ export default function PDFExportModal({
             </div>
           </div>
         </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleDirectPrint}
-            className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
-          >
-            <Printer size={15} />
-            Mở Hộp Thoại In
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-800"
-            >
-              Hủy
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateAndDownload}
-              disabled={isGenerating}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md hover:shadow-blue-600/20 disabled:opacity-50"
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw size={15} className="animate-spin" />
-                  Đang tạo File PDF...
-                </>
-              ) : (
-                <>
-                  <Download size={15} />
-                  Tải Xuống File PDF
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+      </Modal>
+    );
+  }

@@ -12,6 +12,7 @@ import {
   MASTER_SHEET_TITLE, DriveSyncPayload
 } from '../lib/driveSync';
 import { ensureGoogleToken, openGoogleAuthTab, getStoredGoogleToken } from '../lib/auth';
+import { Modal, Button } from './ui';
 
 interface GoogleDriveSyncModalProps {
   isOpen: boolean;
@@ -127,37 +128,21 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
-        
-        {/* Linear Header */}
-        <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <Cloud size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-display">
-                Kho Dữ Liệu Đồng Bộ Google Drive
-                <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded-full">2-Way Sync</span>
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Lưu trữ master spreadsheet, chỉnh sửa trên Sheets và đồng bộ 2 chiều tức thì
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-          >
-            <X size={16} />
-          </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Kho Dữ Liệu Đồng Bộ Google Drive"
+      subtitle="Lưu trữ master spreadsheet, chỉnh sửa trên Sheets và đồng bộ 2 chiều tức thì"
+      size="xl"
+      footer={
+        <div className="flex justify-end w-full">
+          <Button variant="secondary" onClick={onClose}>
+            Đóng
+          </Button>
         </div>
-
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
+      }
+    >
+      <div className="space-y-5 text-xs sm:text-sm">
 
           {/* Drive File Status Box */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
@@ -327,19 +312,7 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
             </ul>
           </div>
 
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 flex justify-end bg-slate-50/80">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all shadow-2xs"
-          >
-            Đóng
-          </button>
-        </div>
-
       </div>
-    </div>
+    </Modal>
   );
 }
