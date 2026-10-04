@@ -1768,10 +1768,25 @@ function TableView({
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden pb-safe sm:pb-0">
-            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
-              <MacTrafficLights onClose={() => setIsModalOpen(false)} />
-              <div className="h-4 w-px bg-black/[0.08]" />
-              <h3 className="text-sm font-bold text-[#1D1D1F]">Thêm mới {title}</h3>
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
+                  <PlusCircle size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-display">Thêm mới {title}</h3>
+                  <p className="text-[11px] text-slate-400">Nhập thông tin bản ghi để lưu vào cơ sở dữ liệu</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
+                title="Đóng"
+                aria-label="Đóng"
+              >
+                <X size={16} />
+              </button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2163,20 +2178,29 @@ function TableView({
             animate={{ x: 0 }}
             className="w-full sm:max-w-md bg-white max-h-[90vh] sm:h-full rounded-t-[28px] sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-black/[0.08] pb-safe sm:pb-0 overflow-hidden"
           >
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
-              <MacTrafficLights onClose={() => {
-                setIsEditModalOpen(false);
-                setEditingRow(null);
-                setFormData({});
-              }} />
-              <div className="h-4 w-px bg-black/[0.08]" />
-              <div>
-                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                  <Edit size={16} className="text-blue-600" />
-                  Chi tiết & Chỉnh sửa
-                </h3>
-                <p className="text-[11px] text-slate-500 font-medium">Cập nhật thông tin cho bản ghi này</p>
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
+                  <Edit size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-display">Chi tiết & Chỉnh sửa</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Cập nhật thông tin cho bản ghi này</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingRow(null);
+                  setFormData({});
+                }}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
+                title="Đóng"
+                aria-label="Đóng"
+              >
+                <X size={16} />
+              </button>
             </div>
             
             <div className="flex-1 overflow-auto p-6 space-y-4">

@@ -131,16 +131,14 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
         
-        {/* Apple macOS Window Header */}
-        <div className="px-6 py-4 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
-          <MacTrafficLights onClose={onClose} />
-          <div className="h-4 w-px bg-black/[0.08]" />
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+        {/* Linear Header */}
+        <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <Cloud size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-space-grotesk">
                 Kho Dữ Liệu Đồng Bộ Google Drive
                 <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded-full">2-Way Sync</span>
               </h3>
@@ -149,6 +147,14 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Modal Body */}

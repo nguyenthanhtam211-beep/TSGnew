@@ -1245,12 +1245,26 @@ export default function ContactView({
       {isContactModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-3.5 border-b border-black/[0.06] flex items-center gap-3 bg-[#F5F5F7]">
-              <MacTrafficLights onClose={() => setIsContactModalOpen(false)} />
-              <div className="h-4 w-px bg-black/[0.08]" />
-              <h3 className="text-sm font-bold text-[#1D1D1F]">
-                {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
-              </h3>
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <Users size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                    {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Thông tin liên lạc & đơn vị công tác</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsContactModalOpen(false)}
+                aria-label="Đóng"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveContact} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">

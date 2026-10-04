@@ -23,7 +23,8 @@ import {
   LayoutGrid,
   Trash2,
   Edit2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
@@ -1572,12 +1573,26 @@ export default function DeliveryView({
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-[#F5F5F7] px-6 py-4 text-slate-900 border-b border-black/[0.06] flex items-center justify-between">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <Truck size={20} className="text-blue-600" />
-                Tạo Phiếu Xuất Kho (PXK) Mới
-              </h3>
-              <MacTrafficLights onClose={() => setIsAddModalOpen(false)} />
+            <div className="bg-white px-6 py-4 text-slate-900 border-b border-black/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <Truck size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 font-space-grotesk">
+                    Tạo Phiếu Xuất Kho (PXK) Mới
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Khởi tạo phiếu xuất hàng & đối chiếu tiến độ giao</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                aria-label="Đóng"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">

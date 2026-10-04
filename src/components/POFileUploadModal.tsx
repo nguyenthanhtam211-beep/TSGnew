@@ -210,25 +210,21 @@ export function POFileUploadModal({
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-5 py-4 bg-[#F9FAFB] border-b border-slate-200 flex items-center justify-between">
+        <div className="px-5 py-4 bg-white border-b border-black/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <MacTrafficLights onClose={onClose} />
-            <div className="h-4 w-px bg-slate-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                <UploadCloud size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                    Google Drive Ready
-                  </span>
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Lưu trữ đám mây Google Drive an toàn & tự động tạo đường link chia sẻ
-                </p>
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <UploadCloud size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-space-grotesk">
+                Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                  Google Drive Ready
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Lưu trữ đám mây Google Drive an toàn & tự động tạo đường link chia sẻ
+              </p>
             </div>
           </div>
 

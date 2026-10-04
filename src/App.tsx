@@ -730,15 +730,15 @@ export default function App() {
           <div className="relative w-4/5 max-w-xs bg-[#F5F5F7] dark:bg-slate-900 flex flex-col text-slate-900 dark:text-slate-100 shadow-2xl h-full border-r border-slate-200/80 dark:border-slate-800 z-10 animate-in slide-in-from-left duration-200 pl-[max(env(safe-area-inset-left),0px)] pb-safe">
             <div className="p-4 border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <MacTrafficLights onClose={() => setMobileMenuOpen(false)} />
-                <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-                <h2 className="text-xs font-black tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase">TSG BUSINESS OS</h2>
+                <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                <h2 className="text-xs font-black tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase font-space-grotesk">TSG BUSINESS OS</h2>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)} 
-                className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Đóng menu"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 

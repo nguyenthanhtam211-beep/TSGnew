@@ -252,35 +252,46 @@ export function ProductDetailModal({
         isMaximized ? "w-[98vw] h-[96vh]" : "w-[92vw] max-w-5xl h-[88vh]"
       )}>
         
-        {/* Apple macOS Style Header */}
-        <div className="px-5 py-3.5 border-b border-slate-200/80 flex justify-between items-center bg-[#F8F9FA] shrink-0">
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-black/[0.06] flex justify-between items-center bg-white shrink-0">
           <div className="flex items-center gap-3.5 min-w-0">
-            <MacTrafficLights 
-              onClose={onClose} 
-              onMaximize={() => setIsMaximized(!isMaximized)}
-              isMaximized={isMaximized}
-            />
-            <div className="h-4 w-px bg-slate-300" />
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs font-bold">
-                <Package size={16} />
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs font-bold">
+              <Package size={17} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono font-bold text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                  {productCode || 'SKU'}
+                </span>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate font-space-grotesk">{productName}</h2>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono font-bold text-[11px] bg-slate-200/80 text-slate-800 px-1.5 py-0.5 rounded border border-slate-300/60 shrink-0">
-                    {productCode || 'SKU'}
-                  </span>
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{productName}</h2>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                  <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>
-                  <span>•</span>
-                  <span>ĐVT: <strong className="text-slate-700 font-semibold">{product['Đơn Vị Tính'] || 'Cái'}</strong></span>
-                  <span>•</span>
-                  <span>Tình trạng: <span className="font-semibold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span></span>
-                </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>
+                <span>•</span>
+                <span>ĐVT: <strong className="text-slate-700 font-semibold">{product['Đơn Vị Tính'] || 'Cái'}</strong></span>
+                <span>•</span>
+                <span>Tình trạng: <span className="font-semibold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span></span>
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsMaximized(!isMaximized)}
+              aria-label={isMaximized ? "Thu nhỏ" : "Phóng to"}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+            >
+              {isMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
 

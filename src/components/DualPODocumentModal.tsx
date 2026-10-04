@@ -520,16 +520,14 @@ export function DualPODocumentModal({
         
         {/* Header Modal Bar */}
         <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-black/[0.06]">
-          <div className="flex items-center gap-4">
-            <MacTrafficLights onClose={onClose} />
-            <div className="h-6 w-px bg-slate-200" />
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-md">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-black/5">
               <Layers className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900 tracking-wide">Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight font-space-grotesk">Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp</h2>
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Step 2 - Order Sourcing
                 </span>
               </div>
@@ -542,9 +540,10 @@ export function DualPODocumentModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 rounded-xl transition"
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
           >
-            Đóng [ESC]
+            <X className="w-4 h-4" />
           </button>
         </div>
 

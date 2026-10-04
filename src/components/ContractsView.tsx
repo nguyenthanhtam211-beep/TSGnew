@@ -1004,17 +1004,21 @@ export default function ContractsView({
             className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 border border-black/[0.08]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+            <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
-                <MacTrafficLights onClose={() => setIsMobileDetailOpen(false)} />
-                <div className="h-4 w-px bg-black/[0.08]" />
-                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                  <FileText size={15} className="text-blue-600" />
-                  Chi Tiết Hợp Đồng
-                </h3>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <FileText size={15} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                    Chi Tiết Hợp Đồng
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Tra cứu nhanh hồ sơ hợp đồng</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsMobileDetailOpen(false);
                     handleOpenEdit(selectedContract);
@@ -1025,9 +1029,10 @@ export default function ContractsView({
                   Sửa
                 </button>
                 <button
+                  type="button"
                   onClick={() => setIsMobileDetailOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
                   aria-label="Đóng"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
                 >
                   <X size={16} />
                 </button>
@@ -1205,20 +1210,24 @@ export default function ContractsView({
             className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
-            {/* Apple Header */}
-            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
-              <div className="flex items-center gap-3">
-                <MacTrafficLights onClose={() => setIsModalOpen(false)} />
-                <div className="h-4 w-px bg-black/[0.08]" />
-                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                  <FileText size={16} className="text-blue-600" />
-                  {editingContract ? 'Cập Nhật Hợp Đồng' : 'Thêm Hợp Đồng Mới'}
-                </h3>
+            {/* Clean Modern Modal Header */}
+            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
+                    {editingContract ? 'Cập Nhật Hợp Đồng' : 'Thêm Hợp Đồng Mới'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Quản lý hồ sơ pháp lý & file lưu trữ Google Drive</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
+                title="Đóng (Esc)"
                 aria-label="Đóng"
               >
                 <X size={16} />
@@ -1481,23 +1490,23 @@ export default function ContractsView({
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7] shrink-0">
+            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <MacTrafficLights onClose={() => setIsOcrModalOpen(false)} />
-                <div className="h-4 w-px bg-black/[0.08]" />
-                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                  <Sparkles size={16} className="text-blue-600" />
-                  <span>Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)</span>
-                </h3>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                    Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-block text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200/50">
-                  Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026
-                </span>
                 <button
                   type="button"
                   onClick={() => setIsOcrModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-black/[0.05]"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
                   aria-label="Đóng"
                 >
                   <X size={16} />

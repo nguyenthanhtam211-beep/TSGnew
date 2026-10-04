@@ -3,7 +3,7 @@ import {
   Percent, Plus, Search, Filter, Calendar, CheckCircle2, Clock, 
   AlertCircle, DollarSign, Download, Eye, Edit3, Trash2, UserCheck,
   Building2, ArrowUpRight, ArrowDownRight, Wallet, Receipt, CreditCard,
-  ChevronRight, Tag, Scale, CalendarDays, Sparkles, RefreshCw, FileText, Check
+  ChevronRight, Tag, Scale, CalendarDays, Sparkles, RefreshCw, FileText, Check, X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
@@ -1091,15 +1091,26 @@ export default function CommissionView({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08]">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F5F5F7]">
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
-                <MacTrafficLights onClose={() => setIsModalOpen(false)} />
-                <div className="h-4 w-px bg-black/[0.08]" />
-                <h3 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
-                  <Receipt size={16} className="text-purple-600" />
-                  {editingCommission ? 'Cập Nhật Phiếu Hoa Hồng' : 'Lập Phiếu Hoa Hồng Mới (3 Phương Thức)'}
-                </h3>
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center shrink-0">
+                  <Receipt size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                    {editingCommission ? 'Cập Nhật Phiếu Hoa Hồng' : 'Lập Phiếu Hoa Hồng Mới (3 Phương Thức)'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Quản lý định mức chi trả & theo dõi thanh toán</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Đóng"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveCommission} className="flex-1 overflow-y-auto p-6 space-y-4">

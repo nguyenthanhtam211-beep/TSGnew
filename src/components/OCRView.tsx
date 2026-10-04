@@ -864,10 +864,10 @@ export default function OCRView({
 
             {/* Document Details Card */}
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs overflow-hidden">
-              <div className="bg-[#F5F5F7] px-6 py-4 border-b border-slate-200/80 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MacTrafficLights />
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <div className="bg-white px-6 py-4 border-b border-black/[0.06] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-blue-600" />
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider font-space-grotesk">
                     Thông Tin Chứng Từ Đã Bóc Tách
                   </span>
                 </div>

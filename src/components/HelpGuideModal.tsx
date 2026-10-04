@@ -63,18 +63,14 @@ export default function HelpGuideModal({ isOpen, onClose, onNavigateTab }: HelpG
         {/* Top Window Bar */}
         <div className="px-5 sm:px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <MacTrafficLights onClose={onClose} />
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-2xs">
-                <BookOpen size={14} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                  <span>Trung Tâm Trợ Giúp & Cẩm Nang Sử Dụng</span>
-                  <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800">TSG OS 2026</span>
-                </h3>
-              </div>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+              <BookOpen size={15} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 font-space-grotesk">
+                <span>Trung Tâm Trợ Giúp & Cẩm Nang Sử Dụng</span>
+                <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800">TSG OS 2026</span>
+              </h3>
             </div>
           </div>
 
