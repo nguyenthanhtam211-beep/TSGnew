@@ -30,6 +30,9 @@ import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
 import { 
   ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal 
 } from './index';
+import { 
+  Button, IconButton, Modal, Drawer, StatusBadge, Field, Input, Select 
+} from './ui';
 
 function SortableColumnItem({ id, label, isVisible, onToggleVisibility }: { id: string; label: string; isVisible: boolean; onToggleVisibility: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -994,7 +997,7 @@ function TableView({
   };
 
   return (
-    <div className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-8 bg-[#F5F5F7] min-h-0">
+    <div className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-8 bg-canvas min-h-0">
       
       {/* Subtab Switcher: Pricing vs Contracts */}
       {isPricingTable && (
@@ -1030,34 +1033,40 @@ function TableView({
 
         <div className="flex items-center gap-2 flex-wrap relative">
           {title.includes("Báo cáo") && (
-            <button
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Printer size={14} />}
               onClick={() => {
                 alert("Vui lòng chọn khổ giấy A4 ngang (Landscape) và Tỷ lệ (Scale) phù hợp khi hộp thoại in hiện ra để báo cáo hiển thị đầy đủ nhất.");
                 window.print();
               }}
-              className="flex items-center gap-1.5 bg-[#007AFF] text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] transition-all shadow-xs"
               title="In báo cáo"
             >
-              <Printer size={15} /> In báo cáo
-            </button>
+              <span>In báo cáo</span>
+            </Button>
           )}
 
-          <button 
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Columns size={14} />}
             onClick={() => setShowColSettings(!showColSettings)}
-            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 transition-all shadow-2xs"
             title="Tuỳ chỉnh cột"
           >
-            <Columns size={15} />
             <span className="hidden sm:inline">Cột</span>
-          </button>
+          </Button>
 
           {showColSettings && (
-            <div className="absolute top-12 right-0 z-50 w-72 bg-white border border-black/[0.08] shadow-2xl rounded-2xl max-h-[70vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-              <div className="flex justify-between items-center p-3.5 border-b border-black/[0.06] bg-[#F5F5F7]">
-                <h3 className="font-semibold text-[#1D1D1F] text-xs">Hiển thị & Sắp xếp cột</h3>
-                <button onClick={() => setShowColSettings(false)} className="text-slate-400 hover:text-slate-700">
-                  <X size={15} />
-                </button>
+            <div className="absolute top-12 right-0 z-50 w-72 bg-surface border border-line shadow-pop rounded-card max-h-[70vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+              <div className="flex justify-between items-center p-3.5 border-b border-line bg-subtle">
+                <h3 className="font-semibold text-ink text-xs font-display">Hiển thị & Sắp xếp cột</h3>
+                <IconButton
+                  icon={<X size={14} />}
+                  label="Đóng"
+                  size="sm"
+                  onClick={() => setShowColSettings(false)}
+                />
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -1077,7 +1086,10 @@ function TableView({
             </div>
           )}
 
-          <button 
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Download size={14} />}
             onClick={() => {
               const exportData = filteredData.map(row => {
                 const newRow: any = {};
@@ -1091,14 +1103,15 @@ function TableView({
               XLSX.utils.book_append_sheet(wb, ws, "Data");
               XLSX.writeFile(wb, `${title}.xlsx`);
             }}
-            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-2xs"
             title="Xuất Bảng Excel"
           >
-            <Download size={15} />
             <span className="hidden sm:inline">Excel</span>
-          </button>
+          </Button>
 
-          <button 
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FileText size={14} />}
             onClick={() => {
               try {
                 const exportData = filteredData.map(row => {
@@ -1119,15 +1132,16 @@ function TableView({
                 toast.error('Lỗi xuất PDF: ' + (err?.message || err));
               }
             }}
-            className="flex items-center gap-1.5 bg-white text-slate-700 border border-black/[0.08] px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all shadow-2xs"
             title="Xuất Bảng PDF Chuyên Nghiệp"
           >
-            <FileText size={15} />
             <span className="hidden sm:inline">PDF</span>
-          </button>
+          </Button>
           
           {selectedRowIds.size > 0 && onDelete && (
-            <button 
+            <Button 
+              variant="danger"
+              size="sm"
+              icon={<Trash2 size={14} />}
               onClick={() => {
                 if (window.confirm(`Bạn có chắc chắn muốn xoá ${selectedRowIds.size} bản ghi đã chọn?`)) {
                   Array.from(selectedRowIds).forEach(id => {
@@ -1137,15 +1151,16 @@ function TableView({
                   setSelectedRowIds(new Set());
                 }
               }}
-              className="flex items-center gap-1.5 bg-red-600 text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-red-700 transition-all shadow-xs"
             >
-              <Trash2 size={15} />
               <span>Xóa ({selectedRowIds.size})</span>
-            </button>
+            </Button>
           )}
 
           {showAddButton && (
-            <button 
+            <Button 
+              variant="primary"
+              size="sm"
+              icon={<PlusCircle size={14} />}
               onClick={() => {
                 setUploadedFile(null);
                 setFormData({
@@ -1156,25 +1171,24 @@ function TableView({
                 });
                 setIsModalOpen(true);
               }} 
-              className="flex items-center gap-1.5 bg-[#007AFF] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-[#0062CC] active:bg-[#0051A8] transition-all shadow-xs"
             >
-              <PlusCircle size={15} />
               <span>Thêm mới</span>
-            </button>
+            </Button>
           )}
 
           {isPOHeaderTable && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<UploadCloud size={14} />}
               onClick={() => {
                 setFileUploadModalPO(data[0] || null);
                 setShowPOFileUploadModal(true);
               }}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
               title="Cập nhật chứng từ PO bằng file PDF hoặc Hình ảnh lên Google Drive (kèm link chia sẻ)"
             >
-              <UploadCloud size={15} />
-              <span>⚡ Cập nhật file PO (PDF/Ảnh)</span>
-            </button>
+              <span>Cập nhật file PO</span>
+            </Button>
           )}
         </div>
       </div>
@@ -1366,7 +1380,7 @@ function TableView({
                   </th>
                 )}
                 {visibleColumns.map((h, idx) => (
-                  <th key={h} className={`px-4 py-3 font-semibold font-display border-b border-black/[0.06] bg-[#F5F5F7] dark:bg-slate-900 text-slate-700 dark:text-slate-200 tracking-wider text-[11px] uppercase ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_rgba(226,232,240,0.85)] z-[15]' : ''}`}>
+                  <th key={h} className={`px-4 py-2.5 font-semibold font-display border-b border-line bg-subtle text-ink-3 tracking-wider text-[11px] uppercase ${idx === 0 ? 'sticky left-0 shadow-[1px_0_0_0_rgba(230,230,234,0.85)] z-[15]' : ''}`}>
                     <div className="flex items-center justify-between relative gap-2">
                       <span className="truncate">{h}</span>
                       <button 
@@ -1765,31 +1779,26 @@ function TableView({
         </div>
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden pb-safe sm:pb-0">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <PlusCircle size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">Thêm mới {title}</h3>
-                  <p className="text-[11px] text-slate-400">Nhập thông tin bản ghi để lưu vào cơ sở dữ liệu</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={`Thêm mới ${title}`}
+        subtitle="Nhập thông tin bản ghi để lưu vào cơ sở dữ liệu"
+        icon={<PlusCircle size={16} />}
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button variant="primary" type="submit" form="add-form">
+              Lưu dữ liệu
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <form id="add-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {headers.filter(h => {
                   if (h === 'STT' || h === 'id' || h === 'isDeleted' || h.startsWith('_')) return false;
 
@@ -2158,52 +2167,42 @@ function TableView({
                   </div>
                 </div>
               )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
-              <button onClick={() => setIsModalOpen(false)} type="button" className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                Hủy
-              </button>
-              <button type="submit" form="add-form" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md">
-                Lưu dữ liệu
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
 
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-end">
-          <motion.div 
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            className="w-full sm:max-w-md bg-white max-h-[90vh] sm:h-full rounded-t-[28px] sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-black/[0.08] pb-safe sm:pb-0 overflow-hidden"
-          >
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <Edit size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">Chi tiết & Chỉnh sửa</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">Cập nhật thông tin cho bản ghi này</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingRow(null);
-                  setFormData({});
-                }}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-auto p-6 space-y-4">
+      <Drawer
+        open={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingRow(null);
+          setFormData({});
+        }}
+        title="Chi tiết & Chỉnh sửa"
+        subtitle="Cập nhật thông tin cho bản ghi này"
+        icon={<Edit size={16} />}
+        width="lg"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setEditingRow(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="edit-form-side"
+            >
+              Lưu thay đổi
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
               <form id="edit-form-side" onSubmit={handleSubmit} className="space-y-4">
                 {headers.filter(h => {
                   if (h === 'id' || h === 'isDeleted' || h === 'createdAt' || h === 'updatedAt' || h === 'deletedAt' || h === 'STT' || h.startsWith('_')) return false;
@@ -2551,29 +2550,8 @@ function TableView({
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button 
-                  type="submit"
-                  form="edit-form-side"
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2"
-                >
-                  <Check size={18} />
-                  Lưu thay đổi
-                </button>
-                <button 
-                  onClick={() => { setIsEditModalOpen(false); setEditingRow(null); }}
-                  className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all cursor-pointer"
-                >
-                  Hủy
-                </button>
-              </div>
-            </div>
-          </motion.div>
         </div>
-      )}
+      </Drawer>
 
       {/* PO File Upload & Drive Sync Modal */}
       {isPOHeaderTable && (
