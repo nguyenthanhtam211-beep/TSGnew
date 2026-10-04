@@ -45,6 +45,7 @@ import clsx from 'clsx';
 import { parseNumber } from '../lib/business-logic';
 import { CustomChartTooltip } from './CustomChartTooltip';
 import { RECHARTS_PALETTE } from '../lib/design-tokens';
+import { Modal, Button, StatusBadge } from './ui';
 
 interface PODetailModalProps {
   poNumber: string;
@@ -318,67 +319,44 @@ export function PODetailModal({
   const numberFormatter = new Intl.NumberFormat('vi-VN');
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 sm:p-6">
-      <div className={clsx(
-        "bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-200 animate-in fade-in zoom-in-95",
-        isMaximized ? "max-w-7xl h-[95vh]" : "max-w-5xl max-h-[90vh]"
-      )}>
-        
-        {/* Clean Modern Window Header */}
-        <div className="px-6 py-4 border-b border-black/[0.06] flex justify-between items-center bg-[#F8F9FA] shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 border border-emerald-200/60 shadow-2xs">
-              <ShoppingCart size={20} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm font-bold text-slate-900 font-display truncate">
-                Chi tiết Đơn hàng: <span className="font-mono text-emerald-700">{poHeader['Đơn hàng']}</span>
-              </h2>
-              <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                {poHeader['Khách hàng'] && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded">
-                    Khách hàng: {poHeader['Khách hàng']}
-                  </span>
-                )}
-                {poHeader['Phân loại'] && (
-                  <span className="text-xs text-slate-400 font-medium">
-                    {poHeader['Phân loại']}
-                  </span>
-                )}
-                {poHeader['Trạng Thái'] && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
-                    poHeader['Trạng Thái'] === 'Hoàn thành' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 
-                    poHeader['Trạng Thái'] === 'Mới nhận' ? 'bg-blue-50 text-blue-700 border border-blue-200/60' :
-                    'bg-slate-100 text-slate-700 border border-slate-200'
-                  }`}>
-                    {poHeader['Trạng Thái']}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsMaximized(!isMaximized)}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-              title={isMaximized ? "Thu nhỏ cửa sổ" : "Phóng to toàn màn hình"}
-              aria-label="Phóng to / Thu nhỏ"
-            >
-              {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-              title="Đóng (Esc)"
-              aria-label="Đóng"
-            >
-              <X size={16} />
-            </button>
-          </div>
+    <>
+      <Modal
+        open={true}
+        onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <span>Chi tiết Đơn hàng:</span>
+          <span className="font-mono text-emerald-700">{poHeader['Đơn hàng']}</span>
         </div>
+      }
+      subtitle={
+        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+          {poHeader['Khách hàng'] && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded">
+              Khách hàng: {poHeader['Khách hàng']}
+            </span>
+          )}
+          {poHeader['Phân loại'] && (
+            <span className="text-xs text-slate-400 font-medium">
+              {poHeader['Phân loại']}
+            </span>
+          )}
+          {poHeader['Trạng Thái'] && (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+              poHeader['Trạng Thái'] === 'Hoàn thành' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 
+              poHeader['Trạng Thái'] === 'Mới nhận' ? 'bg-blue-50 text-blue-700 border border-blue-200/60' :
+              'bg-slate-100 text-slate-700 border border-slate-200'
+            }`}>
+              {poHeader['Trạng Thái']}
+            </span>
+          )}
+        </div>
+      }
+      icon={<ShoppingCart size={18} />}
+      size="xl"
+      maximizable
+    >
+      <div className="flex flex-col h-[78vh]">
 
         {/* Tab Navigation */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 bg-white shrink-0">
@@ -1007,6 +985,7 @@ export function PODetailModal({
           
         </div>
       </div>
+    </Modal>
 
       {/* Dual PO Review Modal */}
       <DualPODocumentModal
@@ -1032,7 +1011,7 @@ export function PODetailModal({
           }
         }}
       />
-    </div>
+    </>
   );
 }
 
