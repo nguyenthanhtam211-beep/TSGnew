@@ -16,7 +16,11 @@ import {
   CockpitTableToolbar, 
   CockpitPagination, 
   CockpitTableEmptyState, 
-  CockpitBadge 
+  CockpitBadge,
+  Modal,
+  Drawer,
+  Button,
+  IconButton
 } from './ui';
 
 interface ProductsViewProps {
@@ -727,39 +731,16 @@ export default function ProductsView({
         </div>
       )}
 
-      {/* Edit Product Drawer / Modal */}
-      <AnimatePresence>
-        {isEditModalOpen && (
-          <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
-            <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-              className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200"
-            >
-              <div className="p-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs shrink-0">
-                    <Edit3 size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 text-sm truncate font-display">Chỉnh Sửa Thông Tin Sản Phẩm</h3>
-                    <p className="text-[11px] text-slate-400">Cập nhật thông tin chi tiết vào hệ thống</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                  title="Đóng"
-                  aria-label="Đóng"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+      {/* Edit Product Drawer */}
+      <Drawer
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Chỉnh Sửa Thông Tin Sản Phẩm"
+        subtitle="Cập nhật thông tin chi tiết vào hệ thống"
+        icon={<Edit3 size={16} />}
+        width="md"
+      >
+        <form onSubmit={handleSaveEdit} className="p-6 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1.5">Tên sản phẩm (*):</label>
                   <input
@@ -896,61 +877,36 @@ export default function ProductsView({
                   />
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex gap-3">
-                  <button
+                <div className="pt-4 border-t border-line flex gap-3">
+                  <Button
                     type="submit"
-                    disabled={isSaving}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+                    variant="primary"
+                    loading={isSaving}
+                    className="flex-1"
                   >
-                    <Check size={16} />
-                    <span>{isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
-                  </button>
-                  <button
+                    Lưu thay đổi
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="px-5 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all"
                   >
                     Hủy
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Drawer>
 
       {/* Add Product Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden"
-            >
-              <div className="p-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs shrink-0">
-                    <Plus size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 text-sm truncate font-display">Thêm Mới Sản Phẩm</h3>
-                    <p className="text-[11px] text-slate-400">Đăng ký sản phẩm mới vào hệ thống</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                  title="Đóng"
-                  aria-label="Đóng"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveAdd} className="p-6 space-y-4 text-xs">
+      <Modal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Thêm Mới Sản Phẩm"
+        subtitle="Đăng ký sản phẩm mới vào hệ thống"
+        icon={<Plus size={16} />}
+        size="md"
+      >
+        <form onSubmit={handleSaveAdd} className="p-6 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1.5">Tên sản phẩm (*):</label>
                   <input
@@ -1063,28 +1019,25 @@ export default function ProductsView({
                   />
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex gap-3">
-                  <button
+                <div className="pt-4 border-t border-line flex gap-3">
+                  <Button
                     type="submit"
-                    disabled={isSaving}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50"
+                    variant="primary"
+                    loading={isSaving}
+                    className="flex-1"
                   >
-                    <Check size={16} />
-                    <span>{isSaving ? 'Đang thêm...' : 'Tạo sản phẩm'}</span>
-                  </button>
-                  <button
+                    Tạo sản phẩm
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-5 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all"
                   >
                     Hủy
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

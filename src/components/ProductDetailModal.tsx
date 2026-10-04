@@ -36,6 +36,7 @@ import clsx from 'clsx';
 import { formatVND, parseNumber, formatDateForDisplay } from '../lib/business-logic';
 import CompanyLogo from './CompanyLogo';
 import { getDriveFolderPath, formatShortFileName } from '../lib/driveSync';
+import { Modal } from './ui';
 
 interface ProductDetailModalProps {
   productNameOrId: string;
@@ -244,55 +245,32 @@ export function ProductDetailModal({
   }, [latestPO, productCode, relatedCustomers]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-4 sm:p-6 animate-in fade-in duration-150">
-      {/* Fixed Dimension Window Frame to prevent layout shifts when toggling tabs */}
-      <div className={clsx(
-        "bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 border border-slate-200/80",
-        isMaximized ? "w-[98vw] h-[96vh]" : "w-[92vw] max-w-5xl h-[88vh]"
-      )}>
-        
-        {/* Header */}
-        <div className="px-5 py-3.5 border-b border-black/[0.06] flex justify-between items-center bg-white shrink-0">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs font-bold">
-              <Package size={17} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono font-bold text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 shrink-0">
-                  {productCode || 'SKU'}
-                </span>
-                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate font-display">{productName}</h2>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>
-                <span>•</span>
-                <span>ĐVT: <strong className="text-slate-700 font-semibold">{product['Đơn Vị Tính'] || 'Cái'}</strong></span>
-                <span>•</span>
-                <span>Tình trạng: <span className="font-semibold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span></span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsMaximized(!isMaximized)}
-              aria-label={isMaximized ? "Thu nhỏ" : "Phóng to"}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-            >
-              {isMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-            >
-              <X size={16} />
-            </button>
-          </div>
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono font-bold text-[11px] bg-subtle text-ink-2 px-2 py-0.5 rounded border border-line shrink-0">
+            {productCode || 'SKU'}
+          </span>
+          <span className="truncate">{productName}</span>
         </div>
+      }
+      subtitle={
+        <div className="flex items-center gap-2 text-[11px] text-ink-3 mt-0.5">
+          <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>
+          <span>•</span>
+          <span>ĐVT: <strong className="text-ink-1 font-semibold">{product['Đơn Vị Tính'] || 'Cái'}</strong></span>
+          <span>•</span>
+          <span>Tình trạng: <span className="font-semibold text-emerald-600">{product['Tình trạng'] || 'Đang kinh doanh'}</span></span>
+        </div>
+      }
+      icon={<Package size={17} />}
+      size="xl"
+      maximizable
+    >
+      <div className="flex flex-col h-[78vh]">
+        {/* Apple Segmented Pills Tab Bar */}
 
         {/* Apple Segmented Pills Tab Bar */}
         <div className="px-5 py-2.5 border-b border-slate-200/70 bg-white shrink-0 overflow-x-auto">
@@ -850,8 +828,7 @@ export function ProductDetailModal({
           )}
 
         </div>
-
       </div>
-    </div>
+    </Modal>
   );
 }
