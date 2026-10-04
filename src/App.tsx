@@ -1102,6 +1102,8 @@ export default function App() {
             poHeaders={poHeaderData} 
             title="Bảng giá 2026 (Phân loại theo Khách hàng & Nhóm hàng)" 
             data={pricingData} 
+            showAddButton={true}
+            onAdd={(row) => handleAddToFirestore("pricing", row)}
             onEdit={(row) => handleUpdateToFirestore("pricing", row)} 
             onDelete={(row) => handleDeleteFromFirestore("pricing", row)} 
             onProductClick={(val) => setSelectedProductDetails(val)} 

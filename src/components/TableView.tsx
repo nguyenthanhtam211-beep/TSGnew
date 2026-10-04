@@ -28,7 +28,8 @@ import {
 import { exportGenericTableToPDF } from '../lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
 import { 
-  ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal 
+  ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal,
+  MobilePricingCatalog
 } from './index';
 import { 
   Button, IconButton, Modal, Drawer, StatusBadge, Field, Input, Select 
@@ -766,6 +767,78 @@ function TableView({
       return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium border border-gray-200">{strVal}</span>;
     }
 
+    // Pricing Table Specific Cells (Enhanced Desktop Display)
+    if (isPricingTable) {
+      if (header === 'Biên lợi nhuận' || header === '% Lợi nhuận') {
+        const num = parseNumber(strVal);
+        if (num >= 30) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <TrendingUp size={11} className="text-emerald-700" />
+              <span>{strVal}</span>
+            </span>
+          );
+        }
+        if (num >= 20) {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-800 border border-blue-300">
+              <span>{strVal}</span>
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+            <span>{strVal}</span>
+          </span>
+        );
+      }
+
+      if (header === 'Đơn giá bán' || header === 'Đơn giá bán mới') {
+        return (
+          <span className="font-mono font-bold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded border border-blue-200/60 tabular-nums">
+            {strVal}
+          </span>
+        );
+      }
+
+      if (header === 'Lợi nhuận' || header === 'Lợi nhuận (1)') {
+        return (
+          <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 tabular-nums">
+            +{strVal}
+          </span>
+        );
+      }
+
+      if (header === 'RP_Khách hàng' || header === 'Giao đến') {
+        const lower = strVal.toLowerCase();
+        let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+        if (lower.includes('thăng long')) badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+        else if (lower.includes('bắc sơn')) badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+        else if (lower.includes('thanh hoá') || lower.includes('thanh hoa')) badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+        return (
+          <span className={clsx("inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border", badgeClass)}>
+            <Building2 size={11} className="shrink-0" />
+            <span>{strVal}</span>
+          </span>
+        );
+      }
+
+      if (header === 'RP_Nhà cung cấp' || header === 'Nhà cung cấp') {
+        if (strVal.toLowerCase().includes('tâm sen')) {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+              <span>🏭 Tâm Sen (Nội bộ)</span>
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
+            <span>{strVal}</span>
+          </span>
+        );
+      }
+    }
+
     // Progress percentage
     if (header === 'Tiến độ' || header === 'Tiến độ giao' || header === 'Tiến độ sản phẩm' || header.includes('% Lợi nhuận')) {
       const isPercent = strVal.includes('%');
@@ -999,6 +1072,38 @@ function TableView({
   return (
     <div className="flex-1 p-3 sm:p-6 lg:p-8 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-8 bg-canvas min-h-0">
       
+      {/* Mobile-First Dedicated Pricing Catalog (Activated on Mobile for isPricingTable) */}
+      {isPricingTable && (
+        <div className="block md:hidden">
+          <MobilePricingCatalog
+            data={data}
+            contractsData={contractsData}
+            products={products}
+            suppliers={suppliers}
+            specsData={specsData}
+            onEdit={(row) => {
+              setUploadedFile(null);
+              setEditingRow(row);
+              setFormData({ ...row });
+              setIsEditModalOpen(true);
+              setConfirmDelete(false);
+            }}
+            onDelete={onDelete}
+            onProductClick={onProductClick}
+            onNavigateTab={onNavigateTab}
+            onAddNew={showAddButton ? () => {
+              setUploadedFile(null);
+              setFormData({});
+              setIsModalOpen(true);
+            } : undefined}
+            showAddButton={showAddButton}
+          />
+        </div>
+      )}
+
+      {/* Desktop Shell & Generic Tables Wrapper */}
+      <div className={clsx(isPricingTable ? "hidden md:flex md:flex-col md:h-full md:min-h-0" : "flex flex-col flex-1")}>
+
       {/* Subtab Switcher: Pricing vs Contracts */}
       {isPricingTable && (
         <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold border border-slate-300/60 shadow-2xs w-fit mb-3">
@@ -1778,6 +1883,7 @@ function TableView({
           </div>
         </div>
       )}
+      </div>
 
       <Modal
         open={isModalOpen}
