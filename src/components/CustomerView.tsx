@@ -24,7 +24,7 @@ import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone, form
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
 import clsx from 'clsx';
-import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat } from './ui';
+import { CockpitCard, CockpitButton, CockpitBadge, CockpitStat, Modal, Drawer, Button, IconButton, StatusBadge } from './ui';
 
 export const getCustomerLogo = (c: any) => {
   if (!c) return '';
@@ -685,7 +685,7 @@ export default function CustomerView({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white min-h-screen text-slate-900 font-sans">
+    <div className="flex-1 overflow-y-auto bg-canvas min-h-screen text-ink-1 font-sans">
       <div className="w-full max-w-[1720px] mx-auto p-4 sm:p-6 lg:p-8 space-y-5 pb-24 lg:pb-12">
         
         {/* Hallmark Enterprise Header */}
@@ -1418,33 +1418,15 @@ export default function CustomerView({
       </div>
 
       {/* Customer Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-black/[0.06] w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <Building2 size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingCustomer ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng mới'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Thông tin định danh đối tác doanh nghiệp</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingCustomer ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng mới'}
+        subtitle="Thông tin định danh đối tác doanh nghiệp"
+        icon={<Building2 size={16} />}
+        size="lg"
+      >
+        <form onSubmit={handleSave} className="p-6 space-y-4 text-xs sm:text-sm">
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-1">Mã khách hàng *</label>
@@ -1619,54 +1601,34 @@ export default function CustomerView({
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                <button 
+              <div className="pt-3 border-t border-line flex justify-end gap-2.5">
+                <Button 
                   type="button" 
+                  variant="ghost"
                   onClick={() => setIsModalOpen(false)} 
-                  className="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                 >
                   Hủy
-                </button>
-                <button 
+                </Button>
+                <Button 
                   type="submit" 
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] rounded-xl shadow-xs transition-all"
+                  variant="primary"
                 >
                   {editingCustomer ? 'Lưu' : 'Thêm'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Contact Add/Edit Modal */}
-      {isContactModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-black/[0.06] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <Users size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingContact ? 'Chỉnh sửa nhân sự khách hàng' : 'Thêm nhân sự vào danh bạ'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Đầu mối liên hệ & thông tin liên lạc</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsContactModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveContact} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+      <Modal
+        open={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        title={editingContact ? 'Chỉnh sửa nhân sự khách hàng' : 'Thêm nhân sự vào danh bạ'}
+        subtitle="Đầu mối liên hệ & thông tin liên lạc"
+        icon={<Users size={16} />}
+        size="md"
+      >
+        <form onSubmit={handleSaveContact} className="p-5 space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1">Khách hàng liên kết</label>
                 <select
@@ -1753,66 +1715,44 @@ export default function CustomerView({
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                <button
+              <div className="pt-3 border-t border-line flex justify-end gap-2">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setIsContactModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-medium"
                 >
                   Hủy
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-4 py-2 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs"
+                  variant="primary"
                 >
                   Lưu nhân sự
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Customer Detail Drawer / Modal */}
-      {selectedCustomerDetail && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className={clsx(
-            "bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full flex flex-col overflow-hidden transition-all duration-200",
-            isCustomerModalMaximized ? "max-w-6xl h-[94vh]" : "max-w-3xl max-h-[88vh]"
-          )}>
-            
-            {/* Modal Header with Mac Traffic Lights */}
-            <div className="px-6 py-4 border-b border-black/[0.06] flex justify-between items-center bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <CompanyLogo 
-                  name={selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]} 
-                  size="md" 
-                  className="rounded-xl shadow-2xs shrink-0" 
-                  logoUrl={getCustomerLogo(selectedCustomerDetail)} 
-                  logoFit={selectedCustomerDetail.logoFit} 
-                />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 font-display truncate">
-                    {cleanCompanyName(selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"])}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {selectedCustomerDetail["Customer_ID"]} • {selectedCustomerDetail["Loại hình"] || "Công ty Cổ phần"} • {selectedCustomerDetail["Phân loại"] || "Bao bì"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCustomerDetail(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer shrink-0"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
+      {/* Customer Detail Modal */}
+      <Modal
+        open={Boolean(selectedCustomerDetail)}
+        onClose={() => setSelectedCustomerDetail(null)}
+        title={selectedCustomerDetail ? cleanCompanyName(selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]) : ''}
+        subtitle={selectedCustomerDetail ? `${selectedCustomerDetail["Customer_ID"]} • ${selectedCustomerDetail["Loại hình"] || "Công ty Cổ phần"} • ${selectedCustomerDetail["Phân loại"] || "Bao bì"}` : ''}
+        icon={selectedCustomerDetail ? (
+          <CompanyLogo 
+            name={selectedCustomerDetail["Tên đầy đủ"] || selectedCustomerDetail["Customer_ID"]} 
+            size="sm" 
+            className="rounded-lg shadow-2xs" 
+            logoUrl={getCustomerLogo(selectedCustomerDetail)} 
+            logoFit={selectedCustomerDetail.logoFit} 
+          />
+        ) : undefined}
+        size="xl"
+        maximizable
+      >
+        {selectedCustomerDetail && (
+          <div className="p-6 space-y-5 text-xs sm:text-sm">
               
               {/* Legal & Factory Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1956,42 +1896,25 @@ export default function CustomerView({
                 </div>
               </div>
 
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Contact Detail Inspector Modal */}
-      {selectedContactDetail && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl pb-safe sm:pb-0 border border-black/[0.06] w-full max-w-4xl h-[88vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">
-                  {getAvatarInitials(selectedContactDetail["Tên"] || "")}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 font-display truncate">
-                    {selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}{selectedContactDetail["Tên"]}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-medium truncate">
-                    {selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • {selectedContactDetail["Công ty"]}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedContactDetail(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer shrink-0"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <Modal
+        open={Boolean(selectedContactDetail)}
+        onClose={() => setSelectedContactDetail(null)}
+        title={selectedContactDetail ? `${selectedContactDetail["Danh xưng"] ? `${selectedContactDetail["Danh xưng"]} ` : ''}${selectedContactDetail["Tên"]}` : ''}
+        subtitle={selectedContactDetail ? `${selectedContactDetail["Chức vụ"] || "Chức vụ chưa rõ"} • ${selectedContactDetail["Công ty"]}` : ''}
+        icon={selectedContactDetail ? (
+          <div className="h-6 w-6 rounded-md bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-xs shadow-2xs">
+            {getAvatarInitials(selectedContactDetail["Tên"] || "")}
+          </div>
+        ) : undefined}
+        size="xl"
+      >
+        {selectedContactDetail && (
+          <div className="flex flex-col md:flex-row min-h-[500px]">
               <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-slate-100 p-5 overflow-y-auto space-y-4 bg-slate-50/50">
                 <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kênh kết nối</span>
@@ -2224,9 +2147,8 @@ export default function CustomerView({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Google Drive Master Sync Modal */}
       <GoogleDriveSyncModal
