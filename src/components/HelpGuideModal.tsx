@@ -33,6 +33,8 @@ import {
   Globe2
 } from 'lucide-react';
 import clsx from 'clsx';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 interface HelpGuideModalProps {
   isOpen: boolean;
@@ -53,62 +55,49 @@ export default function HelpGuideModal({ isOpen, onClose, onNavigateTab }: HelpG
   const isSearching = searchQuery.trim().length > 0;
   const q = searchQuery.toLowerCase().trim();
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#F8F9FB] dark:bg-slate-900 rounded-3xl w-full max-w-5xl h-[92vh] max-h-[860px] flex flex-col shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-150 text-slate-800 dark:text-slate-100">
-        
-        {/* Top Window Bar */}
-        <div className="px-5 sm:px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
-              <BookOpen size={15} />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 font-display">
-                <span>Trung Tâm Trợ Giúp & Cẩm Nang Sử Dụng</span>
-                <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800">TSG OS 2026</span>
-              </h3>
-            </div>
-          </div>
-
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Trung Tâm Trợ Giúp & Cẩm Nang Sử Dụng"
+      subtitle="TSG OS 2026 • Hướng dẫn vận hành & tra cứu quy trình"
+      size="2xl"
+      maximizable
+      bodyClassName="!p-0 !overflow-hidden flex flex-col md:flex-row h-[72vh] max-h-[750px]"
+      footer={
+        <div className="flex items-center justify-between w-full text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            {/* Quick search inside modal */}
-            <div className="relative hidden sm:block w-48 lg:w-64">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm hướng dẫn, phím tắt..."
-                className="w-full pl-8 pr-7 py-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs outline-none border border-transparent focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              title="Đóng (Esc)"
-            >
-              <X size={18} />
-            </button>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Tâm Sen Group • Tài liệu hướng dẫn v2.6 (2026)</span>
           </div>
-        </div>
 
-        {/* Modal Body: 2-Column macOS Help Viewer */}
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-          
-          {/* Left Navigation Sidebar */}
-          <div className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 p-3 space-y-1 overflow-y-auto shrink-0 custom-scrollbar">
+          <Button variant="primary" onClick={onClose}>
+            Đã Hiểu & Đóng
+          </Button>
+        </div>
+      }
+    >
+      {/* Left Navigation Sidebar */}
+      <div className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 p-3 space-y-1 overflow-y-auto shrink-0 custom-scrollbar">
+        {/* Quick search inside sidebar */}
+        <div className="relative mb-2">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm hướng dẫn, phím tắt..."
+            className="w-full pl-8 pr-7 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs outline-none border border-transparent focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
             <div className="px-3 py-1.5 text-[10.5px] font-extrabold text-slate-400 uppercase tracking-wider">
               Chủ Đề Hướng Dẫn
             </div>
@@ -627,23 +616,6 @@ export default function HelpGuideModal({ isOpen, onClose, onNavigateTab }: HelpG
               </div>
             )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 sm:px-6 py-3.5 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Tâm Sen Group • Tài liệu hướng dẫn v2.6 (2026)</span>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-          >
-            Đã Hiểu & Đóng
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

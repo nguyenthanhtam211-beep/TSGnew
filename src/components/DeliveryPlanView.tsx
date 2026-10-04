@@ -14,6 +14,8 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import { parseNumber } from '../lib/business-logic';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 interface DeliveryPlanViewProps {
   deliveryPlans: any[];
@@ -653,207 +655,194 @@ export default function DeliveryPlanView({
       </div>
 
       {/* Plan Modal */}
-      {isPlanModalOpen && planForm && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe sm:pb-0">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                {isEditing ? 'Chỉnh Sửa Kế Hoạch' : 'Thêm Kế Hoạch Mới'}
-              </h3>
-              <button onClick={() => setIsPlanModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 rounded-xl p-3 border border-blue-100 space-y-1 mb-2">
-                <div className="text-xs text-blue-600 font-bold uppercase tracking-wider">Đơn hàng: {planForm['Đơn hàng']}</div>
-                <div className="text-sm font-medium text-gray-800">{planForm['Sản phẩm']}</div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Mã Kế Hoạch</label>
-                <input 
-                  type="text" 
-                  readOnly
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono text-gray-500 outline-none"
-                  value={planForm['Mã kế hoạch']}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Ngày Dự Kiến Giao</label>
-                <input 
-                  type="date" 
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-900"
-                  value={planForm['Ngày dự kiến'] ? planForm['Ngày dự kiến'].split('/').reverse().join('-') : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setPlanForm({
-                      ...planForm,
-                      'Ngày dự kiến': val ? val.split('-').reverse().join('/') : ''
-                    })
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex justify-between">
-                  <span>Số Lượng Giao</span>
-                  <span className="text-blue-600 font-medium">Tối đa: {planForm.maxQty.toLocaleString()}</span>
-                </label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-lg font-bold outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  value={planForm['Số lượng cần giao'] || ''}
-                  onChange={(e) => setPlanForm({ ...planForm, 'Số lượng cần giao': parseInt(e.target.value) || 0 })}
-                  max={planForm.maxQty}
-                  min={1}
-                />
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/50">
-              <button 
+      {planForm && (
+        <Modal
+          open={isPlanModalOpen}
+          onClose={() => setIsPlanModalOpen(false)}
+          title={isEditing ? 'Chỉnh Sửa Kế Hoạch' : 'Thêm Kế Hoạch Mới'}
+          size="sm"
+          footer={
+            <div className="flex items-center justify-end gap-2.5 w-full">
+              <Button 
+                variant="secondary"
                 onClick={() => setIsPlanModalOpen(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
               >
                 Hủy
-              </button>
-              <button 
+              </Button>
+              <Button 
+                variant="primary"
                 onClick={handleSavePlan}
-                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-md shadow-blue-100 transition-all"
               >
                 Lưu Kế Hoạch
-              </button>
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50/70 rounded-xl p-3 border border-blue-100 space-y-1 mb-2">
+              <div className="text-xs text-blue-600 font-bold uppercase tracking-wider">Đơn hàng: {planForm['Đơn hàng']}</div>
+              <div className="text-sm font-medium text-slate-800">{planForm['Sản phẩm']}</div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mã Kế Hoạch</label>
+              <input 
+                type="text" 
+                readOnly
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-500 outline-none"
+                value={planForm['Mã kế hoạch']}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ngày Dự Kiến Giao</label>
+              <input 
+                type="date" 
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                value={planForm['Ngày dự kiến'] ? planForm['Ngày dự kiến'].split('/').reverse().join('-') : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPlanForm({
+                    ...planForm,
+                    'Ngày dự kiến': val ? val.split('-').reverse().join('/') : ''
+                  })
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between">
+                <span>Số Lượng Giao</span>
+                <span className="text-blue-600 font-medium">Tối đa: {planForm.maxQty.toLocaleString()}</span>
+              </label>
+              <input 
+                type="number" 
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-bold outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                value={planForm['Số lượng cần giao'] || ''}
+                onChange={(e) => setPlanForm({ ...planForm, 'Số lượng cần giao': parseInt(e.target.value) || 0 })}
+                max={planForm.maxQty}
+                min={1}
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Multi-Batch Delivery Planning Modal */}
-      {isMultiModalOpen && multiBatchData && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-t-[28px] sm:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom duration-200 pb-safe sm:pb-0">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50/60">
-              <div>
-                <h3 className="font-bold text-indigo-950 text-base flex items-center gap-2">
-                  <Calendar className="text-indigo-600" size={20} />
-                  Chia Đơn Hàng Thành Nhiều Đợt Giao
-                </h3>
-                <p className="text-xs text-indigo-700 mt-0.5">PO: {multiBatchData.poNumber} — {multiBatchData.prodName}</p>
-              </div>
-              <button onClick={() => setIsMultiModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 flex justify-between items-center text-xs">
-                <span className="text-gray-600 font-medium">Tổng số lượng cần lập KH:</span>
-                <span className="font-bold text-gray-900 text-sm">{multiBatchData.totalQtyToPlan.toLocaleString()}</span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Danh Sách Các Đợt Giao</label>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const newBatches = [...multiBatchData.batches];
-                      const lastBatch = newBatches[newBatches.length - 1];
-                      newBatches.push({ date: lastBatch ? lastBatch.date : '01/08/2026', qty: 0 });
-                      setMultiBatchData({ ...multiBatchData, batches: newBatches });
-                    }}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 flex items-center gap-1"
-                  >
-                    <Plus size={12} /> Thêm Đợt
-                  </button>
-                </div>
-
-                {multiBatchData.batches.map((b, idx) => (
-                  <div key={idx} className="p-3 bg-indigo-50/30 rounded-xl border border-indigo-100 flex items-center gap-3">
-                    <div className="w-16 font-bold text-xs text-indigo-900 bg-indigo-100/80 px-2 py-1.5 rounded-lg text-center shrink-0">
-                      Đợt {idx + 1}
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Ngày Dự Kiến Giao</label>
-                      <input 
-                        type="date"
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-gray-900 bg-white"
-                        value={b.date ? b.date.split('/').reverse().join('-') : ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const formatted = val ? val.split('-').reverse().join('/') : '';
-                          const next = [...multiBatchData.batches];
-                          next[idx].date = formatted;
-                          setMultiBatchData({ ...multiBatchData, batches: next });
-                        }}
-                      />
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Số Lượng</label>
-                      <input 
-                        type="number"
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 bg-white"
-                        value={b.qty || ''}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          const next = [...multiBatchData.batches];
-                          next[idx].qty = val;
-                          setMultiBatchData({ ...multiBatchData, batches: next });
-                        }}
-                      />
-                    </div>
-                    {multiBatchData.batches.length > 1 && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const next = multiBatchData.batches.filter((_, i) => i !== idx);
-                          setMultiBatchData({ ...multiBatchData, batches: next });
-                        }}
-                        className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                        title="Xóa đợt này"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {/* Total check */}
-                {(() => {
-                  const currentSum = multiBatchData.batches.reduce((sum, b) => sum + (b.qty || 0), 0);
-                  const diff = multiBatchData.totalQtyToPlan - currentSum;
-                  return (
-                    <div className={`p-2.5 rounded-xl text-xs font-bold flex justify-between items-center ${
-                      diff === 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
-                    }`}>
-                      <span>Tổng các đợt đã phân chia: {currentSum.toLocaleString()}</span>
-                      <span>{diff === 0 ? '✓ Đã khớp 100%' : `Còn lại: ${diff.toLocaleString()}`}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/50">
-              <button 
+      {multiBatchData && (
+        <Modal
+          open={isMultiModalOpen}
+          onClose={() => setIsMultiModalOpen(false)}
+          title="Chia Đơn Hàng Thành Nhiều Đợt Giao"
+          subtitle={`PO: ${multiBatchData.poNumber} — ${multiBatchData.prodName}`}
+          size="lg"
+          footer={
+            <div className="flex items-center justify-end gap-2.5 w-full">
+              <Button 
+                variant="secondary"
                 onClick={() => setIsMultiModalOpen(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all text-xs uppercase tracking-wider"
               >
                 Hủy
-              </button>
-              <button 
+              </Button>
+              <Button 
+                variant="primary"
                 onClick={handleSaveMultiBatch}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
+                icon={<CheckCircle size={16} />}
               >
-                <CheckCircle size={16} />
                 Lưu Các Đợt Giao
-              </button>
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex justify-between items-center text-xs">
+              <span className="text-slate-600 font-medium">Tổng số lượng cần lập KH:</span>
+              <span className="font-bold text-slate-900 text-sm">{multiBatchData.totalQtyToPlan.toLocaleString()}</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Danh Sách Các Đợt Giao</label>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const newBatches = [...multiBatchData.batches];
+                    const lastBatch = newBatches[newBatches.length - 1];
+                    newBatches.push({ date: lastBatch ? lastBatch.date : '01/08/2026', qty: 0 });
+                    setMultiBatchData({ ...multiBatchData, batches: newBatches });
+                  }}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 flex items-center gap-1"
+                >
+                  <Plus size={12} /> Thêm Đợt
+                </button>
+              </div>
+
+              {multiBatchData.batches.map((b, idx) => (
+                <div key={idx} className="p-3 bg-indigo-50/30 rounded-xl border border-indigo-100 flex items-center gap-3">
+                  <div className="w-16 font-bold text-xs text-indigo-900 bg-indigo-100/80 px-2 py-1.5 rounded-lg text-center shrink-0">
+                    Đợt {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Ngày Dự Kiến Giao</label>
+                    <input 
+                      type="date"
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 bg-white"
+                      value={b.date ? b.date.split('/').reverse().join('-') : ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const formatted = val ? val.split('-').reverse().join('/') : '';
+                        const next = [...multiBatchData.batches];
+                        next[idx].date = formatted;
+                        setMultiBatchData({ ...multiBatchData, batches: next });
+                      }}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Số Lượng</label>
+                    <input 
+                      type="number"
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white"
+                      value={b.qty || ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        const next = [...multiBatchData.batches];
+                        next[idx].qty = val;
+                        setMultiBatchData({ ...multiBatchData, batches: next });
+                      }}
+                    />
+                  </div>
+                  {multiBatchData.batches.length > 1 && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const next = multiBatchData.batches.filter((_, i) => i !== idx);
+                        setMultiBatchData({ ...multiBatchData, batches: next });
+                      }}
+                      className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Xóa đợt này"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Total check */}
+              {(() => {
+                const currentSum = multiBatchData.batches.reduce((sum, b) => sum + (b.qty || 0), 0);
+                const diff = multiBatchData.totalQtyToPlan - currentSum;
+                return (
+                  <div className={`p-2.5 rounded-xl text-xs font-bold flex justify-between items-center ${
+                    diff === 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                  }`}>
+                    <span>Tổng các đợt đã phân chia: {currentSum.toLocaleString()}</span>
+                    <span>{diff === 0 ? '✓ Đã khớp 100%' : `Còn lại: ${diff.toLocaleString()}`}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

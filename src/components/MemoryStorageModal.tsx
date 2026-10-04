@@ -22,6 +22,8 @@ import {
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
 import dbEngine from "../lib/dbEngine";
+import { Modal } from "./ui/Modal";
+import { Button } from "./ui/Button";
 
 interface MemoryStorageModalProps {
   isOpen: boolean;
@@ -305,43 +307,27 @@ export default function MemoryStorageModal({
     reader.readAsText(file);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col overflow-hidden">
-        
-        {/* Modal Top Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Database size={24} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  Active Persistent Engine
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-xs text-slate-500 font-medium">Lần lưu gần nhất: {lastSavedTime}</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                Trung Tâm Giám Sát Lưu Trữ & Bộ Nhớ Dữ Liệu
-              </h3>
-            </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Trung Tâm Giám Sát Lưu Trữ & Bộ Nhớ Dữ Liệu"
+      subtitle={`Active Persistent Engine • Lần lưu gần nhất: ${lastSavedTime}`}
+      size="2xl"
+      footer={
+        <div className="flex items-center justify-between w-full text-xs">
+          <div className="flex items-center gap-2 text-slate-500">
+            <ShieldCheck size={16} className="text-emerald-600" />
+            <span>Dữ liệu được tự động mã hóa & bảo vệ cục bộ trên thiết bị của bạn</span>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition"
-          >
-            <X size={20} />
-          </button>
+          <Button variant="secondary" onClick={onClose}>
+            Đóng
+          </Button>
         </div>
-
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+      }
+    >
+      <div className="space-y-6">
           
           {/* Architecture Summary Cards: 4 Tiers of Persistence */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -501,27 +487,9 @@ export default function MemoryStorageModal({
                   className="hidden"
                 />
               </label>
-            </div>
           </div>
         </div>
-
-        {/* Modal Footer */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-slate-500">
-            <ShieldCheck size={16} className="text-emerald-600" />
-            <span>Dữ liệu được tự động mã hóa & bảo vệ cục bộ trên thiết bị của bạn</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs transition"
-          >
-            Đóng
-          </button>
-        </div>
-
       </div>
-    </div>
+    </Modal>
   );
 }
