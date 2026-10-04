@@ -32,6 +32,7 @@ import { ProductHoverCard } from "./ProductHoverCard";
 import { findPriceRecord, getSellPriceFromRecord, getBuyPriceFromRecord, parseNumber } from "../lib/business-logic";
 import GoogleSheetsSyncModal from "./GoogleSheetsSyncModal";
 import { generateStructuredPDFReport } from "../lib/pdf-exporter";
+import { Modal, Button } from "./ui";
 
 interface DeliveryViewProps {
   deliveryData: any[];
@@ -1446,19 +1447,17 @@ export default function DeliveryView({
       </div>
 
       {/* Edit Modal */}
-      {isEditModalOpen && editingSlip && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-                <Truck className="text-blue-600" />
-                Chỉnh sửa phiếu giao: {editingSlip["Số PXK"]}
-              </h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-light">&times;</button>
-            </div>
-            
-            <form 
-              className="p-6 space-y-4" 
+      <Modal
+        open={Boolean(isEditModalOpen && editingSlip)}
+        onClose={() => setIsEditModalOpen(false)}
+        title={editingSlip ? `Chỉnh sửa phiếu giao: ${editingSlip["Số PXK"]}` : ''}
+        subtitle="Cập nhật thông tin phiếu xuất kho và tiến độ giao hàng"
+        icon={<Truck size={18} />}
+        size="lg"
+      >
+        {editingSlip && (
+          <form 
+            className="p-6 space-y-4" 
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (onEdit) {
@@ -1548,53 +1547,35 @@ export default function DeliveryView({
                   </button>
                 )}
                 <div className="flex items-center gap-3">
-                  <button 
+                  <Button 
                     type="button"
+                    variant="ghost"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 text-sm"
                   >
                     Hủy
-                  </button>
-                  <button 
+                  </Button>
+                  <Button 
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-sm shadow-sm"
+                    variant="primary"
                   >
                     Lưu thay đổi
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Manual Creation Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-white px-6 py-4 text-slate-900 border-b border-black/[0.06] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                  <Truck size={16} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 font-display">
-                    Tạo Phiếu Xuất Kho (PXK) Mới
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Khởi tạo phiếu xuất hàng & đối chiếu tiến độ giao</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                aria-label="Đóng"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
+      <Modal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Tạo Phiếu Xuất Kho (PXK) Mới"
+        subtitle="Khởi tạo phiếu xuất hàng & đối chiếu tiến độ giao"
+        icon={<Truck size={18} />}
+        size="lg"
+      >
+        <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               {/* Row 1: Khách hàng & Nhà cung cấp */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1824,25 +1805,23 @@ export default function DeliveryView({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
+              <div className="flex justify-end gap-3 pt-4 border-t border-line">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50 rounded-lg transition-all"
                 >
                   Hủy bỏ
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition-all"
+                  variant="primary"
                 >
                   Lưu phiếu giao
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       <GoogleSheetsSyncModal
         isOpen={isSheetsModalOpen}
