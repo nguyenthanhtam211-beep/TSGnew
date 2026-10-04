@@ -9,6 +9,7 @@ import { toast } from "react-hot-toast";
 import { exportElementToPDF } from "../lib/pdf-exporter";
 import { TamSenGroupHeaderLogo, AnVietPhatGroupHeaderLogo } from "./CompanyLogo";
 import { parseNumber, getSupplierShortCode, getDefaultSpecs } from "../lib/business-logic";
+import { Modal, Button } from "./ui";
 
 interface DualPODocumentModalProps {
   isOpen: boolean;
@@ -511,41 +512,41 @@ export function DualPODocumentModal({
     }, 1000);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden">
-        
-        {/* Header Modal Bar */}
-        <div className="px-6 py-4 bg-white text-slate-900 flex items-center justify-between border-b border-black/[0.06]">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-black/5">
-              <Layers className="w-5 h-5" />
+    <>
+      <Modal
+        open={isOpen}
+        onClose={onClose}
+        title="Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp"
+        subtitle={
+          <span>
+            Tâm Sen đặt An Việt Phát (<span className="text-amber-700 font-mono font-bold">{poNumberTamSen}</span>) → An Việt Phát đặt NCC (<span className="text-sky-700 font-mono font-bold">{poNumberAVP}</span>)
+          </span>
+        }
+        size="2xl"
+        maximizable
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="text-xs text-ink-muted">
+              Dữ liệu PO được đồng bộ với <span className="font-semibold text-ink">ERP Tâm Sen - Chuỗi cung ứng Bao Bì</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 tracking-tight font-display">Quy Trình Tạo & Phê Duyệt Bộ Đôi PO Nhà Cung Cấp</h2>
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Step 2 - Order Sourcing
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tâm Sen đặt An Việt Phát (<span className="text-amber-700 font-mono font-bold">{poNumberTamSen}</span>) → An Việt Phát đặt NCC (<span className="text-sky-700 font-mono font-bold">{poNumberAVP}</span>)
-              </p>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={onClose}>
+                Đóng Modal
+              </Button>
+              {onApproveAndProceed && (
+                <Button
+                  variant="primary"
+                  onClick={onApproveAndProceed}
+                  iconRight={<ArrowRight className="w-4 h-4" />}
+                >
+                  Phê Duyệt & Tiếp Tục Lập Kế Hoạch
+                </Button>
+              )}
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+        }
+      >
         {/* Workflow 3-Steps Progress Indicator */}
         <div className="bg-slate-100 border-b border-slate-200 px-6 py-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
@@ -1392,48 +1393,46 @@ export function DualPODocumentModal({
           )}
 
         </div>
-
-        {/* Footer Bar */}
-        <div className="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
-            Dữ liệu PO được đồng bộ với <span className="font-semibold text-slate-700">ERP Tâm Sen - Chuỗi cung ứng Bao Bì</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
-            >
-              Đóng Modal
-            </button>
-            
-            {onApproveAndProceed && (
-              <button
-                onClick={onApproveAndProceed}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2"
-              >
-                Phê Duyệt & Tiếp Tục Lập Kế Hoạch
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-      </div>
+      </Modal>
 
       {/* EMAIL MODAL SIMULATOR */}
-      {showEmailModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-scale-up space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-emerald-600" />
-                Gửi Mail Đơn Đặt Hàng Đến Nhà Cung Cấp
-              </h3>
-              <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+      <Modal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        title="Gửi Mail Đơn Đặt Hàng Đến Nhà Cung Cấp"
+        subtitle={`Gửi email đơn hàng ${poNumberAVP} tới ${emailRecipient || 'nhà cung cấp'}`}
+        size="lg"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleOpenNativeMailClient}
+              className="px-3 py-1.5 text-xs text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-xl font-semibold flex items-center gap-1.5 transition cursor-pointer"
+              title="Mở ứng dụng email trên máy tính (Apple Mail, Outlook...)"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Mở Mail Client Ngoài
+            </button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setShowEmailModal(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSendEmailSubmit}
+                icon={<Send className="w-3.5 h-3.5" />}
+              >
+                Gửi Mail Hệ Thống
+              </Button>
             </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
 
             {/* Quick Templates Picker */}
             <div className="space-y-1.5">
@@ -1503,39 +1502,8 @@ export function DualPODocumentModal({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleOpenNativeMailClient}
-                className="px-3 py-1.5 text-xs text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-xl font-semibold flex items-center gap-1.5 transition"
-                title="Mở ứng dụng email trên máy tính (Apple Mail, Outlook...)"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Mở Mail Client Ngoài
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEmailModal(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSendEmailSubmit}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Gửi Mail Hệ Thống
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
-
-    </div>
+      </Modal>
+    </>
   );
 }
