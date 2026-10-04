@@ -18,6 +18,7 @@ import { formatVietnamesePhone, formatContactFullName, getRawCallablePhone } fro
 import GoogleDriveSyncModal from './GoogleDriveSyncModal';
 import { toast } from 'react-hot-toast';
 import SalutationBadge, { parseContactSalutation } from './SalutationBadge';
+import { Modal, Button } from './ui';
 
 interface ContactViewProps {
   contacts: any[];
@@ -1241,32 +1242,15 @@ export default function ContactView({
       />
 
       {/* Contact Add/Edit Dialog */}
-      {isContactModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl border border-black/[0.08] w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                  <Users size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Thông tin liên lạc & đơn vị công tác</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsContactModalOpen(false)}
-                aria-label="Đóng"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveContact} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs sm:text-sm">
+      <Modal
+        open={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        title={editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
+        subtitle="Thông tin liên lạc & đơn vị công tác"
+        icon={<Users size={16} />}
+        size="md"
+      >
+        <form onSubmit={handleSaveContact} className="p-6 space-y-4 text-xs sm:text-sm">
               <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button
                   type="button"
@@ -1422,25 +1406,23 @@ export default function ContactView({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
-                <button 
+              <div className="pt-3 border-t border-line flex justify-end gap-2.5">
+                <Button 
                   type="button" 
+                  variant="ghost"
                   onClick={() => setIsContactModalOpen(false)} 
-                  className="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                 >
                   Hủy
-                </button>
-                <button 
+                </Button>
+                <Button 
                   type="submit" 
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#0071E3] hover:bg-[#0066D6] rounded-xl shadow-xs transition-all"
+                  variant="primary"
                 >
                   {editingContact ? 'Lưu' : 'Thêm'}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
     </div>
   );
