@@ -14,7 +14,8 @@ import { registerAndUploadDriveDocument, getDriveFolderPath, formatShortFileName
 import CompanyLogo from './CompanyLogo';
 import { 
   CockpitCard, CockpitButton, CockpitBadge, CockpitStat,
-  CockpitTableToolbar, CockpitPagination, CockpitTableEmptyState 
+  CockpitTableToolbar, CockpitPagination, CockpitTableEmptyState,
+  Modal, Button, IconButton
 } from './ui';
 
 export interface ContractItem {
@@ -484,7 +485,7 @@ export default function ContractsView({
   };
 
   return (
-    <div className="flex-1 bg-[#F5F5F7] flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
+    <div className="flex-1 bg-canvas text-ink flex flex-col min-h-full overflow-y-auto pb-24 lg:pb-8">
       {/* Subtab Segmented Control: Pricing vs Contracts */}
       <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-black/[0.06] px-3 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold border border-slate-200/80 dark:border-slate-700 shadow-2xs shrink-0">
@@ -994,247 +995,210 @@ export default function ContractsView({
       </div>
 
       {/* Mobile Detail Modal Sheet */}
-      {isMobileDetailOpen && selectedContract && (
-        <div 
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
-          onClick={() => setIsMobileDetailOpen(false)}
-        >
-          <div 
-            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 border border-black/[0.08]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                  <FileText size={15} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    Chi Tiết Hợp Đồng
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Tra cứu nhanh hồ sơ hợp đồng</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileDetailOpen(false);
-                    handleOpenEdit(selectedContract);
-                  }}
-                  className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1"
-                >
-                  <Edit3 size={13} />
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileDetailOpen(false)}
-                  aria-label="Đóng"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+      <Modal
+        open={Boolean(isMobileDetailOpen && selectedContract)}
+        onClose={() => setIsMobileDetailOpen(false)}
+        title="Chi Tiết Hợp Đồng"
+        subtitle="Tra cứu nhanh hồ sơ hợp đồng"
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsMobileDetailOpen(false);
+                if (selectedContract) handleOpenEdit(selectedContract);
+              }}
+              icon={<Edit3 size={13} />}
+            >
+              Sửa Hợp Đồng
+            </Button>
+            <Button variant="primary" onClick={() => setIsMobileDetailOpen(false)}>
+              Đóng
+            </Button>
+          </div>
+        }
+      >
+        {selectedContract && (
+          <div className="space-y-4">
+            <div className="bg-blue-50/60 border border-blue-200/60 p-4 rounded-xl text-center space-y-1">
+              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Số Hợp Đồng</span>
+              <p className="text-xl font-black text-blue-900 font-mono">
+                {selectedContract.contractNumber}
+              </p>
+              <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-white text-blue-800 border border-blue-200">
+                Trạng thái: {selectedContract.status}
+              </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-4 rounded-2xl text-center space-y-1">
-                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Số Hợp Đồng</span>
-                <p className="text-xl font-black text-blue-900 font-mono">
-                  {selectedContract.contractNumber}
-                </p>
-                <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-white/80 text-blue-800 border border-blue-200">
-                  Trạng thái: {selectedContract.status}
+            {/* AI Summary in Mobile */}
+            {selectedContract.aiExecutiveSummary && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles size={12} />
+                  Tóm Tắt Sơ Bộ Bởi AI
+                </h4>
+                <div className="bg-indigo-50/70 border border-indigo-200/70 p-3 rounded-xl text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                  {selectedContract.aiExecutiveSummary}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-canvas border border-line p-4 rounded-xl space-y-2.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-ink-muted">Đối tác:</span>
+                <span className="font-bold text-ink flex items-center gap-1.5">
+                  <CompanyLogo name={selectedContract.partnerName} size="xs" />
+                  {selectedContract.partnerName}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Loại hợp đồng:</span>
+                <span className="font-semibold text-ink">{selectedContract.contractType}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Ngày ký:</span>
+                <span className="font-medium text-ink">{formatDateForDisplay(selectedContract.signDate)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Thời hạn:</span>
+                <span className="font-medium text-ink">
+                  {formatDateForDisplay(selectedContract.effectiveDate)} ➔ {formatDateForDisplay(selectedContract.expirationDate) || 'Không thời hạn'}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-line pt-2">
+                <span className="text-ink-muted">Điều khoản TT:</span>
+                <span className="font-medium text-ink text-right">{selectedContract.paymentTerms}</span>
+              </div>
+            </div>
 
-              {/* AI Summary in Mobile */}
-              {selectedContract.aiExecutiveSummary && (
-                <div className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles size={12} />
-                    Tóm Tắt Sơ Bộ Bởi AI
-                  </h4>
-                  <div className="bg-indigo-50/70 border border-indigo-200/70 p-3 rounded-xl text-xs text-slate-700 whitespace-pre-line leading-relaxed">
-                    {selectedContract.aiExecutiveSummary}
+            {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) - Mobile */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                <span>Hồ Sơ Hợp Đồng Gốc (PDF)</span>
+                <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded">DRIVE CLOUD</span>
+              </h4>
+              <div className="bg-rose-50/60 border border-rose-200/80 p-3 rounded-xl space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <FileText size={16} />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {selectedContract.attachmentName || `${selectedContract.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`}
+                    </p>
+                    <span className="text-[10px] text-rose-700 font-medium block">
+                      Thư mục: 📁 01_Hop_Dong_Goc_Va_Phu_Luc_PDF
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-rose-200/50">
+                  <a
+                    href={selectedContract.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(selectedContract.contractNumber)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <Eye size={14} />
+                    <span>Xem File PDF Gốc</span>
+                    <ArrowUpRight size={13} />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Price list in contract */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Bảng Đơn Giá Ký Kết & Đối Chiếu ({selectedContractReconciled.length} mục)
+              </h4>
+              {selectedContractReconciled.length === 0 ? (
+                <div className="p-3 bg-canvas rounded-xl text-center text-xs text-slate-400 border border-dashed border-line">
+                  Chưa nhập danh mục đơn giá cam kết trong hợp đồng này.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {selectedContractReconciled.map((p, idx) => (
+                    <div key={idx} className="p-3 bg-canvas rounded-xl border border-line space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center">
+                        <p className="font-bold text-slate-900">{p.productName}</p>
+                        <span className="font-bold text-blue-600 font-mono">{formatVND(p.contractPrice)}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-500 pt-1 border-t border-line">
+                        <span>Bảng giá 2026: {p.currentPrice ? formatVND(p.currentPrice) : 'Mới'}</span>
+                        <span className={clsx(
+                          "font-bold",
+                          p.matchStatus === 'exact' ? "text-emerald-600" :
+                          p.matchStatus === 'higher' ? "text-amber-600" : "text-rose-600"
+                        )}>
+                          {p.matchStatus === 'exact' ? '✓ Khớp' : `${p.diff > 0 ? '+' : ''}${p.diffPct.toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+            </div>
 
-              <div className="bg-[#F5F5F7] p-4 rounded-2xl space-y-2.5 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Đối tác:</span>
-                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <CompanyLogo name={selectedContract.partnerName} size="xs" />
-                    {selectedContract.partnerName}
-                  </span>
+            {/* Appendices in Mobile */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Phụ Lục Hợp Đồng ({(selectedContract.appendices || []).length})
+              </h4>
+              {(selectedContract.appendices || []).length === 0 ? (
+                <div className="p-2.5 bg-canvas rounded-xl text-center text-[11px] text-slate-400">
+                  Không có phụ lục điều chỉnh giá
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Loại hợp đồng:</span>
-                  <span className="font-semibold text-slate-800">{selectedContract.contractType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Ngày ký:</span>
-                  <span className="font-medium text-slate-800">{formatDateForDisplay(selectedContract.signDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Thời hạn:</span>
-                  <span className="font-medium text-slate-800">
-                    {formatDateForDisplay(selectedContract.effectiveDate)} ➔ {formatDateForDisplay(selectedContract.expirationDate) || 'Không thời hạn'}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t border-slate-200/60 pt-2">
-                  <span className="text-slate-500">Điều khoản TT:</span>
-                  <span className="font-medium text-slate-800 text-right">{selectedContract.paymentTerms}</span>
-                </div>
-              </div>
-
-              {/* File Hợp Đồng Gốc (PDF Scan trên Google Drive) - Mobile */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Hồ Sơ Hợp Đồng Gốc (PDF)</span>
-                  <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded">DRIVE CLOUD</span>
-                </h4>
-                <div className="bg-rose-50/60 border border-rose-200/80 p-3 rounded-2xl space-y-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <FileText size={16} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        {selectedContract.attachmentName || `${selectedContract.contractNumber.replace(/\//g, '_')}_HopDongGoc.pdf`}
-                      </p>
-                      <span className="text-[10px] text-rose-700 font-medium block">
-                        Thư mục: 📁 01_Hop_Dong_Goc_Va_Phu_Luc_PDF
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-1 border-t border-rose-200/50">
-                    <a
-                      href={selectedContract.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(selectedContract.contractNumber)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                    >
-                      <Eye size={14} />
-                      <span>Xem File PDF Gốc</span>
-                      <ArrowUpRight size={13} />
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price list in contract */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Bảng Đơn Giá Ký Kết & Đối Chiếu ({selectedContractReconciled.length} mục)
-                </h4>
-                {selectedContractReconciled.length === 0 ? (
-                  <div className="p-3 bg-slate-50 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-200">
-                    Chưa nhập danh mục đơn giá cam kết trong hợp đồng này.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto">
-                    {selectedContractReconciled.map((p, idx) => (
-                      <div key={idx} className="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.04] space-y-1.5 text-xs">
-                        <div className="flex justify-between items-center">
-                          <p className="font-bold text-slate-900">{p.productName}</p>
-                          <span className="font-bold text-blue-600 font-mono">{formatVND(p.contractPrice)}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/40">
-                          <span>Bảng giá 2026: {p.currentPrice ? formatVND(p.currentPrice) : 'Mới'}</span>
-                          <span className={clsx(
-                            "font-bold",
-                            p.matchStatus === 'exact' ? "text-emerald-600" :
-                            p.matchStatus === 'higher' ? "text-amber-600" : "text-rose-600"
-                          )}>
-                            {p.matchStatus === 'exact' ? '✓ Khớp' : `${p.diff > 0 ? '+' : ''}${p.diffPct.toFixed(1)}%`}
-                          </span>
-                        </div>
+              ) : (
+                <div className="space-y-2">
+                  {(selectedContract.appendices || []).map((app, idx) => (
+                    <div key={idx} className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-xl space-y-1 text-xs">
+                      <div className="flex justify-between font-bold text-amber-900">
+                        <span>{app.appendixNumber}</span>
+                        <span className="text-[10px] font-normal text-amber-700">{formatDateForDisplay(app.signDate)}</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Appendices in Mobile */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Phụ Lục Hợp Đồng ({(selectedContract.appendices || []).length})
-                </h4>
-                {(selectedContract.appendices || []).length === 0 ? (
-                  <div className="p-2.5 bg-slate-50 rounded-xl text-center text-[11px] text-slate-400">
-                    Không có phụ lục điều chỉnh giá
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {(selectedContract.appendices || []).map((app, idx) => (
-                      <div key={idx} className="p-2.5 bg-amber-50/60 border border-amber-200/60 rounded-xl space-y-1 text-xs">
-                        <div className="flex justify-between font-bold text-amber-900">
-                          <span>{app.appendixNumber}</span>
-                          <span className="text-[10px] font-normal text-amber-700">{formatDateForDisplay(app.signDate)}</span>
-                        </div>
-                        <p className="text-slate-700 text-[11px]">{app.title}</p>
-                        {app.priceAdjustment && (
-                          <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">
-                            {app.priceAdjustment}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsMobileDetailOpen(false)}
-                className="w-full py-3 bg-[#007AFF] text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-[0.98] transition-all"
-              >
-                Đóng
-              </button>
+                      <p className="text-slate-700 text-[11px]">{app.title}</p>
+                      {app.priceAdjustment && (
+                        <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">
+                          {app.priceAdjustment}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* Add / Edit Contract Modal - Apple macOS Window Style */}
-      {isModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Clean Modern Modal Header */}
-            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-[#F8F9FA] shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0066FF] flex items-center justify-center border border-blue-200/60 shadow-2xs">
-                  <FileText size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    {editingContract ? 'Cập Nhật Hợp Đồng' : 'Thêm Hợp Đồng Mới'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Quản lý hồ sơ pháp lý & file lưu trữ Google Drive</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors flex items-center justify-center cursor-pointer"
-                title="Đóng (Esc)"
-                aria-label="Đóng"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleSaveContract} className="flex-1 overflow-auto p-6 space-y-4">
+      {/* Add / Edit Contract Modal */}
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingContract ? 'Cập Nhật Hợp Đồng' : 'Thêm Hợp Đồng Mới'}
+        subtitle="Quản lý hồ sơ pháp lý & file lưu trữ Google Drive"
+        size="2xl"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              variant="secondary"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="contract-form"
+            >
+              Lưu Hợp Đồng
+            </Button>
+          </div>
+        }
+      >
+        {/* Modal Body */}
+        <form id="contract-form" onSubmit={handleSaveContract} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Số Hợp Đồng *</label>
@@ -1458,63 +1422,36 @@ export default function ContractsView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
-                >
-                  Lưu Hợp Đồng
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* AI Contract OCR & Price Cross-Reference Modal */}
-      {isOcrModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setIsOcrModalOpen(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in-95 duration-200 border border-black/[0.08] max-h-[92vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="px-5 sm:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                  <Sparkles size={16} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsOcrModalOpen(false)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border border-transparent hover:border-black/[0.06]"
-                  aria-label="Đóng"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+      <Modal
+        open={isOcrModalOpen}
+        onClose={() => setIsOcrModalOpen(false)}
+        title="Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)"
+        subtitle="Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026"
+        size="2xl"
+        maximizable
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <Button
+              variant="secondary"
+              onClick={() => setIsOcrModalOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveOcrContract}
+              icon={<CheckSquare size={14} />}
+            >
+              Lưu Hợp Đồng & Bảng Giá Vào Hệ Thống
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
               {/* Top: Upload Area & Quick Samples */}
               <div className="bg-[#F5F5F7] p-4 rounded-2xl border border-black/[0.04] space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1733,32 +1670,8 @@ export default function ContractsView({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="px-6 py-4 border-t border-black/[0.06] bg-[#F5F5F7] flex items-center justify-between shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsOcrModalOpen(false)}
-                className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                Đóng
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveOcrContract}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-1.5"
-                >
-                  <CheckSquare size={14} />
-                  <span>Lưu Hợp Đồng & Bảng Giá Vào Hệ Thống</span>
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
