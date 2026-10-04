@@ -731,7 +731,7 @@ export default function App() {
             <div className="p-4 border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                <h2 className="text-xs font-black tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase font-space-grotesk">TSG BUSINESS OS</h2>
+                <h2 className="text-xs font-black tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent uppercase font-display">TSG BUSINESS OS</h2>
               </div>
               <button 
                 onClick={() => setMobileMenuOpen(false)} 

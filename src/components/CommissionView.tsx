@@ -1097,7 +1097,7 @@ export default function CommissionView({
                   <Receipt size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
                     {editingCommission ? 'Cập Nhật Phiếu Hoa Hồng' : 'Lập Phiếu Hoa Hồng Mới (3 Phương Thức)'}
                   </h3>
                   <p className="text-[11px] text-slate-500">Quản lý định mức chi trả & theo dõi thanh toán</p>

@@ -1010,7 +1010,7 @@ export default function ContractsView({
                   <FileText size={15} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
                     Chi Tiết Hợp Đồng
                   </h3>
                   <p className="text-[11px] text-slate-500">Tra cứu nhanh hồ sơ hợp đồng</p>
@@ -1496,7 +1496,7 @@ export default function ContractsView({
                   <Sparkles size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
                     Quét OCR Hợp Đồng & Đối Chiếu Bảng Giá (Gemini AI)
                   </h3>
                   <p className="text-[11px] text-slate-500">Tự động bóc tách + Tóm tắt AI + Đối chiếu 2026</p>

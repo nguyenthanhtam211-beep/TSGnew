@@ -1251,7 +1251,7 @@ export default function ContactView({
                   <Users size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-space-grotesk">
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
                     {editingContact ? 'Chỉnh sửa hồ sơ liên hệ' : 'Thêm liên hệ mới'}
                   </h3>
                   <p className="text-[11px] text-slate-500">Thông tin liên lạc & đơn vị công tác</p>

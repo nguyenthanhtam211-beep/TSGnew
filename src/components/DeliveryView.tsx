@@ -1579,7 +1579,7 @@ export default function DeliveryView({
                   <Truck size={16} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 font-space-grotesk">
+                  <h3 className="font-bold text-sm text-slate-900 font-display">
                     Tạo Phiếu Xuất Kho (PXK) Mới
                   </h3>
                   <p className="text-[11px] text-slate-500">Khởi tạo phiếu xuất hàng & đối chiếu tiến độ giao</p>

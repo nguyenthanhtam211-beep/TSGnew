@@ -67,7 +67,7 @@ export default function HelpGuideModal({ isOpen, onClose, onNavigateTab }: HelpG
               <BookOpen size={15} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 font-space-grotesk">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 font-display">
                 <span>Trung Tâm Trợ Giúp & Cẩm Nang Sử Dụng</span>
                 <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200/60 dark:border-blue-800">TSG OS 2026</span>
               </h3>

@@ -263,7 +263,7 @@ export function ProductDetailModal({
                 <span className="font-mono font-bold text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 shrink-0">
                   {productCode || 'SKU'}
                 </span>
-                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate font-space-grotesk">{productName}</h2>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate font-display">{productName}</h2>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                 <span>{product['Nhóm hàng'] || 'Sản phẩm TSG'}</span>

@@ -216,7 +216,7 @@ export function POFileUploadModal({
               <UploadCloud size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-space-grotesk">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-display">
                 Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh
                 <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
                   Google Drive Ready

@@ -138,7 +138,7 @@ export default function GoogleDriveSyncModal({ isOpen, onClose, data }: GoogleDr
               <Cloud size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-space-grotesk">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-display">
                 Kho Dữ Liệu Đồng Bộ Google Drive
                 <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded-full">2-Way Sync</span>
               </h3>
