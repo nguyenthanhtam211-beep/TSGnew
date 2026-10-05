@@ -775,23 +775,31 @@ export default function PricingView({
                         </div>
 
                         {/* Clean Quotation Table (Không còn 3 cột giá cạnh nhau!) */}
-                        <div className="rounded-lg border border-slate-200/90 overflow-hidden">
+                        <div className="rounded-lg border border-slate-300/90 shadow-2xs overflow-hidden">
                           <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                            <thead className="bg-slate-100/95 border-b-2 border-slate-300 text-slate-800 text-[11.5px] font-extrabold uppercase tracking-wider shadow-2xs select-none">
                               <tr>
-                                <th className="px-3 py-2 w-10 text-center text-slate-400">#</th>
-                                <th className="px-3.5 py-2 text-slate-700">Sản Phẩm & Mã Hiệu</th>
-                                <th className="px-3 py-2 text-center w-16">ĐVT</th>
-                                <th className="px-4 py-2 text-right text-slate-900 font-bold bg-blue-50/40 w-36">
+                                <th className="px-3 py-2.5 w-10 text-center text-slate-500 font-mono font-bold">#</th>
+                                <th className="px-3.5 py-2.5 text-slate-900 font-black tracking-wide">
+                                  Sản Phẩm & Mã Hiệu
+                                </th>
+                                <th className="px-3 py-2.5 text-center w-16 text-slate-700 font-extrabold">
+                                  ĐVT
+                                </th>
+                                <th className="px-4 py-2.5 text-right text-blue-950 font-black bg-blue-100/80 border-x border-blue-200/70 w-36 tracking-tight">
                                   Đơn Giá Bán
                                 </th>
                                 {showInternalFinancials && (
-                                  <th className="px-4 py-2 text-right text-emerald-800 font-bold bg-emerald-50/30 w-52">
+                                  <th className="px-4 py-2.5 text-right text-emerald-950 font-black bg-emerald-100/80 border-r border-emerald-200/70 w-52 tracking-tight">
                                     Cấu Trúc Lợi Nhuận
                                   </th>
                                 )}
-                                <th className="px-3 py-2 text-slate-600 w-32">Hợp Đồng</th>
-                                <th className="px-3 py-2 text-center w-24">Thao Tác</th>
+                                <th className="px-3.5 py-2.5 text-slate-800 font-extrabold w-32">
+                                  Hợp Đồng
+                                </th>
+                                <th className="px-3 py-2.5 text-center w-24 text-slate-700 font-extrabold">
+                                  Thao Tác
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
