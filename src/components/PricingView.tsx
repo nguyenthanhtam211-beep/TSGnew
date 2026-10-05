@@ -4,7 +4,10 @@ import {
   Building2, FileText, ArrowUpRight, Eye, 
   Edit3, Trash2, Layers, CheckCircle2, 
   Download, Copy, ArrowUpDown, RotateCcw, 
-  Scale, Tag, X, List, LayoutGrid, Check
+  Scale, Tag, X, List, LayoutGrid, Check,
+  SlidersHorizontal, ChevronRight, HelpCircle,
+  FileSpreadsheet, ShieldCheck, Factory, Sparkles,
+  Columns
 } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
@@ -34,9 +37,8 @@ export interface PricingViewProps {
   onNavigateTab?: (tab: string) => void;
 }
 
-type ViewMode = 'table' | 'cards';
-type SortOption = 'name_asc' | 'price_desc' | 'price_asc' | 'profit_desc' | 'margin_desc';
-type MarginFilter = 'all' | 'high' | 'mid';
+type ViewMode = 'pricebook' | 'master_detail';
+type SortOption = 'name_asc' | 'price_desc' | 'price_asc' | 'profit_desc';
 
 const formatVnCurrency = (val: number) => {
   return new Intl.NumberFormat('vi-VN').format(Math.round(val)) + ' ₫';
@@ -61,14 +63,18 @@ export default function PricingView({
   onSelectPoDetails,
   onNavigateTab
 }: PricingViewProps) {
-  // View states: Default to clean table mode for high legibility
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  // View states
+  const [viewMode, setViewMode] = useState<ViewMode>('pricebook');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('name_asc');
-  const [marginFilter, setMarginFilter] = useState<MarginFilter>('all');
-  const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
+  
+  // Toggle internal financial breakdown (COGS & Profit) vs clean customer quote view
+  const [showInternalFinancials, setShowInternalFinancials] = useState<boolean>(true);
+
+  // Active selected item for Master-Detail view
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
 
   // Clipboard feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -142,6 +148,12 @@ export default function PricingView({
 
       const isInternalFactory = supplier.toLowerCase().includes('tâm sen') || supplier.toLowerCase().includes('tam sen');
 
+      // Find matching specs if available
+      const matchedSpec = specsData.find((s: any) => 
+        (sku && s['Mã sản phẩm'] === sku) || 
+        (prodName && s['Tên sản phẩm'] === prodName)
+      );
+
       return {
         ...row,
         _id: rowId,
@@ -159,10 +171,11 @@ export default function PricingView({
         _avpPrice: avpPrice,
         _profit: profit,
         _marginPct: marginPct,
-        _isInternalFactory: isInternalFactory
+        _isInternalFactory: isInternalFactory,
+        _specs: matchedSpec
       };
     });
-  }, [pricingData, products]);
+  }, [pricingData, products, specsData]);
 
   // Count items per customer
   const customerCounts = useMemo(() => {
@@ -170,16 +183,6 @@ export default function PricingView({
     enrichedList.forEach(item => {
       const c = item._customer || 'Khác';
       map[c] = (map[c] || 0) + 1;
-    });
-    return map;
-  }, [enrichedList]);
-
-  // Count items per group
-  const groupCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    enrichedList.forEach(item => {
-      const g = item._group || 'Khác';
-      map[g] = (map[g] || 0) + 1;
     });
     return map;
   }, [enrichedList]);
@@ -194,9 +197,6 @@ export default function PricingView({
       if (selectedGroup !== 'all' && item._group !== selectedGroup) {
         return false;
       }
-
-      if (marginFilter === 'high' && item._marginPct < 30) return false;
-      if (marginFilter === 'mid' && (item._marginPct < 20 || item._marginPct >= 30)) return false;
 
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase().trim();
@@ -218,28 +218,59 @@ export default function PricingView({
       if (sortBy === 'price_desc') return b._sellPrice - a._sellPrice;
       if (sortBy === 'price_asc') return a._sellPrice - b._sellPrice;
       if (sortBy === 'profit_desc') return b._profit - a._profit;
-      if (sortBy === 'margin_desc') return b._marginPct - a._marginPct;
       return 0;
     });
 
     return result;
-  }, [enrichedList, selectedCustomer, selectedGroup, marginFilter, searchTerm, sortBy]);
+  }, [enrichedList, selectedCustomer, selectedGroup, searchTerm, sortBy]);
 
   // Unique SKUs count
   const uniqueSkusCount = useMemo(() => {
     return new Set(filteredList.map(i => i._sku).filter(Boolean)).size;
   }, [filteredList]);
 
-  // Grouped by customer for grouped view
-  const groupedByCustomerData = useMemo(() => {
-    const groupsMap: Record<string, typeof filteredList> = {};
-    filteredList.forEach(item => {
-      const cust = item._customer || 'Khách hàng khác';
-      if (!groupsMap[cust]) groupsMap[cust] = [];
-      groupsMap[cust].push(item);
+  // Group items hierarchically: Customer -> Category Group
+  const hierarchicalData = useMemo(() => {
+    // If a specific customer is selected, group by category groups
+    // If 'all' customers selected, group by customer then by category groups
+    const result: {
+      customerName: string;
+      categories: {
+        categoryName: string;
+        items: typeof filteredList;
+      }[];
+    }[] = [];
+
+    const targetCustomers = selectedCustomer === 'all' 
+      ? Array.from(new Set(filteredList.map(i => i._customer || 'Khác'))).sort()
+      : [selectedCustomer];
+
+    targetCustomers.forEach(cust => {
+      const custItems = filteredList.filter(i => (i._customer || 'Khác') === cust);
+      if (custItems.length === 0) return;
+
+      const groupNames = Array.from(new Set(custItems.map(i => i._group || 'Chung'))).sort();
+      const categories = groupNames.map(g => ({
+        categoryName: g,
+        items: custItems.filter(i => (i._group || 'Chung') === g)
+      }));
+
+      result.push({
+        customerName: cust,
+        categories
+      });
     });
-    return groupsMap;
-  }, [filteredList]);
+
+    return result;
+  }, [filteredList, selectedCustomer]);
+
+  // Active item for Master-Detail view
+  const activeItem = useMemo(() => {
+    if (!activeItemId && filteredList.length > 0) {
+      return filteredList[0];
+    }
+    return filteredList.find(i => i._id === activeItemId) || filteredList[0] || null;
+  }, [filteredList, activeItemId]);
 
   // Quick copy quote to clipboard
   const handleCopyQuote = useCallback((item: any, e: React.MouseEvent) => {
@@ -379,7 +410,6 @@ export default function PricingView({
       'Đơn giá mua': r._costPrice,
       'Giá AVP': r._avpPrice || '',
       'Đơn giá bán': r._sellPrice,
-      'Đơn giá bán mới': r._newSellPrice || '',
       'Lợi nhuận': r._profit,
       'Biên lợi nhuận': `${r._marginPct}%`,
       'Ngày bắt đầu': r['Ngày bắt đầu'],
@@ -420,18 +450,18 @@ export default function PricingView({
     }
   };
 
-  const getCustomerBadgeClass = (customer: string) => {
-    const c = customer.toLowerCase();
-    if (c.includes('thăng long')) return 'bg-blue-50 text-blue-700 border-blue-200';
-    if (c.includes('bắc sơn')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (c.includes('thanh hoá') || c.includes('thanh hoa')) return 'bg-purple-50 text-purple-700 border-purple-200';
-    return 'bg-slate-100 text-slate-700 border-slate-200';
+  const getCategoryIcon = (categoryName: string) => {
+    const c = categoryName.toLowerCase();
+    if (c.includes('thùng') || c.includes('carton')) return <Package size={15} className="text-amber-600" />;
+    if (c.includes('nguyên liệu') || c.includes('lưỡi gà')) return <Layers size={15} className="text-blue-600" />;
+    if (c.includes('in') || c.includes('nhãn')) return <Tag size={15} className="text-purple-600" />;
+    return <Package size={15} className="text-slate-500" />;
   };
 
   return (
-    <div className="flex-1 p-3 sm:p-6 lg:p-7 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-6 bg-slate-50/50 min-h-0 space-y-4">
+    <div className="flex-1 p-3 sm:p-5 lg:p-6 flex flex-col md:h-full md:overflow-hidden relative pb-28 md:pb-4 bg-slate-100/70 min-h-0 space-y-3">
       
-      {/* 📱 Mobile Experience (Active on screens < 768px) */}
+      {/* 📱 Mobile Experience (< 768px) */}
       <div className="block md:hidden">
         <MobilePricingCatalog
           data={pricingData}
@@ -448,74 +478,90 @@ export default function PricingView({
         />
       </div>
 
-      {/* 💻 Clean Desktop Experience (Active on screens >= 768px) */}
-      <div className="hidden md:flex md:flex-col md:h-full md:min-h-0 space-y-3.5">
+      {/* 💻 Executive Desktop Experience (>= 768px) */}
+      <div className="hidden md:flex md:flex-col md:h-full md:min-h-0 space-y-3">
 
-        {/* 1. Header Toolbar: Title, Clean Statistics & Quick Actions */}
-        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between gap-4 shadow-2xs flex-shrink-0">
+        {/* 1. Header Bar: Tiêu Đề & Chỉ Thống Kê Số Sản Phẩm (Bỏ Tổng Lợi Nhuận Theo Yêu Cầu) */}
+        <div className="bg-white rounded-xl border border-slate-200/90 px-4 py-2.5 flex items-center justify-between gap-4 shadow-xs flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Package size={20} />
+            <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shadow-2xs">
+              <FileSpreadsheet size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black text-slate-900 tracking-tight">
-                  Bảng Giá Bán 2026
+                <h1 className="text-sm font-black text-slate-900 tracking-tight uppercase">
+                  Sổ Bảng Giá Niêm Yết 2026
                 </h1>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                   {filteredList.length} sản phẩm
                 </span>
                 {uniqueSkusCount > 0 && (
-                  <span className="text-[11px] font-semibold text-slate-500">
+                  <span className="text-[11px] font-medium text-slate-500">
                     ({uniqueSkusCount} mã SKU)
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Đang áp dụng cho <strong className="text-slate-800 font-semibold">{customers.length} khách hàng</strong> trên <strong className="text-slate-800 font-semibold">{groups.length} nhóm hàng hóa</strong>
+              <p className="text-[11px] text-slate-500">
+                Phân loại theo <strong className="text-slate-700">{customers.length} khách hàng</strong> & <strong className="text-slate-700">{groups.length} nhóm hàng hóa</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* View Mode Switcher */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+            {/* Toggle Chế Độ Xem Nội Bộ (Giá Vốn & Lãi) vs Báo Giá Khách Hàng Thuần Túy */}
+            <button
+              type="button"
+              onClick={() => setShowInternalFinancials(!showInternalFinancials)}
+              className={clsx(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer",
+                showInternalFinancials 
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+              )}
+              title="Bật/Tắt hiển thị phân tích Giá vốn & Lợi nhuận nội bộ"
+            >
+              <ShieldCheck size={14} className={showInternalFinancials ? "text-emerald-600" : "text-slate-400"} />
+              <span>{showInternalFinancials ? 'Đang hiện giá vốn & lãi' : 'Ẩn giá vốn (Chỉ hiện giá bán)'}</span>
+            </button>
+
+            {/* Chuyển Chế Độ: Sổ Báo Giá Theo Nhóm Hàng vs Chi Tiết 2 Khung */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
               <button
                 type="button"
-                onClick={() => setViewMode('table')}
+                onClick={() => setViewMode('pricebook')}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
-                  viewMode === 'table'
-                    ? "bg-white text-blue-700 shadow-2xs"
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  viewMode === 'pricebook'
+                    ? "bg-white text-slate-900 shadow-2xs"
                     : "text-slate-500 hover:text-slate-800"
                 )}
-                title="Xem dạng Bảng tra cứu chuẩn (Gọn gàng, dễ đối chiếu)"
+                title="Xem dạng Sổ Báo Giá theo Phân Nhóm Hàng"
               >
-                <List size={14} />
-                <span>Bảng dữ liệu</span>
+                <List size={13} />
+                <span>Sổ báo giá</span>
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode('cards')}
+                onClick={() => setViewMode('master_detail')}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
-                  viewMode === 'cards'
-                    ? "bg-white text-blue-700 shadow-2xs"
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  viewMode === 'master_detail'
+                    ? "bg-white text-slate-900 shadow-2xs"
                     : "text-slate-500 hover:text-slate-800"
                 )}
-                title="Xem dạng Thẻ sản phẩm nổi bật"
+                title="Xem dạng 2 Khung (Duyệt danh sách & So sánh chi tiết)"
               >
-                <LayoutGrid size={14} />
-                <span>Thẻ sản phẩm</span>
+                <Columns size={13} />
+                <span>Chi tiết 2 khung</span>
               </button>
             </div>
 
             <Button
               variant="secondary"
               size="sm"
-              icon={<Download size={14} />}
+              icon={<Download size={13} />}
               onClick={handleExportExcel}
-              title="Xuất file Excel"
+              title="Xuất Excel"
             >
               <span>Excel</span>
             </Button>
@@ -523,9 +569,9 @@ export default function PricingView({
             <Button
               variant="secondary"
               size="sm"
-              icon={<FileText size={14} />}
+              icon={<FileText size={13} />}
               onClick={handleExportPDF}
-              title="Xuất file PDF"
+              title="Xuất PDF"
             >
               <span>PDF</span>
             </Button>
@@ -534,38 +580,34 @@ export default function PricingView({
               <Button
                 variant="primary"
                 size="sm"
-                icon={<Plus size={14} />}
+                icon={<Plus size={13} />}
                 onClick={handleOpenAdd}
-                title="Thêm đơn giá sản phẩm mới"
+                title="Thêm giá mới"
               >
-                <span>+ Thêm giá mới</span>
+                <span>+ Thêm giá</span>
               </Button>
             )}
           </div>
         </div>
 
-        {/* 2. Customer Navigation Tabs (Primary Level Filter - Rõ ràng, không rối mắt) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-2xs flex-shrink-0">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 shrink-0 flex items-center gap-1">
-              <Building2 size={13} className="text-slate-500" />
-              <span>Khách hàng:</span>
-            </span>
-
+        {/* 2. Customer Tabs: Phân loại theo Khách hàng (Cấp 1) */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-1.5 shadow-xs flex-shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
             <button
               type="button"
               onClick={() => setSelectedCustomer('all')}
               className={clsx(
-                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer border flex items-center gap-1.5",
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2",
                 selectedCustomer === 'all'
-                  ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
-                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-transparent text-slate-600 hover:bg-slate-100"
               )}
             >
+              <Building2 size={13} />
               <span>Tất cả khách hàng</span>
               <span className={clsx(
                 "text-[10px] font-mono px-1.5 py-0.2 rounded-full",
-                selectedCustomer === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600 font-bold"
+                selectedCustomer === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
               )}>
                 {enrichedList.length}
               </span>
@@ -580,16 +622,16 @@ export default function PricingView({
                   type="button"
                   onClick={() => setSelectedCustomer(cust)}
                   className={clsx(
-                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer border flex items-center gap-1.5",
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2",
                     isSelected
-                      ? "bg-blue-600 border-blue-600 text-white shadow-2xs"
-                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-transparent text-slate-600 hover:bg-slate-100"
                   )}
                 >
                   <span>{cust}</span>
                   <span className={clsx(
-                    "text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold",
-                    isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                    "text-[10px] font-mono px-1.5 py-0.2 rounded-full",
+                    isSelected ? "bg-white/20 text-white font-bold" : "bg-slate-200 text-slate-600"
                   )}>
                     {count}
                   </span>
@@ -599,18 +641,17 @@ export default function PricingView({
           </div>
         </div>
 
-        {/* 3. Secondary Toolbar: Search, Product Groups & Sort */}
-        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-2xs flex-shrink-0 text-xs flex-wrap">
-          <div className="flex items-center gap-3 flex-1 min-w-[320px]">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-sm">
+        {/* 3. Toolbar: Tìm kiếm & Sắp xếp nhanh */}
+        <div className="bg-white rounded-xl border border-slate-200/90 px-3 py-2 flex items-center justify-between gap-3 shadow-xs flex-shrink-0 text-xs">
+          <div className="flex items-center gap-2.5 flex-1 max-w-md">
+            <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm tên sản phẩm, mã SKU, hợp đồng..."
-                className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-7 py-1.5 text-xs font-semibold text-slate-900 outline-none transition-all placeholder:text-slate-400"
+                placeholder="Tìm nhanh theo tên sản phẩm hoặc mã SKU..."
+                className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400"
               />
               {searchTerm && (
                 <button
@@ -623,82 +664,33 @@ export default function PricingView({
               )}
             </div>
 
-            {/* Product Groups Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
-                <Layers size={12} />
-                <span>Nhóm:</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedGroup('all')}
-                className={clsx(
-                  "px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer border",
-                  selectedGroup === 'all'
-                    ? "bg-slate-800 border-slate-800 text-white"
-                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                )}
-              >
-                Tất cả ({filteredList.length})
-              </button>
-
-              {groups.map(g => {
-                const isSel = selectedGroup === g;
-                const count = groupCounts[g] || 0;
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setSelectedGroup(isSel ? 'all' : g)}
-                    className={clsx(
-                      "px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer border flex items-center gap-1",
-                      isSel
-                        ? "bg-slate-800 border-slate-800 text-white"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    )}
-                  >
-                    <span>{g}</span>
-                    <span className={clsx("text-[10px] font-mono", isSel ? "text-slate-300" : "text-slate-400")}>
-                      ({count})
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Nhóm hàng Filter */}
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="all">Tất cả nhóm hàng</option>
+              {groups.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Sort Selector */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                <ArrowUpDown size={12} />
-                <span>Sắp xếp:</span>
-              </span>
+              <span className="text-[11px] font-medium text-slate-400">Sắp xếp:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
               >
-                <option value="name_asc">🔤 Tên sản phẩm (A → Z)</option>
-                <option value="price_desc">🏷️ Giá bán (Cao → Thấp)</option>
-                <option value="price_asc">🏷️ Giá bán (Thấp → Cao)</option>
-                <option value="profit_desc">💰 Lợi nhuận cao nhất</option>
-                <option value="margin_desc">📈 Biên LN (%) cao nhất</option>
+                <option value="name_asc">Tên sản phẩm (A → Z)</option>
+                <option value="price_desc">Giá bán: Cao → Thấp</option>
+                <option value="price_asc">Giá bán: Thấp → Cao</option>
+                <option value="profit_desc">Lợi nhuận cao nhất</option>
               </select>
             </div>
-
-            {/* Group By Customer Toggle (Only when all customers selected) */}
-            {selectedCustomer === 'all' && viewMode === 'table' && (
-              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-600 select-none">
-                <input
-                  type="checkbox"
-                  checked={groupByCustomer}
-                  onChange={(e) => setGroupByCustomer(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Gom nhóm theo Khách hàng</span>
-              </label>
-            )}
 
             {(selectedCustomer !== 'all' || selectedGroup !== 'all' || searchTerm) && (
               <button
@@ -709,25 +701,25 @@ export default function PricingView({
                   setSelectedGroup('all');
                   setSortBy('name_asc');
                 }}
-                className="text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
+                className="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1 cursor-pointer"
               >
-                <RotateCcw size={12} />
-                <span>Đặt lại lọc</span>
+                <RotateCcw size={11} />
+                <span>Đặt lại</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* 4. Main Body: Clean Table Mode OR 2-Column Clean Cards */}
-        <div className="flex-1 overflow-auto min-h-0 bg-white rounded-xl border border-slate-200 shadow-2xs">
+        {/* 4. MAIN CONTENT AREA */}
+        <div className="flex-1 overflow-auto min-h-0">
           {filteredList.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center space-y-3">
               <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                <Search size={22} />
+                <Search size={20} />
               </div>
               <h3 className="text-sm font-bold text-slate-800">Không tìm thấy sản phẩm phù hợp</h3>
               <p className="text-xs text-slate-500">
-                Vui lòng thử từ khoá tìm kiếm khác hoặc bấm đặt lại bộ lọc.
+                Thử đổi từ khóa tìm kiếm hoặc bấm đặt lại bộ lọc.
               </p>
               <button
                 type="button"
@@ -736,195 +728,439 @@ export default function PricingView({
                   setSelectedCustomer('all');
                   setSelectedGroup('all');
                 }}
-                className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
               >
                 Đặt lại bộ lọc
               </button>
             </div>
-          ) : viewMode === 'table' ? (
-            /* ======================================================== */
-            /* 📋 EXECUTIVE TABLE VIEW: TÊN SẢN PHẨM & GIÁ BÁN NỔI BẬT */
-            /* ======================================================== */
-            <div className="overflow-x-auto">
-              {groupByCustomer && selectedCustomer === 'all' ? (
-                /* Grouped Table Sections */
-                <div className="divide-y divide-slate-200">
-                  {Object.entries(groupedByCustomerData).map(([custName, items]) => (
-                    <div key={custName} className="p-3 bg-slate-50/40">
-                      <div className="flex items-center gap-2 mb-2 px-1">
-                        <Building2 size={15} className="text-blue-600" />
-                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-                          {custName}
-                        </h3>
-                        <span className="text-[11px] font-bold px-2 py-0.2 bg-blue-100 text-blue-800 rounded-full">
-                          {items.length} sản phẩm
-                        </span>
+          ) : viewMode === 'pricebook' ? (
+            /* ========================================================================= */
+            /* 📑 THIẾT KẾ 1: SỔ BÁO GIÁ THEO PHÂN NHÓM HÀNG (QUOTATION PRICE BOOK)      */
+            /* ========================================================================= */
+            <div className="space-y-4 pb-6">
+              {hierarchicalData.map(custGroup => (
+                <div key={custGroup.customerName} className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+                  {/* Customer Banner (Chỉ hiện khi xem 'Tất cả khách hàng') */}
+                  {selectedCustomer === 'all' && (
+                    <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Building2 size={16} className="text-blue-400" />
+                        <h2 className="text-xs font-bold tracking-wide uppercase">
+                          Khách hàng: {custGroup.customerName}
+                        </h2>
                       </div>
-                      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                        <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-                          {renderTableHeader(false)}
-                          <tbody className="divide-y divide-slate-100">
-                            {items.map(item => renderTableRow(item, false))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <span className="text-[11px] font-mono text-slate-300">
+                        {custGroup.categories.reduce((acc, cat) => acc + cat.items.length, 0)} sản phẩm
+                      </span>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Render Categories within this Customer */}
+                  <div className="divide-y divide-slate-100">
+                    {custGroup.categories.map(cat => (
+                      <div key={cat.categoryName} className="p-4 space-y-2.5">
+                        {/* Category Subheader */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 rounded bg-slate-100 text-slate-700">
+                              {getCategoryIcon(cat.categoryName)}
+                            </span>
+                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                              {cat.categoryName}
+                            </h3>
+                            <span className="text-[11px] font-semibold text-slate-400">
+                              ({cat.items.length} mặt hàng)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Clean Quotation Table (Không còn 3 cột giá cạnh nhau!) */}
+                        <div className="rounded-lg border border-slate-200/90 overflow-hidden">
+                          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                              <tr>
+                                <th className="px-3 py-2 w-10 text-center text-slate-400">#</th>
+                                <th className="px-3.5 py-2 text-slate-700">Sản Phẩm & Mã Hiệu</th>
+                                <th className="px-3 py-2 text-center w-16">ĐVT</th>
+                                <th className="px-4 py-2 text-right text-slate-900 font-bold bg-blue-50/40 w-36">
+                                  Đơn Giá Bán
+                                </th>
+                                {showInternalFinancials && (
+                                  <th className="px-4 py-2 text-right text-emerald-800 font-bold bg-emerald-50/30 w-52">
+                                    Cấu Trúc Lợi Nhuận
+                                  </th>
+                                )}
+                                <th className="px-3 py-2 text-slate-600 w-32">Hợp Đồng</th>
+                                <th className="px-3 py-2 text-center w-24">Thao Tác</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {cat.items.map((item, idx) => {
+                                const isCopied = copiedId === item._id;
+                                const matchedContract = contractsData.find((c: any) => 
+                                  (c.contractNumber && c.contractNumber.trim().toLowerCase() === item._contractNum.trim().toLowerCase()) ||
+                                  (c.partnerName && item._customer && c.partnerName.includes(item._customer))
+                                );
+                                const driveContractUrl = matchedContract?.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(item._contractNum || item._customer)}`;
+
+                                return (
+                                  <tr 
+                                    key={item._id}
+                                    onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
+                                    className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                                  >
+                                    {/* STT */}
+                                    <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[11px]">
+                                      {idx + 1}
+                                    </td>
+
+                                    {/* Tên sản phẩm & Mã SKU */}
+                                    <td className="px-3.5 py-2.5">
+                                      <div className="flex flex-col">
+                                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                          {item._prodName}
+                                        </span>
+                                        <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                                          {item._sku && (
+                                            <span className="font-mono text-slate-500">
+                                              Mã: {item._sku}
+                                            </span>
+                                          )}
+                                          {item._isInternalFactory ? (
+                                            <span className="text-teal-700 font-medium">
+                                              • 🏭 Nhà máy Tâm Sen
+                                            </span>
+                                          ) : item._supplier ? (
+                                            <span className="text-slate-400">
+                                              • NCC: {item._supplier}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* ĐVT */}
+                                    <td className="px-3 py-2.5 text-center text-slate-600">
+                                      {item._unit}
+                                    </td>
+
+                                    {/* ĐƠN GIÁ BÁN (Cột Giá Duy Nhất, To Rõ, Không Bị Nhầm Lẫn) */}
+                                    <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 text-sm bg-blue-50/20 tabular-nums">
+                                      {formatVnCurrency(item._sellPrice)}
+                                    </td>
+
+                                    {/* Cấu Trúc Lợi Nhuận Trực Quan (Gom gọn Giá vốn & Lãi vào 1 khối thông minh) */}
+                                    {showInternalFinancials && (
+                                      <td className="px-4 py-2.5 text-right bg-emerald-50/10">
+                                        <div className="flex flex-col items-end">
+                                          <div className="flex items-center gap-1.5 font-mono">
+                                            <span className="font-bold text-emerald-700">
+                                              +{formatVnCurrency(item._profit)}
+                                            </span>
+                                            {item._marginPct > 0 && (
+                                              <span className="text-[10px] font-extrabold px-1 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                                                {item._marginPct}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                            Vốn: {formatVnCurrency(item._costPrice)}
+                                            {item._avpPrice ? ` • AVP: ${formatVnCurrency(item._avpPrice)}` : ''}
+                                          </span>
+                                        </div>
+                                      </td>
+                                    )}
+
+                                    {/* Hợp đồng */}
+                                    <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px]">
+                                      {item._contractNum ? (
+                                        <a
+                                          href={driveContractUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="text-slate-600 hover:text-blue-600 hover:underline inline-flex items-center gap-0.5"
+                                          title="Mở hợp đồng Google Drive"
+                                        >
+                                          <span>{item._contractNum}</span>
+                                          <ArrowUpRight size={10} />
+                                        </a>
+                                      ) : '—'}
+                                    </td>
+
+                                    {/* Thao tác */}
+                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopyQuote(item, e)}
+                                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                          title="Chép báo giá"
+                                        >
+                                          {isCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
+                                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                          title="Xem chi tiết"
+                                        >
+                                          <Eye size={12} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleOpenEdit(item, e)}
+                                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                          title="Sửa giá"
+                                        >
+                                          <Edit3 size={12} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                /* Flat Clean Table */
-                <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-                  {renderTableHeader(true)}
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredList.map(item => renderTableRow(item, true))}
-                  </tbody>
-                </table>
-              )}
+              ))}
             </div>
           ) : (
-            /* ======================================================== */
-            /* 🗂️ CLEAN 2-COLUMN CARDS (KHÔNG DÙNG 3 CỘT RỐI MẮT NỮA!)  */
-            /* ======================================================== */
-            <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-3.5">
-              {filteredList.map((item) => {
-                const isCopied = copiedId === item._id;
-                const matchedContract = contractsData.find((c: any) => 
-                  (c.contractNumber && c.contractNumber.trim().toLowerCase() === item._contractNum.trim().toLowerCase()) ||
-                  (c.partnerName && item._customer && c.partnerName.includes(item._customer))
-                );
-                const driveContractUrl = matchedContract?.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(item._contractNum || item._customer)}`;
+            /* ========================================================================= */
+            /* 🔍 THIẾT KẾ 2: MASTER-DETAIL (CHI TIẾT 2 KHUNG - DUYỆT & SO SÁNH GIÁ)     */
+            /* ========================================================================= */
+            <div className="flex h-full gap-3 overflow-hidden">
+              {/* Left Pane: Clean Product Catalog List (38% Width) */}
+              <div className="w-[38%] bg-white rounded-xl border border-slate-200 flex flex-col h-full overflow-hidden shadow-2xs">
+                <div className="p-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Danh Sách Sản Phẩm ({filteredList.length})
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Chọn để xem hồ sơ giá
+                  </span>
+                </div>
 
-                return (
-                  <div
-                    key={item._id}
-                    onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
-                    className="bg-white rounded-xl p-4 border border-slate-200 hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-                  >
-                    {/* Top: Product Name (Hero Element) */}
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                  {filteredList.map((item) => {
+                    const isSelected = activeItem?._id === item._id;
+                    return (
+                      <div
+                        key={item._id}
+                        onClick={() => setActiveItemId(item._id)}
+                        className={clsx(
+                          "p-3 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs",
+                          isSelected
+                            ? "bg-blue-50/70 border-l-4 border-l-blue-600"
+                            : "hover:bg-slate-50 border-l-4 border-l-transparent"
+                        )}
+                      >
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+                          <h4 className={clsx(
+                            "font-bold truncate",
+                            isSelected ? "text-blue-900" : "text-slate-800"
+                          )}>
                             {item._prodName}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                            {item._sku && (
-                              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
-                                SKU: {item._sku}
-                              </span>
-                            )}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                            <span className="font-mono text-slate-500">{item._sku}</span>
                             <span>•</span>
-                            <span className="font-medium text-slate-600">ĐVT: {item._unit}</span>
-                            {item._isInternalFactory && (
-                              <>
-                                <span>•</span>
-                                <span className="font-bold text-teal-700">🏭 Nhà máy Tâm Sen</span>
-                              </>
-                            )}
+                            <span className="truncate">{item._customer}</span>
                           </div>
                         </div>
 
-                        {/* Customer Badge */}
-                        {item._customer && (
-                          <span className={clsx("shrink-0 text-xs font-bold px-2.5 py-1 rounded-md border", getCustomerBadgeClass(item._customer))}>
-                            {item._customer}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Middle: Clear Prominent Price Section */}
-                      <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-baseline justify-between gap-4">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Đơn giá bán niêm yết
-                          </span>
-                          <div className="text-xl font-black text-blue-700 font-mono tracking-tight tabular-nums mt-0.5">
+                        <div className="text-right shrink-0">
+                          <span className={clsx(
+                            "font-mono font-bold block",
+                            isSelected ? "text-blue-700" : "text-slate-900"
+                          )}>
                             {formatVnCurrency(item._sellPrice)}
-                            <span className="text-xs font-semibold text-slate-500 ml-1">/ {item._unit}</span>
-                          </div>
-                        </div>
-
-                        {/* Profit summary chip */}
-                        <div className="text-right">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Lợi nhuận gộp
                           </span>
-                          <div className="text-sm font-bold text-emerald-700 font-mono tabular-nums mt-0.5 flex items-center justify-end gap-1.5">
-                            <span>+{formatVnCurrency(item._profit)}</span>
-                            {item._marginPct > 0 && (
-                              <span className="text-xs px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-extrabold">
-                                {item._marginPct}%
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
-                            Giá vốn: {formatVnCurrency(item._costPrice)}
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            /{item._unit}
                           </span>
                         </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                    {/* Bottom: Subtle Actions Footer */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2 text-slate-500">
-                        {item._group && (
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">
-                            {item._group}
+              {/* Right Pane: Dossier & Visual Price Architecture (62% Width) */}
+              <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col h-full overflow-y-auto shadow-2xs p-5 space-y-5">
+                {activeItem ? (
+                  <>
+                    {/* Header: Product Overview */}
+                    <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700">
+                            {activeItem._group}
                           </span>
-                        )}
-                        {item._contractNum && (
-                          <a
-                            href={driveContractUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-indigo-600 hover:underline flex items-center gap-0.5 text-[11px]"
-                            title="Mở hợp đồng Google Drive"
-                          >
-                            <span>HĐ: {item._contractNum}</span>
-                            <ArrowUpRight size={11} />
-                          </a>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => handleCopyQuote(item, e)}
-                          className={clsx(
-                            "px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer border text-xs",
-                            isCopied
-                              ? "bg-emerald-600 border-emerald-600 text-white"
-                              : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            {activeItem._customer}
+                          </span>
+                          {activeItem._isInternalFactory && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                              Nhà máy Tâm Sen
+                            </span>
                           )}
-                          title="Sao chép báo giá nhanh"
-                        >
-                          {isCopied ? <Check size={12} /> : <Copy size={12} className="text-blue-600" />}
-                          <span>{isCopied ? 'Đã chép' : 'Chép giá'}</span>
-                        </button>
+                        </div>
+                        <h2 className="text-lg font-black text-slate-900 mt-2 leading-snug">
+                          {activeItem._prodName}
+                        </h2>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-mono">
+                          <span>Mã SKU: <strong>{activeItem._sku}</strong></span>
+                          <span>•</span>
+                          <span>Mã giá: <strong>{activeItem['Mã giá bán'] || activeItem._id}</strong></span>
+                          <span>•</span>
+                          <span>ĐVT: <strong>{activeItem._unit}</strong></span>
+                        </div>
+                      </div>
 
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
-                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md font-bold flex items-center gap-1 transition-all cursor-pointer text-xs"
-                          title="Xem thông số kỹ thuật chi tiết"
+                          onClick={(e) => handleCopyQuote(activeItem, e)}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Eye size={12} />
-                          <span>Chi tiết</span>
+                          <Copy size={13} />
+                          <span>Sao chép báo giá</span>
                         </button>
-
                         <button
                           type="button"
-                          onClick={(e) => handleOpenEdit(item, e)}
-                          className="p-1 hover:bg-slate-100 text-slate-600 hover:text-blue-600 border border-slate-200 rounded-md transition-all cursor-pointer"
-                          title="Chỉnh sửa đơn giá"
+                          onClick={(e) => handleOpenEdit(activeItem, e)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                         >
                           <Edit3 size={13} />
+                          <span>Sửa giá</span>
                         </button>
                       </div>
                     </div>
+
+                    {/* Visual Price Architecture: Giải Thích Rõ Ý Nghĩa Từng Mức Giá */}
+                    <div className="space-y-2.5">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <DollarSign size={14} className="text-slate-600" />
+                        <span>Cấu Trúc Đơn Giá & Lợi Nhuận Sản Phẩm</span>
+                      </h3>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        {/* Giá Bán Niêm Yết */}
+                        <div className="bg-blue-50/60 rounded-xl p-3.5 border border-blue-200/80">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
+                            Đơn Giá Bán Niêm Yết
+                          </span>
+                          <div className="text-lg font-black text-blue-900 font-mono mt-1 tabular-nums">
+                            {formatVnCurrency(activeItem._sellPrice)}
+                          </div>
+                          <span className="text-[11px] text-blue-600 font-medium block mt-0.5">
+                            Áp dụng cho {activeItem._customer}
+                          </span>
+                        </div>
+
+                        {/* Giá Vốn Mua Vào */}
+                        <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            Đơn Giá Vốn Mua Vào
+                          </span>
+                          <div className="text-lg font-bold text-slate-800 font-mono mt-1 tabular-nums">
+                            {formatVnCurrency(activeItem._costPrice)}
+                          </div>
+                          <span className="text-[11px] text-slate-500 block mt-0.5 truncate">
+                            Nguồn: {activeItem._supplier || 'Tâm Sen'}
+                          </span>
+                        </div>
+
+                        {/* Lợi Nhuận Gộp */}
+                        <div className="bg-emerald-50/70 rounded-xl p-3.5 border border-emerald-200/80">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+                            Lợi Nhuận Gộp / Đơn Vị
+                          </span>
+                          <div className="text-lg font-black text-emerald-700 font-mono mt-1 tabular-nums">
+                            +{formatVnCurrency(activeItem._profit)}
+                          </div>
+                          <span className="text-[11px] font-bold text-emerald-800 block mt-0.5">
+                            Biên lợi nhuận: {activeItem._marginPct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Benchmark Price (Giá AVP nếu có) */}
+                      {activeItem._avpPrice && (
+                        <div className="bg-amber-50/50 border border-amber-200/70 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-amber-900">Mức giá tham chiếu AVP (An Việt Phát):</span>
+                            <span className="font-mono font-bold text-amber-800">{formatVnCurrency(activeItem._avpPrice)}</span>
+                          </div>
+                          <span className="text-slate-500 text-[11px]">
+                            Chênh lệch so với giá bán: {formatVnCurrency(activeItem._sellPrice - activeItem._avpPrice)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Technical Specifications from SpecsData */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Layers size={14} className="text-slate-600" />
+                        <span>Thông Số Quy Cách & Tiêu Chuẩn Kỹ Thuật</span>
+                      </h3>
+
+                      {activeItem._specs ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                            <span className="text-[10px] text-slate-400 block font-medium">Quy cách</span>
+                            <span className="font-semibold text-slate-800 block mt-0.5">{activeItem._specs['Quy cách'] || '—'}</span>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                            <span className="text-[10px] text-slate-400 block font-medium">Kích thước (DxRxC)</span>
+                            <span className="font-semibold text-slate-800 block mt-0.5">{activeItem._specs['Kích thước'] || '—'}</span>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                            <span className="text-[10px] text-slate-400 block font-medium">Định lượng / Loại sóng</span>
+                            <span className="font-semibold text-slate-800 block mt-0.5">{activeItem._specs['Loại sóng'] || activeItem._specs['Định lượng'] || '—'}</span>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                            <span className="text-[10px] text-slate-400 block font-medium">Trọng lượng riêng</span>
+                            <span className="font-semibold text-slate-800 block mt-0.5">{activeItem._specs['Trọng lượng'] || '—'}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-slate-50 rounded-lg text-slate-400 text-xs text-center border border-dashed border-slate-200">
+                          Chưa có thông số mở rộng trong danh mục Specs. Bấm "Chi tiết" để kiểm tra hệ thống.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Legal Contract Information */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-600">Hợp đồng kinh tế:</span>
+                        <span className="font-mono text-slate-800">{activeItem._contractNum || 'Chưa liên kết'}</span>
+                        <span className="text-slate-400">• Hiệu lực: {activeItem['Ngày bắt đầu'] || '2026'} - {activeItem['Ngày kết thúc'] || '31/12/2026'}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onSelectProductDetails?.(activeItem._prodName || activeItem._sku)}
+                        className="text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Mở toàn bộ hồ sơ sản phẩm</span>
+                        <ArrowUpRight size={13} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                    Vui lòng chọn sản phẩm bên trái để xem hồ sơ giá.
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -972,7 +1208,6 @@ export default function PricingView({
       >
         <form id="pricing-edit-form" onSubmit={handleSaveEdit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            {/* Tên sản phẩm */}
             <div className="space-y-1 col-span-2">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Tên sản phẩm</label>
               <input
@@ -984,7 +1219,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Mã giá bán */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Mã giá bán (ID)</label>
               <input
@@ -995,7 +1229,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Mã sản phẩm */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Mã sản phẩm (SKU)</label>
               <input
@@ -1006,7 +1239,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Khách hàng áp dụng */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Khách hàng áp dụng</label>
               <select
@@ -1023,7 +1255,6 @@ export default function PricingView({
               </select>
             </div>
 
-            {/* Nhà cung cấp */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Nhà cung cấp / Nguồn hàng</label>
               <select
@@ -1042,7 +1273,6 @@ export default function PricingView({
               </select>
             </div>
 
-            {/* Nhóm sản phẩm */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Nhóm sản phẩm</label>
               <select
@@ -1057,7 +1287,6 @@ export default function PricingView({
               </select>
             </div>
 
-            {/* Đơn vị tính */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Đơn vị tính (ĐVT)</label>
               <select
@@ -1072,7 +1301,6 @@ export default function PricingView({
               </select>
             </div>
 
-            {/* Đơn giá bán */}
             <div className="space-y-1">
               <label className="font-bold text-blue-700 uppercase tracking-wide">Đơn giá bán niêm yết (₫)</label>
               <input
@@ -1090,7 +1318,6 @@ export default function PricingView({
               )}
             </div>
 
-            {/* Đơn giá mua / Giá vốn */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Đơn giá mua / Giá vốn (₫)</label>
               <input
@@ -1108,7 +1335,6 @@ export default function PricingView({
               )}
             </div>
 
-            {/* Lợi nhuận (Tự động tính) */}
             <div className="space-y-1">
               <label className="font-bold text-emerald-700 uppercase tracking-wide flex items-center justify-between">
                 <span>Lợi nhuận gộp (₫)</span>
@@ -1122,7 +1348,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Biên lợi nhuận (Tự động tính) */}
             <div className="space-y-1">
               <label className="font-bold text-emerald-700 uppercase tracking-wide flex items-center justify-between">
                 <span>Biên lợi nhuận (%)</span>
@@ -1136,7 +1361,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Số hợp đồng */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Số hợp đồng</label>
               <input
@@ -1148,7 +1372,6 @@ export default function PricingView({
               />
             </div>
 
-            {/* Trạng thái giá */}
             <div className="space-y-1">
               <label className="font-bold text-slate-600 uppercase tracking-wide">Trạng thái giá</label>
               <select
@@ -1350,175 +1573,4 @@ export default function PricingView({
 
     </div>
   );
-
-  // Helper render Table Header
-  function renderTableHeader(showCustomerCol: boolean) {
-    return (
-      <thead className="bg-slate-50 border-b border-slate-200">
-        <tr>
-          <th className="px-4 py-3 font-extrabold text-slate-700 uppercase tracking-wider text-[11px] w-[35%]">
-            Tên Sản Phẩm & Quy Cách
-          </th>
-          {showCustomerCol && (
-            <th className="px-3.5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px] w-[15%]">
-              Khách Hàng
-            </th>
-          )}
-          <th className="px-3 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px] w-[12%]">
-            Nhóm Hàng
-          </th>
-          <th className="px-3 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px] text-center w-[6%]">
-            ĐVT
-          </th>
-          <th className="px-4 py-3 font-extrabold text-blue-900 uppercase tracking-wider text-[11px] text-right w-[14%] bg-blue-50/40">
-            Đơn Giá Bán
-          </th>
-          <th className="px-3.5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px] text-right w-[10%]">
-            Giá Vốn
-          </th>
-          <th className="px-3.5 py-3 font-bold text-emerald-800 uppercase tracking-wider text-[11px] text-right w-[12%]">
-            Lợi Nhuận Gộp
-          </th>
-          <th className="px-3 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px] text-center w-[8%]">
-            Thao Tác
-          </th>
-        </tr>
-      </thead>
-    );
-  }
-
-  // Helper render Table Row
-  function renderTableRow(item: any, showCustomerCol: boolean) {
-    const isCopied = copiedId === item._id;
-    const matchedContract = contractsData.find((c: any) => 
-      (c.contractNumber && c.contractNumber.trim().toLowerCase() === item._contractNum.trim().toLowerCase()) ||
-      (c.partnerName && item._customer && c.partnerName.includes(item._customer))
-    );
-    const driveContractUrl = matchedContract?.attachmentUrl || `https://drive.google.com/drive/search?q=${encodeURIComponent(item._contractNum || item._customer)}`;
-
-    return (
-      <tr
-        key={item._id}
-        onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
-        className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
-      >
-        {/* Tên sản phẩm & Quy cách (Hero column) */}
-        <td className="px-4 py-3">
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
-              {item._prodName}
-            </span>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-              {item._sku && (
-                <span className="font-mono text-blue-600 font-semibold">
-                  Mã: {item._sku}
-                </span>
-              )}
-              {item._isInternalFactory ? (
-                <span className="font-semibold text-teal-700 bg-teal-50 px-1 rounded">
-                  🏭 Tâm Sen (Nội bộ)
-                </span>
-              ) : item._supplier ? (
-                <span className="text-slate-500">
-                  NCC: {item._supplier}
-                </span>
-              ) : null}
-              {item._contractNum && (
-                <a
-                  href={driveContractUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="font-mono text-indigo-600 hover:underline flex items-center gap-0.5"
-                  title="Mở hợp đồng Google Drive"
-                >
-                  <span>HĐ: {item._contractNum}</span>
-                  <ArrowUpRight size={10} />
-                </a>
-              )}
-            </div>
-          </div>
-        </td>
-
-        {/* Khách hàng */}
-        {showCustomerCol && (
-          <td className="px-3.5 py-3">
-            {item._customer ? (
-              <span className={clsx("inline-block px-2.5 py-0.5 rounded text-xs font-bold border", getCustomerBadgeClass(item._customer))}>
-                {item._customer}
-              </span>
-            ) : (
-              <span className="text-slate-400">—</span>
-            )}
-          </td>
-        )}
-
-        {/* Nhóm hàng */}
-        <td className="px-3 py-3">
-          <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[11px]">
-            {item._group || 'Chung'}
-          </span>
-        </td>
-
-        {/* ĐVT */}
-        <td className="px-3 py-3 text-center text-slate-600 font-medium">
-          {item._unit}
-        </td>
-
-        {/* ĐƠN GIÁ BÁN (Hero Metric - Nổi bật nhất) */}
-        <td className="px-4 py-3 text-right font-mono font-extrabold text-blue-700 tabular-nums text-base bg-blue-50/20">
-          {formatVnCurrency(item._sellPrice)}
-        </td>
-
-        {/* Giá vốn */}
-        <td className="px-3.5 py-3 text-right font-mono text-slate-500 tabular-nums text-xs">
-          {formatVnCurrency(item._costPrice)}
-        </td>
-
-        {/* Lợi nhuận gộp */}
-        <td className="px-3.5 py-3 text-right">
-          <div className="flex flex-col items-end">
-            <span className="font-mono font-bold text-emerald-700 tabular-nums text-xs">
-              +{formatVnCurrency(item._profit)}
-            </span>
-            {item._marginPct > 0 && (
-              <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded mt-0.5">
-                {item._marginPct}%
-              </span>
-            )}
-          </div>
-        </td>
-
-        {/* Thao tác */}
-        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-center gap-1">
-            <button
-              type="button"
-              onClick={(e) => handleCopyQuote(item, e)}
-              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-md transition-colors cursor-pointer"
-              title="Sao chép báo giá nhanh"
-            >
-              {isCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-            </button>
-            <button
-              type="button"
-              onClick={() => onSelectProductDetails?.(item._prodName || item._sku)}
-              className="p-1.5 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-md transition-colors cursor-pointer"
-              title="Xem thông số kỹ thuật chi tiết"
-            >
-              <Eye size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => handleOpenEdit(item, e)}
-              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-md transition-colors cursor-pointer"
-              title="Chỉnh sửa đơn giá"
-            >
-              <Edit3 size={13} />
-            </button>
-          </div>
-        </td>
-      </tr>
-    );
-  }
 }
