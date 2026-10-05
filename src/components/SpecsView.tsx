@@ -47,21 +47,50 @@ interface SpecRecord {
 
 const PRESET_TEMPLATES: Record<string, SpecParameter[]> = {
   Carton: [
-    { criterion: 'Định lượng giấy sóng Sóng A/B/C/E', unit: 'gsm', standard: '150 - 250', tolerance: '± 5%', testMethod: 'Cân điện tử ISO 536' },
-    { criterion: 'Độ chịu nén thùng (BCT)', unit: 'KgF', standard: '≥ 350', tolerance: '- 5%', testMethod: 'Máy nén thùng ISO 12048' },
-    { criterion: 'Độ bục carton (Bursting Strength)', unit: 'kPa', standard: '≥ 1200', tolerance: '± 50', testMethod: 'Máy đo độ bục ISO 2759' },
-    { criterion: 'Kích thước phủ ngoài (LxWxH)', unit: 'mm', standard: '600 x 400 x 350', tolerance: '± 2mm', testMethod: 'Thước cặp / Thước cuộn' },
-    { criterion: 'Độ ẩm carton', unit: '%', standard: '8 - 12', tolerance: '± 1%', testMethod: 'Máy đo độ ẩm sấy' }
-  ],
-  Label: [
-    { criterion: 'Loại keo dính (Adhesive type)', unit: '-', standard: 'Acrylic / Hotmelt', tolerance: '-', testMethod: 'Quan sát / Kiểm tra kéo' },
-    { criterion: 'Độ dày màng mặt (Face Stock)', unit: 'µm', standard: '80', tolerance: '± 5µm', testMethod: 'Thước panme điện tử' },
-    { criterion: 'Độ bám dính (Peel Adhesion)', unit: 'N/25mm', standard: '≥ 15', tolerance: '- 10%', testMethod: 'Máy thử độ kéo FTM 1' },
-    { criterion: 'Chịu nhiệt độ vận hành', unit: '°C', standard: '-20 đến +80', tolerance: '-', testMethod: 'Tủ thử sốc nhiệt' }
+    { criterion: 'Cấu trúc thùng carton', unit: 'Kiểu', standard: 'Thùng A1 (Đối khẩu nắp chạm tâm)', tolerance: 'FEFCO 0201', testMethod: 'Quan sát kết cấu mẫu' },
+    { criterion: 'Số lớp & Loại sóng', unit: '-', standard: '5 lớp sóng BC (hoặc 3 lớp sóng B)', tolerance: '± 0.2mm', testMethod: 'Thước panme đo sóng' },
+    { criterion: 'Loại giấy mặt ngoài (Top Liner)', unit: 'gsm', standard: 'Kraft mộc vàng K175 (hoặc K250 XK)', tolerance: '± 5 gsm', testMethod: 'Cân điện tử ISO 536' },
+    { criterion: 'Giấy sóng & Giấy giữa', unit: 'gsm', standard: 'Medium M125 + Giấy lót M125 + Medium M125', tolerance: '± 5 gsm', testMethod: 'Cân điện tử ISO 536' },
+    { criterion: 'Giấy mặt trong (Inner Liner)', unit: 'gsm', standard: 'Kraft K150 / Testliner', tolerance: '± 5 gsm', testMethod: 'Cân điện tử ISO 536' },
+    { criterion: 'Độ chịu bục carton (Bursting Strength)', unit: 'kPa', standard: '≥ 1150 (≥ 11.7 kgf/cm²)', tolerance: '- 40 kPa', testMethod: 'Máy đo độ bục Mullen ISO 2759' },
+    { criterion: 'Độ nén cạnh (ECT)', unit: 'kN/m', standard: '≥ 5.5', tolerance: '- 0.2 kN/m', testMethod: 'Máy nén cạnh ISO 3037' },
+    { criterion: 'Độ chịu nén thùng (BCT)', unit: 'KgF', standard: '≥ 380', tolerance: '- 5%', testMethod: 'Máy nén thùng ISO 12048' },
+    { criterion: 'Độ hút nước Cobb 60 (Mặt ngoài)', unit: 'g/m²', standard: '≤ 45', tolerance: '+ 5 g/m²', testMethod: 'Phương pháp Cobb ISO 535' },
+    { criterion: 'Độ ẩm carton', unit: '%', standard: '8.0 - 12.0', tolerance: '± 1.0%', testMethod: 'Máy sấy ẩm ISO 287' },
+    { criterion: 'Mối nối ghép thân thùng', unit: '-', standard: 'Dập ghim thép mạ kẽm chống rỉ / Ghim đôi', tolerance: 'Cách mép 15mm', testMethod: 'Kiểm tra độ gập mép' }
   ],
   Material: [
-    { criterion: 'Độ dãn dài khi đứt (Elongation)', unit: '%', standard: '≥ 150', tolerance: '± 10%', testMethod: 'Máy đo kéo dãn ASTM D882' },
-    { criterion: 'Độ bền kéo (Tensile Strength)', unit: 'MPa', standard: '≥ 45', tolerance: '± 5', testMethod: 'Máy thử kéo universal' }
+    { criterion: 'Quy cách khổ rộng cuộn', unit: 'mm', standard: '71 mm (hoặc 95 mm)', tolerance: '± 0.5 mm', testMethod: 'Thước panme điện tử' },
+    { criterion: 'Chiều dài cuộn tiêu chuẩn', unit: 'm', standard: '800 m', tolerance: '± 5 m', testMethod: 'Bộ đếm mét máy chia cuộn' },
+    { criterion: 'Trọng lượng riêng cuộn tiêu chuẩn', unit: 'kg/cuộn', standard: '11.92 kg/cuộn (95mm: 15.95 kg)', tolerance: '± 0.20 kg', testMethod: 'Cân điện tử công nghiệp kiểm định' },
+    { criterion: 'Định lượng giấy (Grammage)', unit: 'gsm', standard: '210 gsm (Tùy chọn 230 gsm)', tolerance: '± 5 gsm', testMethod: 'Cân phân tích ISO 536' },
+    { criterion: 'Độ dày giấy (Caliper)', unit: 'µm', standard: '280 µm (0.28 mm)', tolerance: '± 10 µm', testMethod: 'Đo độ dày vi sai ISO 534' },
+    { criterion: 'Độ bền kéo dọc (Tensile MD)', unit: 'kN/m', standard: '≥ 8.5', tolerance: '- 0.3 kN/m', testMethod: 'Máy thử kéo universal ISO 1924-2' },
+    { criterion: 'Độ bền kéo ngang (Tensile CD)', unit: 'kN/m', standard: '≥ 4.2', tolerance: '- 0.2 kN/m', testMethod: 'Máy thử kéo universal ISO 1924-2' },
+    { criterion: 'Độ trắng bề mặt ISO', unit: '%', standard: '≥ 85% ISO (Trắng sứ đều màu)', tolerance: '± 2%', testMethod: 'Máy đo độ trắng quang học ISO 2470' },
+    { criterion: 'Đường kính lõi trong (Core ID)', unit: 'mm', standard: '76 mm (3 inch)', tolerance: '± 1.0 mm', testMethod: 'Thước cặp cơ khí' },
+    { criterion: 'Đường kính ngoài cuộn (Outer OD)', unit: 'mm', standard: '420 - 450 mm', tolerance: '± 10 mm', testMethod: 'Thước đo ngoài' },
+    { criterion: 'Độ ẩm cuộn giấy', unit: '%', standard: '6.5 - 8.0', tolerance: '± 0.5%', testMethod: 'Máy sấy hồng ngoại ISO 287' },
+    { criterion: 'Quy cách bọc màng bảo vệ', unit: '-', standard: 'Bọc màng PE chống ẩm, tem nhãn đầu cuộn', tolerance: 'Kín 100%', testMethod: 'Quan sát ngoại quan' }
+  ],
+  Label: [
+    { criterion: 'Chất liệu giấy mặt (Face Stock)', unit: '-', standard: 'Giấy Ivory 230gsm / Decal Fasson cao cấp', tolerance: 'Đúng mẫu duyệt', testMethod: 'Cân định lượng & soi sợi' },
+    { criterion: 'Loại keo dính (Adhesive)', unit: '-', standard: 'Keo Acrylic vĩnh viễn (Permanent)', tolerance: 'Phủ đều 20 gsm', testMethod: 'Kiểm tra bóc tách keo' },
+    { criterion: 'Độ bám dính bóc 180° (Peel Adhesion)', unit: 'N/25mm', standard: '≥ 16.0', tolerance: '- 1.0 N', testMethod: 'Máy thử kéo bám dính FTM 1' },
+    { criterion: 'Độ dính ban đầu (Loop Tack)', unit: 'N', standard: '≥ 12.0', tolerance: '- 1.0 N', testMethod: 'Máy đo độ dính nhanh FTM 9' },
+    { criterion: 'Công nghệ in ấn', unit: '-', standard: 'In Offset UV 4 màu (CMYK) + Màu pha Pantone', tolerance: 'Delta E ≤ 2.0', testMethod: 'Máy quang phổ màu X-Rite' },
+    { criterion: 'Gia công hoàn thiện bề mặt', unit: '-', standard: 'Cán màng BOPP bóng / mờ chống trầy xước', tolerance: 'Không bọt khí', testMethod: 'Thử xé màng & cồn 90°' },
+    { criterion: 'Độ bóng bề mặt (Gloss 60°)', unit: '%', standard: '≥ 88', tolerance: '± 3%', testMethod: 'Máy đo độ bóng góc 60°' },
+    { criterion: 'Độ bền cọ xát màu mực', unit: 'Lần', standard: '≥ 100 lần không phai màu', tolerance: '- 10 lần', testMethod: 'Máy chà xát mực Sutherland Rub Test' },
+    { criterion: 'Dung sai bế định hình', unit: 'mm', standard: 'Đúng đường kính bế ma-két', tolerance: '± 0.3 mm', testMethod: 'Thước kính quang học' }
+  ],
+  Other: [
+    { criterion: 'Chất liệu quy chuẩn', unit: '-', standard: 'Gỗ keo xẻ sấy / Nhựa HDPE / Màng PE', tolerance: 'Đúng chủng loại', testMethod: 'Kiểm tra xuất xứ CO/CQ' },
+    { criterion: 'Tiêu chuẩn khử trùng (Pallet)', unit: '-', standard: 'Hun trùng đạt chuẩn ISPM 15 / Sấy nhiệt HT', tolerance: 'Đóng dấu kiểm dịch', testMethod: 'Chứng thư kiểm dịch thực vật' },
+    { criterion: 'Kích thước phủ bì', unit: 'mm', standard: '1200 x 1000 x 150 mm', tolerance: '± 3.0 mm', testMethod: 'Thước cuộn thép' },
+    { criterion: 'Tải trọng chịu lực tĩnh', unit: 'kg', standard: '≥ 1500 kg', tolerance: '- 50 kg', testMethod: 'Thử tải trọng tĩnh giàn' },
+    { criterion: 'Tải trọng chịu lực động', unit: 'kg', standard: '≥ 800 kg', tolerance: '- 30 kg', testMethod: 'Thử tải trọng xe nâng' },
+    { criterion: 'Độ ẩm vật liệu', unit: '%', standard: '≤ 18%', tolerance: '± 1%', testMethod: 'Máy đo ẩm kim gỗ' }
   ]
 };
 
@@ -97,10 +126,12 @@ export default function SpecsView({
   const stats = useMemo(() => {
     const total = specsData.length;
     const carton = specsData.filter(s => s['Loại sản phẩm'] === 'Carton').length;
+    const material = specsData.filter(s => s['Loại sản phẩm'] === 'Material').length;
     const label = specsData.filter(s => s['Loại sản phẩm'] === 'Label').length;
+    const other = specsData.filter(s => s['Loại sản phẩm'] === 'Other').length;
     const approved = specsData.filter(s => s['Trạng thái'] === 'Đã phê duyệt').length;
     const draft = specsData.filter(s => s['Trạng thái'] === 'Nháp').length;
-    return { total, carton, label, approved, draft };
+    return { total, carton, material, label, other, approved, draft };
   }, [specsData]);
 
   // Filtered dataset based on search and active tab
@@ -114,7 +145,9 @@ export default function SpecsView({
       
       let matchTab = true;
       if (activeTab === 'CARTON') matchTab = s['Loại sản phẩm'] === 'Carton';
+      else if (activeTab === 'MATERIAL') matchTab = s['Loại sản phẩm'] === 'Material';
       else if (activeTab === 'LABEL') matchTab = s['Loại sản phẩm'] === 'Label';
+      else if (activeTab === 'OTHER') matchTab = s['Loại sản phẩm'] === 'Other';
       else if (activeTab === 'APPROVED') matchTab = s['Trạng thái'] === 'Đã phê duyệt';
       else if (activeTab === 'DRAFT') matchTab = s['Trạng thái'] === 'Nháp';
 
@@ -367,17 +400,20 @@ export default function SpecsView({
         stats={[
           { label: 'Tổng Tiêu Chuẩn', value: stats.total, tone: 'cobalt' },
           { label: 'Thùng Carton', value: stats.carton, tone: 'emerald' },
-          { label: 'Tem Nhãn', value: stats.label, tone: 'cobalt' },
-          { label: 'Đã Phê Duyệt', value: stats.approved, tone: 'emerald' },
-          { label: 'Bản Nháp', value: stats.draft, tone: 'amber' },
+          { label: 'Cuộn Lưỡi Gà', value: stats.material, tone: 'cobalt' },
+          { label: 'Tem Nhãn', value: stats.label, tone: 'amber' },
+          { label: 'Phụ Kiện / Khác', value: stats.other, tone: 'default' },
+          { label: 'Đã Duyệt', value: stats.approved, tone: 'emerald' },
         ]}
         searchPlaceholder="Tìm theo Mã Spec, Tên tiêu chuẩn, Khách hàng hoặc Sản phẩm..."
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         tabs={[
           { id: 'ALL', label: 'Tất cả', count: stats.total },
-          { id: 'CARTON', label: 'Thùng Carton', count: stats.carton },
-          { id: 'LABEL', label: 'Tem Nhãn', count: stats.label },
+          { id: 'CARTON', label: '📦 Thùng Carton', count: stats.carton },
+          { id: 'MATERIAL', label: '🧵 Cuộn Lưỡi Gà', count: stats.material },
+          { id: 'LABEL', label: '🏷️ Tem Nhãn', count: stats.label },
+          { id: 'OTHER', label: '🧱 Phụ Kiện', count: stats.other },
           { id: 'APPROVED', label: 'Đã Duyệt', count: stats.approved },
           { id: 'DRAFT', label: 'Bản Nháp', count: stats.draft },
         ]}
@@ -792,27 +828,34 @@ export default function SpecsView({
                   <Sparkles size={16} className="text-blue-600 animate-bounce" />
                   <span>Nạp nhanh chỉ tiêu mẫu ISO chuẩn:</span>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <button 
                     type="button" 
                     onClick={() => applyPresetTemplate('Carton')}
                     className="px-3 py-1.5 bg-white hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold rounded-xl transition-all shadow-sm flex-1 sm:flex-initial"
                   >
-                    Thùng Carton 3/5 lớp
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => applyPresetTemplate('Label')}
-                    className="px-3 py-1.5 bg-white hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-700 text-xs font-bold rounded-xl transition-all shadow-sm flex-1 sm:flex-initial"
-                  >
-                    Tem Nhãn Decal
+                    📦 Thùng Carton 3/5 lớp
                   </button>
                   <button 
                     type="button" 
                     onClick={() => applyPresetTemplate('Material')}
                     className="px-3 py-1.5 bg-white hover:bg-emerald-600 hover:text-white border border-emerald-200 text-emerald-700 text-xs font-bold rounded-xl transition-all shadow-sm flex-1 sm:flex-initial"
                   >
-                    Nguyên vật liệu
+                    🧵 Cuộn Lưỡi Gà Trắng
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPresetTemplate('Label')}
+                    className="px-3 py-1.5 bg-white hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-700 text-xs font-bold rounded-xl transition-all shadow-sm flex-1 sm:flex-initial"
+                  >
+                    🏷️ Tem Nhãn & In Ấn
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => applyPresetTemplate('Other')}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-700 hover:text-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm flex-1 sm:flex-initial"
+                  >
+                    🧱 Phụ Kiện & Pallet
                   </button>
                 </div>
               </div>

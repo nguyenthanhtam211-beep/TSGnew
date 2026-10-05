@@ -644,3 +644,120 @@ export function getDefaultSpecs(name: string = "", code: string = "", unit: stri
   return "Sản xuất theo đúng bản vẽ ma-két, quy cách đóng gói và tiêu chuẩn kỹ thuật (TCKT) đã được phê duyệt.";
 }
 
+export interface PackagingSpecItem {
+  criterion: string;
+  unit: string;
+  standard: string;
+  tolerance?: string;
+  testMethod?: string;
+}
+
+/**
+ * Returns complete packaging industry specifications tailored by product category
+ */
+export function getPackagingIndustrySpecs(name: string = "", code: string = "", category: string = ""): PackagingSpecItem[] {
+  const n = (name || "").toLowerCase();
+  const c = (code || "").toLowerCase();
+  const cat = (category || "").toLowerCase();
+
+  // 1. Thùng Carton (Corrugated Box Standards)
+  if (cat.includes("thùng") || cat.includes("carton") || n.includes("thùng") || n.includes("carton") || c.startsWith("th") || c.startsWith("c5-") || c.startsWith("c48")) {
+    const isExport = n.includes("xk") || n.includes("xuất khẩu") || c.startsWith("c5-") || n.includes("laguna") || n.includes("v5");
+    const is3Ply = n.includes("mềm") || n.includes("3 lớp") || n.includes("th25");
+
+    if (is3Ply) {
+      return [
+        { criterion: "Cấu trúc thùng", unit: "Kiểu", standard: "Thùng A1 (Đối khẩu thường)", tolerance: "Tiêu chuẩn FEFCO 0201", testMethod: "Quan sát kết cấu mẫu" },
+        { criterion: "Số lớp & Loại sóng", unit: "-", standard: "3 lớp - Sóng B (Độ cao sóng 2.5 - 3.0mm)", tolerance: "± 0.2mm", testMethod: "Thước panme đo sóng" },
+        { criterion: "Loại giấy mặt ngoài (Top Liner)", unit: "gsm", standard: "Kraft vàng K150", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Giấy sóng giữa (Fluting Medium)", unit: "gsm", standard: "Medium M125", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Giấy mặt trong (Inner Liner)", unit: "gsm", standard: "Kraft K125 / Testliner", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Độ chịu bục carton (Bursting)", unit: "kPa", standard: "≥ 850 (≥ 8.7 kgf/cm²)", tolerance: "- 50 kPa", testMethod: "Máy đo độ bục Mullen ISO 2759" },
+        { criterion: "Độ nén cạnh (ECT)", unit: "kN/m", standard: "≥ 4.2", tolerance: "- 0.2 kN/m", testMethod: "Máy nén cạnh ISO 3037" },
+        { criterion: "Độ chịu nén thùng (BCT)", unit: "KgF", standard: "≥ 280", tolerance: "- 5%", testMethod: "Máy nén thùng ISO 12048" },
+        { criterion: "Độ hút nước Cobb 60 (Mặt ngoài)", unit: "g/m²", standard: "≤ 45", tolerance: "+ 5 g/m²", testMethod: "Phương pháp Cobb ISO 535" },
+        { criterion: "Độ ẩm carton", unit: "%", standard: "8.0 - 11.5", tolerance: "± 1.0%", testMethod: "Máy đo sấy ẩm ISO 287" },
+        { criterion: "Quy cách nối thân", unit: "-", standard: "Dán keo Hotmelt chịu lực cao", tolerance: "Không bung tách", testMethod: "Kiểm tra kéo bóc mối nối" }
+      ];
+    }
+
+    if (isExport) {
+      return [
+        { criterion: "Cấu trúc thùng", unit: "Kiểu", standard: "Thùng A1 xuất khẩu chịu tải cao", tolerance: "FEFCO 0201 chuẩn XK", testMethod: "Kiểm tra kết cấu bao gói" },
+        { criterion: "Số lớp & Loại sóng", unit: "-", standard: "5 lớp - Sóng AB (Độ cao sóng 6.8 - 7.5mm)", tolerance: "± 0.3mm", testMethod: "Thước panme đo sóng" },
+        { criterion: "Loại giấy mặt ngoài (Top Liner)", unit: "gsm", standard: "Kraft vàng cao cấp K250 (Chống ẩm)", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Giấy sóng & Giấy giữa", unit: "gsm", standard: "Sóng Medium M140 + Đệm K150 + Sóng M140", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Giấy mặt trong (Inner Liner)", unit: "gsm", standard: "Kraft xuất khẩu K250", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+        { criterion: "Độ chịu bục carton (Bursting)", unit: "kPa", standard: "≥ 1550 (≥ 15.8 kgf/cm²)", tolerance: "- 50 kPa", testMethod: "Máy đo độ bục ISO 2759" },
+        { criterion: "Độ nén cạnh (ECT)", unit: "kN/m", standard: "≥ 6.8", tolerance: "- 0.3 kN/m", testMethod: "Máy nén cạnh ISO 3037" },
+        { criterion: "Độ chịu nén thùng (BCT)", unit: "KgF", standard: "≥ 460", tolerance: "- 5%", testMethod: "Máy nén thùng ISO 12048" },
+        { criterion: "Độ hút nước Cobb 60 (Mặt ngoài)", unit: "g/m²", standard: "≤ 35 (Chống thấm nhiệt đới)", tolerance: "+ 5 g/m²", testMethod: "Phương pháp Cobb ISO 535" },
+        { criterion: "Độ ẩm carton", unit: "%", standard: "8.0 - 10.5", tolerance: "± 0.5%", testMethod: "Máy đo sấy ẩm ISO 287" },
+        { criterion: "Liên kết mối ghép", unit: "-", standard: "Dập ghim thép dẹp đôi mạ kẽm chống rỉ", tolerance: "Khoảng cách 50-60mm", testMethod: "Kiểm tra độ gập ghim" }
+      ];
+    }
+
+    // Default 5-ply (Thùng Thăng Long TH130/07, TH211/05, etc.)
+    return [
+      { criterion: "Cấu trúc thùng", unit: "Kiểu", standard: "Thùng A1 (Đối khẩu nắp chạm tâm)", tolerance: "Tiêu chuẩn FEFCO 0201", testMethod: "Quan sát kết cấu mẫu" },
+      { criterion: "Số lớp & Loại sóng", unit: "-", standard: "5 lớp - Sóng BC (Độ cao sóng 6.0 - 6.8mm)", tolerance: "± 0.2mm", testMethod: "Thước panme đo sóng" },
+      { criterion: "Loại giấy mặt ngoài (Top Liner)", unit: "gsm", standard: "Kraft mộc vàng K175", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+      { criterion: "Giấy sóng & Giấy giữa", unit: "gsm", standard: "Medium M125 + Giấy lót M125 + Medium M125", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+      { criterion: "Giấy mặt đáy / trong", unit: "gsm", standard: "Kraft K150 / Testliner chịu lực", tolerance: "± 5 gsm", testMethod: "Cân điện tử ISO 536" },
+      { criterion: "Độ chịu bục carton (Bursting)", unit: "kPa", standard: "≥ 1150 (≥ 11.7 kgf/cm²)", tolerance: "- 40 kPa", testMethod: "Máy đo độ bục Mullen ISO 2759" },
+      { criterion: "Độ nén cạnh (ECT)", unit: "kN/m", standard: "≥ 5.5", tolerance: "- 0.2 kN/m", testMethod: "Máy nén cạnh ISO 3037" },
+      { criterion: "Độ chịu nén thùng (BCT)", unit: "KgF", standard: "≥ 380", tolerance: "- 5%", testMethod: "Máy nén thùng ISO 12048" },
+      { criterion: "Độ hút nước Cobb 60 (Mặt ngoài)", unit: "g/m²", standard: "≤ 45", tolerance: "+ 5 g/m²", testMethod: "Phương pháp Cobb ISO 535" },
+      { criterion: "Độ ẩm carton", unit: "%", standard: "8.0 - 12.0", tolerance: "± 1.0%", testMethod: "Máy đo sấy ẩm ISO 287" },
+      { criterion: "Quy cách mối nối thân", unit: "-", standard: "Dập ghim thép mạ kẽm chống rỉ / Ghim đôi", tolerance: "Cách mép 15mm", testMethod: "Kiểm tra độ gập mép" }
+    ];
+  }
+
+  // 2. Cuộn Lưỡi Gà Trắng / Giấy Cuộn Nguyên Liệu (Roll Material Standards)
+  if (cat.includes("nguyên liệu") || n.includes("lưỡi gà") || n.includes("cuộn") || c.includes("lg") || c.startsWith("kp-")) {
+    const is71 = n.includes("71") || c.includes("71");
+    const weightSpec = is71 ? "11.92 kg/cuộn (± 0.20 kg)" : "15.95 kg/cuộn (± 0.30 kg)";
+    const widthSpec = is71 ? "71 mm" : "95 mm";
+
+    return [
+      { criterion: "Quy cách khổ rộng cuộn", unit: "mm", standard: widthSpec, tolerance: "± 0.5 mm", testMethod: "Thước panme điện tử" },
+      { criterion: "Chiều dài cuộn tiêu chuẩn", unit: "m", standard: "800 m", tolerance: "± 5 m", testMethod: "Bộ đếm mét tự động máy cuộn" },
+      { criterion: "Trọng lượng riêng mỗi cuộn", unit: "kg/cuộn", standard: weightSpec, tolerance: "± 2%", testMethod: "Cân điện tử công nghiệp chuẩn kiểm định" },
+      { criterion: "Định lượng giấy (Grammage)", unit: "gsm", standard: "210 gsm (Tùy chọn 230 gsm)", tolerance: "± 5 gsm", testMethod: "Cân phân tích điện tử ISO 536" },
+      { criterion: "Độ dày giấy (Caliper)", unit: "µm", standard: "280 µm (0.28 mm)", tolerance: "± 10 µm", testMethod: "Đo độ dày vi sai ISO 534" },
+      { criterion: "Độ bền kéo dọc (Tensile MD)", unit: "kN/m", standard: is71 ? "≥ 8.5" : "≥ 11.2", tolerance: "- 0.3 kN/m", testMethod: "Máy thử kéo universal ISO 1924-2" },
+      { criterion: "Độ bền kéo ngang (Tensile CD)", unit: "kN/m", standard: "≥ 4.2", tolerance: "- 0.2 kN/m", testMethod: "Máy thử kéo universal ISO 1924-2" },
+      { criterion: "Độ trắng bề mặt ISO", unit: "%", standard: "≥ 85% ISO (Trắng sứ đều màu)", tolerance: "± 2%", testMethod: "Máy đo độ trắng quang học ISO 2470" },
+      { criterion: "Đường kính lõi trong (Core ID)", unit: "mm", standard: "76 mm (3 inch)", tolerance: "± 1.0 mm", testMethod: "Thước cặp cơ khí" },
+      { criterion: "Đường kính ngoài cuộn (Outer OD)", unit: "mm", standard: "420 - 450 mm", tolerance: "± 10 mm", testMethod: "Thước đo ngoài" },
+      { criterion: "Độ ẩm cuộn giấy", unit: "%", standard: "6.5 - 8.0", tolerance: "± 0.5%", testMethod: "Máy sấy hồng ngoại ISO 287" },
+      { criterion: "Quy cách quấn cuộn", unit: "-", standard: "Quấn chặt, mép cuộn phẳng, bọc màng PE chống ẩm", tolerance: "Mép lệch ≤ 1mm", testMethod: "Kiểm tra trực quan ngoại quan" }
+    ];
+  }
+
+  // 3. In Ấn & Tem Nhãn (Printing & Label Standards)
+  if (cat.includes("in") || cat.includes("nhãn") || n.includes("nhãn") || n.includes("decal") || n.includes("label") || c.startsWith("nh") || c.startsWith("tsbs")) {
+    return [
+      { criterion: "Chất liệu giấy mặt (Face Stock)", unit: "-", standard: "Giấy Ivory 230gsm / Decal bóng cao cấp", tolerance: "Đúng ma-két duyệt", testMethod: "Cân định lượng & soi sợi" },
+      { criterion: "Loại keo dính (Adhesive)", unit: "-", standard: "Keo Acrylic vĩnh viễn (Permanent)", tolerance: "Độ phủ keo đều 20 gsm", testMethod: "Kiểm tra bóc tách keo" },
+      { criterion: "Độ bám dính bóc 180° (Peel Adhesion)", unit: "N/25mm", standard: "≥ 16.0", tolerance: "- 1.0 N", testMethod: "Máy thử độ kéo FTM 1" },
+      { criterion: "Độ dính ban đầu (Loop Tack)", unit: "N", standard: "≥ 12.0", tolerance: "- 1.0 N", testMethod: "Máy đo độ bám dính nhanh FTM 9" },
+      { criterion: "Công nghệ in ấn", unit: "-", standard: "In Offset UV 4 màu (CMYK) + Màu pha Pantone", tolerance: "Độ sai lệch màu Delta E ≤ 2.0", testMethod: "Máy đo quang phổ màu X-Rite" },
+      { criterion: "Gia công hoàn thiện bề mặt", unit: "-", standard: "Cán màng BOPP bóng nhiệt chống trầy", tolerance: "Màng bám chắc không bọt khí", testMethod: "Thử xé màng & cồn 90°" },
+      { criterion: "Độ bóng bề mặt (Gloss 60°)", unit: "%", standard: "≥ 88", tolerance: "± 3%", testMethod: "Máy đo độ bóng góc 60°" },
+      { criterion: "Độ bền cọ xát màu mực", unit: "Lần", standard: "≥ 100 lần không lem / phai", tolerance: "- 10 lần", testMethod: "Máy chà xát mực Sutherland Rub Test" },
+      { criterion: "Dung sai bế định hình", unit: "mm", standard: "Đúng đường kính bế demi ma-két", tolerance: "± 0.3 mm", testMethod: "Thước kính quang học" },
+      { criterion: "Quy cách đóng gói tem nhãn", unit: "-", standard: "Đóng xấp 500 tờ hoặc cuộn quấn màng PE", tolerance: "Đủ số lượng đếm tự động", testMethod: "Máy đếm sản phẩm điện tử" }
+    ];
+  }
+
+  // 4. Phụ Kiện & Vật Tư Bao Bì Khác
+  return [
+    { criterion: "Chất liệu quy chuẩn", unit: "-", standard: "Vật tư đạt tiêu chuẩn ngành bao bì công nghiệp", tolerance: "Đúng chủng loại", testMethod: "Kiểm tra xuất xứ CO/CQ" },
+    { criterion: "Kích thước tiêu chuẩn", unit: "mm", standard: "Theo đơn đặt hàng và bản vẽ kỹ thuật", tolerance: "± 2.0 mm", testMethod: "Thước cuộn / Thước cặp" },
+    { criterion: "Tải trọng chịu lực", unit: "kg", standard: "Tĩnh ≥ 1500 kg • Động ≥ 800 kg", tolerance: "- 5%", testMethod: "Thử tải trên giàn cân thử" },
+    { criterion: "Độ bền kéo giãn", unit: "%", standard: "≥ 250%", tolerance: "± 20%", testMethod: "Máy thử kéo ASTM D882" }
+  ];
+}
+
+
