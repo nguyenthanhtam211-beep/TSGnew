@@ -3,7 +3,7 @@ import {
   X, UploadCloud, FileText, Image as ImageIcon, ExternalLink, 
   Share2, Copy, CheckCircle2, Loader2, RefreshCw, Download, 
   Eye, AlertCircle, Sparkles, Check, FileCheck, FolderOpen,
-  Layers, Package, CheckSquare
+  Layers, Package, CheckSquare, Edit3, Plus, Trash2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
@@ -585,31 +585,146 @@ export function POFileUploadModal({
                 </span>
               </div>
 
-              <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-                <table className="w-full text-left text-[11px]">
-                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
-                    <tr>
-                      <th className="py-1.5 px-3">Tên sản phẩm</th>
-                      <th className="py-1.5 px-2 text-center">ĐVT</th>
-                      <th className="py-1.5 px-3 text-right">Số lượng</th>
-                      <th className="py-1.5 px-3 text-right">Đơn giá bán</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {extractedOcrData.items.map((it: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/80">
-                        <td className="py-1.5 px-3 font-medium text-slate-800 truncate max-w-[200px]" title={it.name}>
-                          {it.name || it.code}
-                        </td>
-                        <td className="py-1.5 px-2 text-center text-slate-500">{it.unit || 'Cái'}</td>
-                        <td className="py-1.5 px-3 text-right font-bold text-slate-900">{Number(it.quantity || 0).toLocaleString('vi-VN')}</td>
-                        <td className="py-1.5 px-3 text-right text-blue-600 font-mono font-semibold">
-                          {it.price ? `${Number(it.price).toLocaleString('vi-VN')}đ` : 'Theo giá 2026'}
-                        </td>
+              {/* Interactive In-line Editing Table for OCR Verification */}
+              <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-2xs">
+                <div className="p-2.5 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between text-xs">
+                  <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                    <Edit3 size={13} className="text-blue-600" />
+                    Bảng kiểm tra & chỉnh sửa dữ liệu OCR (Kiểm soát 100% trước khi lưu):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentItems = [...(extractedOcrData.items || [])];
+                      currentItems.push({
+                        code: '',
+                        name: '',
+                        unit: 'Cái',
+                        quantity: 1,
+                        price: 0
+                      });
+                      setExtractedOcrData({ ...extractedOcrData, items: currentItems });
+                    }}
+                    className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-blue-700 font-bold hover:bg-blue-50 text-[10.5px] transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={11} /> Thêm dòng
+                  </button>
+                </div>
+
+                <div className="max-h-52 overflow-y-auto">
+                  <table className="w-full text-left text-[11px]">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3 w-[45%]">Sản phẩm (Khớp Bảng Giá 2026)</th>
+                        <th className="py-2 px-2 text-center w-16">ĐVT</th>
+                        <th className="py-2 px-3 text-right w-24">Số lượng</th>
+                        <th className="py-2 px-3 text-right w-28">Đơn giá bán</th>
+                        <th className="py-2 px-2 text-center w-10">Xóa</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {extractedOcrData.items.map((it: any, idx: number) => {
+                        return (
+                          <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                            {/* Product Name & SKU Input with Price Catalog Match */}
+                            <td className="py-1.5 px-2">
+                              <div className="space-y-1">
+                                <input
+                                  type="text"
+                                  value={it.name || ''}
+                                  placeholder="Tên sản phẩm..."
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const updated = [...extractedOcrData.items];
+                                    const matched = pricingData.find(p => 
+                                      (p['Tên sản phẩm'] && p['Tên sản phẩm'].toLowerCase().includes(val.toLowerCase())) ||
+                                      (p['Mã sản phẩm'] && p['Mã sản phẩm'].toLowerCase().includes(val.toLowerCase()))
+                                    );
+                                    updated[idx] = {
+                                      ...updated[idx],
+                                      name: val,
+                                      code: matched ? matched['Mã sản phẩm'] : updated[idx].code,
+                                      price: matched ? parseNumber(matched['Đơn giá bán'] || 0) : updated[idx].price
+                                    };
+                                    setExtractedOcrData({ ...extractedOcrData, items: updated });
+                                  }}
+                                  className="w-full px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-md text-xs font-semibold text-slate-900 outline-none transition-all"
+                                />
+                                {it.code && (
+                                  <div className="text-[10px] text-blue-600 font-mono font-medium flex items-center gap-1">
+                                    <span>Mã: {it.code}</span>
+                                    {pricingData.some(p => p['Mã sản phẩm'] === it.code) && (
+                                      <span className="text-emerald-600 font-bold">✓ Khớp Giá 2026</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Unit */}
+                            <td className="py-1.5 px-1 text-center">
+                              <input
+                                type="text"
+                                value={it.unit || 'Cái'}
+                                onChange={(e) => {
+                                  const updated = [...extractedOcrData.items];
+                                  updated[idx] = { ...updated[idx], unit: e.target.value };
+                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
+                                }}
+                                className="w-full text-center px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 outline-none"
+                              />
+                            </td>
+
+                            {/* Quantity */}
+                            <td className="py-1.5 px-2 text-right">
+                              <input
+                                type="number"
+                                min="1"
+                                value={it.quantity || 1}
+                                onChange={(e) => {
+                                  const updated = [...extractedOcrData.items];
+                                  updated[idx] = { ...updated[idx], quantity: parseNumber(e.target.value) || 1 };
+                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
+                                }}
+                                className="w-full text-right px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-slate-900 outline-none focus:border-blue-500"
+                              />
+                            </td>
+
+                            {/* Unit Price */}
+                            <td className="py-1.5 px-2 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={it.price || 0}
+                                onChange={(e) => {
+                                  const updated = [...extractedOcrData.items];
+                                  updated[idx] = { ...updated[idx], price: parseNumber(e.target.value) || 0 };
+                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
+                                }}
+                                className="w-full text-right px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-emerald-700 outline-none focus:border-blue-500"
+                              />
+                            </td>
+
+                            {/* Remove row button */}
+                            <td className="py-1.5 px-1 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = extractedOcrData.items.filter((_: any, i: number) => i !== idx);
+                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
+                                }}
+                                className="p-1 text-slate-300 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Xóa dòng này"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
