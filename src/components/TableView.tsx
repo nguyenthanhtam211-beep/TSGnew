@@ -744,16 +744,41 @@ function TableView({
         const poNum = (header === 'Chi tiết đơn hàng' && row['Đơn hàng']) ? row['Đơn hàng'] : strVal;
         const displayVal = header === 'Chi tiết đơn hàng' ? 'Xem chi tiết' : strVal;
         
+        // Count number of lines if in poHeaders
+        const matchingLinesCount = poLines ? poLines.filter((l: any) => !l.isDeleted && (l['Số đơn hàng'] === poNum || l['Đơn hàng'] === poNum)).length : 0;
+        
         return (
-            <span 
-                className="text-emerald-600 font-semibold hover:text-emerald-800 hover:underline cursor-pointer transition-colors"
-                onClick={(e) => {
+            <div className="flex items-center gap-1.5 py-0.5">
+              <span 
+                  className="font-mono font-bold text-blue-700 bg-blue-50/90 hover:bg-blue-100 hover:text-blue-900 px-2.5 py-1 rounded-lg border border-blue-200/80 cursor-pointer transition-all inline-flex items-center gap-1.5 shadow-2xs group/po"
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      if (onPoClick) onPoClick(String(poNum).trim());
+                  }}
+                  title="Nhấp để mở xem chi tiết đơn hàng (PO Lines & Tiến độ giao hàng)"
+              >
+                  <FileText size={12} className="text-blue-600 group-hover/po:scale-110 transition-transform" />
+                  <span>{displayVal}</span>
+                  {matchingLinesCount > 0 && (
+                    <span className="text-[10px] font-semibold text-blue-600 bg-white/90 px-1.5 py-0.2 rounded-full border border-blue-200/70" title={`${matchingLinesCount} dòng sản phẩm`}>
+                      {matchingLinesCount} mục
+                    </span>
+                  )}
+              </span>
+              {onPoClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
                     e.stopPropagation();
-                    if (onPoClick) onPoClick(String(poNum).trim());
-                }}
-            >
-                {displayVal}
-            </span>
+                    onPoClick(String(poNum).trim());
+                  }}
+                  className="p-1 hover:bg-slate-100 text-slate-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                  title="Xem chi tiết đơn hàng này"
+                >
+                  <ExternalLink size={12} />
+                </button>
+              )}
+            </div>
         );
     }
 
@@ -1581,6 +1606,11 @@ function TableView({
                     </div>
                   </th>
                 ))}
+                {isPOHeaderTable && (
+                  <th className="px-4 py-2.5 font-bold font-display border-b border-line bg-subtle text-ink-3 tracking-wider text-[11px] uppercase text-center w-28">
+                    Thao tác
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -1658,6 +1688,42 @@ function TableView({
                         </div>
                       </td>
                     ))}
+                    {isPOHeaderTable && (
+                      <td className="px-4 py-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const poNum = row['Đơn hàng'] || row['Số đơn hàng'];
+                              if (onPoClick && poNum) {
+                                onPoClick(String(poNum).trim());
+                              } else {
+                                setUploadedFile(null);
+                                setEditingRow(row);
+                                setFormData({ ...row });
+                                setIsEditModalOpen(true);
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-2xs active:scale-[0.98] cursor-pointer"
+                            title="Xem chi tiết đơn hàng (PO Lines & Tiến độ giao hàng)"
+                          >
+                            <ExternalLink size={12} />
+                            <span>Chi tiết</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFileUploadModalPO(row);
+                              setShowPOFileUploadModal(true);
+                            }}
+                            className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer border border-slate-200/60"
+                            title="Quét OCR / Cập nhật chứng từ PO"
+                          >
+                            <UploadCloud size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1895,14 +1961,46 @@ function TableView({
                   )}
 
                   {/* Card Bottom */}
-                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs font-medium text-slate-500">
-                    <span className="text-[10.5px] text-slate-400 font-medium flex items-center gap-1">
-                      <span>Chạm để sửa chi tiết</span>
-                    </span>
-                    <div className="flex items-center gap-1 text-blue-600 font-bold text-xs">
-                      <span>Chi tiết</span>
-                      <ChevronRight size={14} />
-                    </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs font-medium text-slate-500">
+                    {isPOHeaderTable ? (
+                      <div className="flex items-center gap-2 w-full justify-between" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const poNum = row['Đơn hàng'] || row['Số đơn hàng'];
+                            if (onPoClick && poNum) {
+                              onPoClick(String(poNum).trim());
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-blue-50 text-blue-700 font-bold rounded-lg flex items-center gap-1 border border-blue-200/80 text-[11px]"
+                        >
+                          <ExternalLink size={12} />
+                          <span>Chi tiết PO</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFileUploadModalPO(row);
+                            setShowPOFileUploadModal(true);
+                          }}
+                          className="px-2 py-1 bg-slate-50 text-slate-700 font-semibold rounded-lg flex items-center gap-1 border border-slate-200 text-[11px]"
+                        >
+                          <UploadCloud size={12} className="text-blue-600" />
+                          <span>Quét OCR / Tệp</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[10.5px] text-slate-400 font-medium flex items-center gap-1">
+                          <span>Chạm để sửa chi tiết</span>
+                        </span>
+                        <div className="flex items-center gap-1 text-blue-600 font-bold text-xs">
+                          <span>Chi tiết</span>
+                          <ChevronRight size={14} />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );

@@ -447,7 +447,15 @@ export default function App() {
       const poNum = row['Đơn hàng'];
       const lines = enrichedPoLinesData.filter(l => !l.isDeleted && l['Số đơn hàng'] === poNum);
       
-      const totalValue = lines.reduce((sum, l) => sum + parseNumber(l['Doanh thu']), 0);
+      const totalValue = lines.reduce((sum, l) => {
+        const val = parseNumber(
+          l['Doanh thu'] || 
+          l['Thành tiền dòng'] || 
+          l['Thành tiền'] || 
+          (parseNumber(l['Đơn giá bán']) * parseNumber(l['Số lượng']))
+        );
+        return sum + (isNaN(val) ? 0 : val);
+      }, 0);
       
       // Calculate overall status
       const totalLines = lines.length;
