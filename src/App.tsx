@@ -1128,6 +1128,7 @@ export default function App() {
             customers={customerData}
             poLines={poLinesData}
             fileStorageData={fileStorageData}
+            onAddPOLines={(rows) => handleBatchAddToFirestore("po_lines", rows)}
           />
         )}
         {activeTab === "factory" && (

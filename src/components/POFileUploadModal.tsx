@@ -2,10 +2,14 @@ import React, { useState, useRef } from 'react';
 import { 
   X, UploadCloud, FileText, Image as ImageIcon, ExternalLink, 
   Share2, Copy, CheckCircle2, Loader2, RefreshCw, Download, 
-  Eye, AlertCircle, Sparkles, Check, FileCheck, FolderOpen
+  Eye, AlertCircle, Sparkles, Check, FileCheck, FolderOpen,
+  Layers, Package, CheckSquare
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
+import { processDocumentOCR } from '../lib/gemini';
+import { generateSmartDocumentFileName } from '../lib/documentNaming';
+import { findPriceRecord, parseNumber, parseDateToISO, getDefaultSpecs } from '../lib/business-logic';
 import { Modal, Button } from './ui';
 
 interface POFileUploadModalProps {
@@ -13,8 +17,11 @@ interface POFileUploadModalProps {
   onClose: () => void;
   poHeader: any;
   allPOHeaders?: any[];
+  pricingData?: any[];
+  products?: any[];
   onSelectPO?: (po: any) => void;
   onUpdatePOHeader: (updatedHeader: any) => Promise<void> | void;
+  onAddPOLines?: (newLines: any[]) => Promise<void> | void;
   onUploadSuccess?: (driveData: any) => void;
 }
 
@@ -23,8 +30,11 @@ export function POFileUploadModal({
   onClose,
   poHeader,
   allPOHeaders = [],
+  pricingData = [],
+  products = [],
   onSelectPO,
   onUpdatePOHeader,
+  onAddPOLines,
   onUploadSuccess
 }: POFileUploadModalProps) {
   const [selectedPO, setSelectedPO] = useState<any>(poHeader || null);
@@ -34,12 +44,19 @@ export function POFileUploadModal({
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  
+  // OCR states
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [extractedOcrData, setExtractedOcrData] = useState<any | null>(null);
+  const [autoOcrEnabled, setAutoOcrEnabled] = useState(true);
+
   const [uploadResult, setUploadResult] = useState<{
     fileName: string;
     driveLink: string;
     driveFileId?: string;
     downloadLink?: string;
     folderPath?: string;
+    ocrExtractedCount?: number;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +75,7 @@ export function POFileUploadModal({
   const existingFile = selectedPO?.['Tệp đơn hàng'] || selectedPO?.['Tệp đính kèm'] || '';
   const existingDriveUrl = selectedPO?.['Drive_File_Url'] || selectedPO?.['File_Link'] || '';
 
-  const handleFileChange = (file: File) => {
+  const handleFileChange = async (file: File) => {
     const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
     const lowerName = file.name.toLowerCase();
     const isValid = validExtensions.some(ext => lowerName.endsWith(ext));
@@ -76,6 +93,7 @@ export function POFileUploadModal({
 
     setSelectedFile(file);
     setUploadResult(null);
+    setExtractedOcrData(null);
 
     // If image, create preview
     if (file.type.startsWith('image/')) {
@@ -83,6 +101,32 @@ export function POFileUploadModal({
       setImagePreviewUrl(url);
     } else {
       setImagePreviewUrl(null);
+    }
+
+    // Trigger OCR in background if enabled
+    if (autoOcrEnabled) {
+      runOcrOnSelectedFile(file);
+    }
+  };
+
+  const runOcrOnSelectedFile = async (fileToScan: File) => {
+    setIsOcrProcessing(true);
+    const toastId = toast.loading('Gemini AI Vision đang tự động quét bóc tách nội dung PO...');
+    try {
+      const ocrRes = await processDocumentOCR(fileToScan);
+      setExtractedOcrData(ocrRes);
+
+      const itemsCount = (ocrRes.items || []).length;
+      if (itemsCount > 0) {
+        toast.success(`✨ Đã nhận dạng được ${itemsCount} sản phẩm từ file chứng từ!`, { id: toastId });
+      } else {
+        toast.success('Đã hoàn tất phân tích văn bản chứng từ.', { id: toastId });
+      }
+    } catch (err: any) {
+      console.warn('Lỗi quét OCR:', err);
+      toast.dismiss(toastId);
+    } finally {
+      setIsOcrProcessing(false);
     }
   };
 
@@ -122,11 +166,15 @@ export function POFileUploadModal({
       const year = now.getFullYear().toString();
       const month = (now.getMonth() + 1).toString().padStart(2, '0');
 
-      // Tự động chuẩn hóa tên tệp theo quy chuẩn TSG ERP
+      // Tự động chuẩn hóa tên tệp theo quy chuẩn thông minh TSG ERP
       const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.'));
-      const safePoCode = poNumber.replace(/[/\\#?%[\]\s.]+/g, '_');
-      const safeCust = customerName.replace(/[/\\#?%[\]\s.]+/g, '_');
-      const standardizedName = `PO_${safePoCode}_${safeCust}${fileExt}`;
+      const standardizedName = generateSmartDocumentFileName({
+        documentType: 'PO',
+        documentNumber: poNumber,
+        documentDate: selectedPO?.['Ngày đặt hàng'] || selectedPO?.['Ngày đặt'] || now.toISOString().split('T')[0],
+        buyerName: customerName,
+        originalFileName: selectedFile.name
+      });
 
       setUploadProgress('Đang tải tệp lên Google Drive...');
 
@@ -158,12 +206,68 @@ export function POFileUploadModal({
       await onUpdatePOHeader(updatedPO);
       setSelectedPO(updatedPO);
 
+      // Nếu có kết quả OCR trích xuất được sản phẩm, tạo tự động PO Lines tương ứng
+      let importedLinesCount = 0;
+      if (extractedOcrData && extractedOcrData.items && extractedOcrData.items.length > 0 && onAddPOLines) {
+        setUploadProgress('Đang đồng bộ dòng sản phẩm từ OCR vào Chi tiết đơn hàng...');
+        const newLinesToSave: any[] = [];
+        const headerId = String(poNumber).replace(/\//g, '-').trim();
+
+        extractedOcrData.items.forEach((item: any, idx: number) => {
+          const priceRecord = findPriceRecord(pricingData, { 
+            sku: item.code || item.name, 
+            name: item.name, 
+            customer: customerName 
+          });
+
+          const masterSell = priceRecord ? (parseNumber(priceRecord['Giá bán']) || parseNumber(priceRecord['Đơn giá bán']) || parseNumber(priceRecord['Đơn giá bán mới'])) : (item.price || 0);
+          const masterBuy = priceRecord ? (parseNumber(priceRecord['Giá nhập']) || parseNumber(priceRecord['Đơn giá mua'])) : 0;
+          const effSell = item.price > 0 ? item.price : masterSell;
+          const qty = parseNumber(item.quantity) || 1;
+          const lineId = `D_${headerId}_${idx + 1}`;
+          const prodName = item.name || (priceRecord ? priceRecord['Tên sản phẩm'] : 'Sản phẩm PO');
+          const prodCode = item.code || (priceRecord ? priceRecord['Mã sản phẩm'] : '');
+          const unit = item.unit || (priceRecord ? priceRecord['ĐVT'] : 'Cái');
+          const specs = item.specs || (priceRecord ? priceRecord['Quy cách'] : getDefaultSpecs(prodName, prodCode, unit));
+
+          newLinesToSave.push({
+            'id': lineId,
+            'STT': lineId,
+            'Số đơn hàng': poNumber,
+            'Đơn hàng': poNumber,
+            'Mã giá bán': priceRecord ? (priceRecord['Mã giá'] || priceRecord['Mã giá bán']) : 'Gsp_N/A',
+            'Tên sản phẩm': prodName,
+            'Mã sản phẩm': prodCode,
+            'Mã của khách': prodCode,
+            'ĐVT': unit,
+            'Số lượng': qty,
+            'quantity': qty,
+            'Quy cách': specs,
+            'Ngày đặt hàng': selectedPO?.['Ngày đặt hàng'] || now.toISOString().split('T')[0],
+            'Khách hàng': customerName,
+            'Đơn vị nhận hàng': customerName,
+            'Đơn giá bán': effSell,
+            'Đơn giá nhập': masterBuy,
+            'Thành tiền dòng': effSell * qty,
+            'Lợi nhuận': (effSell - masterBuy) * qty,
+            'Hoàn thành': 0,
+            'createdAt': now.toISOString()
+          });
+        });
+
+        if (newLinesToSave.length > 0) {
+          await onAddPOLines(newLinesToSave);
+          importedLinesCount = newLinesToSave.length;
+        }
+      }
+
       const result = {
         fileName: standardizedName,
         driveLink,
         driveFileId: uploadRes.driveFileId,
         downloadLink: uploadRes.downloadLink,
-        folderPath: uploadRes.folderPath
+        folderPath: uploadRes.folderPath,
+        ocrExtractedCount: importedLinesCount
       };
 
       setUploadResult(result);
@@ -175,9 +279,13 @@ export function POFileUploadModal({
       try {
         await navigator.clipboard.writeText(driveLink);
         setCopiedLink(true);
-        toast.success('🎉 Đã tải lên Google Drive & sao chép link chia sẻ vào bộ nhớ tạm!');
+        toast.success(
+          importedLinesCount > 0 
+            ? `🎉 Đã đổi tên chuẩn [${standardizedName}], tải lên Drive và tự động tạo ${importedLinesCount} dòng PO Lines!` 
+            : `🎉 Đã đổi tên chuẩn [${standardizedName}] và tải lên Google Drive thành công!`
+        );
       } catch {
-        toast.success('🎉 Đã tải lên Google Drive thành công!');
+        toast.success(`🎉 Đã tải lên Google Drive với tên chuẩn: ${standardizedName}`);
       }
 
     } catch (err: any) {
@@ -188,6 +296,8 @@ export function POFileUploadModal({
       setUploadProgress('');
     }
   };
+
+
 
   const handleCopyShareLink = async (url: string) => {
     try {
@@ -436,6 +546,73 @@ export function POFileUploadModal({
               </div>
             )}
           </div>
+
+          {/* OCR Processing & Recognition Status Banner */}
+          {isOcrProcessing && (
+            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-3 animate-pulse">
+              <Loader2 size={20} className="text-indigo-600 animate-spin shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-indigo-600" />
+                  Gemini AI Vision đang đọc và bóc tách dữ liệu từ file...
+                </p>
+                <p className="text-[11px] text-indigo-700 mt-0.5">
+                  Tự động nhận diện Mã đơn hàng, Tên sản phẩm, ĐVT, Số lượng và khớp với Bảng Giá 2026.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* OCR Result Preview Card */}
+          {extractedOcrData && extractedOcrData.items && extractedOcrData.items.length > 0 && !uploadResult && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                    <CheckSquare size={14} />
+                  </span>
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-900">
+                      Tự động trích xuất: {extractedOcrData.items.length} mặt hàng từ chứng từ
+                    </h5>
+                    <p className="text-[10.5px] text-slate-500">
+                      Số PO: <strong>{extractedOcrData.documentNumber || poNumber}</strong> • Ngày đặt: {extractedOcrData.documentDate || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                  ✨ Sẵn sàng tạo PO Lines
+                </span>
+              </div>
+
+              <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th className="py-1.5 px-3">Tên sản phẩm</th>
+                      <th className="py-1.5 px-2 text-center">ĐVT</th>
+                      <th className="py-1.5 px-3 text-right">Số lượng</th>
+                      <th className="py-1.5 px-3 text-right">Đơn giá bán</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {extractedOcrData.items.map((it: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50/80">
+                        <td className="py-1.5 px-3 font-medium text-slate-800 truncate max-w-[200px]" title={it.name}>
+                          {it.name || it.code}
+                        </td>
+                        <td className="py-1.5 px-2 text-center text-slate-500">{it.unit || 'Cái'}</td>
+                        <td className="py-1.5 px-3 text-right font-bold text-slate-900">{Number(it.quantity || 0).toLocaleString('vi-VN')}</td>
+                        <td className="py-1.5 px-3 text-right text-blue-600 font-mono font-semibold">
+                          {it.price ? `${Number(it.price).toLocaleString('vi-VN')}đ` : 'Theo giá 2026'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Success Box after Upload */}
           {uploadResult && (

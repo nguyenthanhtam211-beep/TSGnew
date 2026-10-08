@@ -27,6 +27,8 @@ import {
 } from '../lib/business-logic';
 import { exportGenericTableToPDF } from '../lib/pdf-exporter';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
+import { processDocumentOCR } from '../lib/gemini';
+import { generateSmartDocumentFileName } from '../lib/documentNaming';
 import { 
   ProductHoverCard, ProductCombobox, PricingCombobox, POFileUploadModal,
   MobilePricingCatalog
@@ -82,7 +84,8 @@ function TableView({
   products = [],
   contractsData = [],
   fileStorageData = [],
-  onNavigateTab
+  onNavigateTab,
+  onAddPOLines
 }: { 
   title: string, 
   data: any[], 
@@ -102,7 +105,8 @@ function TableView({
   products?: any[],
   contractsData?: any[],
   fileStorageData?: any[],
-  onNavigateTab?: (tabId: string) => void
+  onNavigateTab?: (tabId: string) => void,
+  onAddPOLines?: (newLines: any[]) => Promise<void> | void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1004,21 +1008,27 @@ function TableView({
 
     // Tự động tải tệp lên Google Drive & tạo link chia sẻ nếu có tệp đính kèm
     if (uploadedFile && isPOHeaderTable) {
-      const uploadToast = toast.loading('Đang tải tệp lên Google Drive & tạo link chia sẻ...');
+      const uploadToast = toast.loading('Đang chuẩn hóa tên tệp, tải lên Google Drive & quét OCR...');
       try {
         const now = new Date();
         const year = now.getFullYear().toString();
         const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const fileExt = uploadedFile.name.substring(uploadedFile.name.lastIndexOf('.'));
-        const poNum = String(finalData['Đơn hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
-        const cust = String(finalData['Khách hàng'] || '').replace(/[/\\#?%[\]\s.]+/g, '_');
-        const standardizedName = `PO_${poNum}_${cust}${fileExt}`;
+        const poNum = String(finalData['Đơn hàng'] || '');
+        const cust = String(finalData['Khách hàng'] || '');
+
+        const standardizedName = generateSmartDocumentFileName({
+          documentType: 'PO',
+          documentNumber: poNum,
+          documentDate: finalData['Ngày đặt hàng'] || now.toISOString().split('T')[0],
+          buyerName: cust,
+          originalFileName: uploadedFile.name
+        });
 
         const uploadRes = await uploadFileDirectToGoogleDrive({
           file: uploadedFile,
           fileName: standardizedName,
           documentType: 'Don_Hang_PO',
-          documentNumber: String(finalData['Đơn hàng'] || ''),
+          documentNumber: poNum,
           year,
           month
         });
@@ -1032,7 +1042,58 @@ function TableView({
         finalData['File_Size'] = uploadedFile.size;
         finalData['File_Updated_At'] = now.toISOString();
 
-        toast.success('🎉 Đã lưu trữ tệp lên Google Drive & tạo link chia sẻ!', { id: uploadToast });
+        // Kích hoạt OCR bóc tách sản phẩm nếu chưa có chi tiết đơn hàng
+        if (onAddPOLines) {
+          try {
+            const ocrRes = await processDocumentOCR(uploadedFile);
+            if (ocrRes && ocrRes.items && ocrRes.items.length > 0) {
+              const headerId = poNum.replace(/\//g, '-').trim();
+              const newLinesToSave: any[] = [];
+
+              ocrRes.items.forEach((item: any, idx: number) => {
+                const priceRecord = pricingData.find(p => 
+                  (p['Mã sản phẩm'] && (p['Mã sản phẩm'] === item.code || p['Mã sản phẩm'] === item.name)) ||
+                  (p['Tên sản phẩm'] && (p['Tên sản phẩm'].toLowerCase().includes((item.name || '').toLowerCase())))
+                );
+
+                const effSell = item.price > 0 ? item.price : parseNumber(priceRecord?.['Đơn giá bán'] || 0);
+                const buyPrice = parseNumber(priceRecord?.['Đơn giá mua'] || 0);
+                const qty = parseNumber(item.quantity) || 1;
+                const lineId = `D_${headerId}_${idx + 1}`;
+
+                newLinesToSave.push({
+                  'id': lineId,
+                  'STT': lineId,
+                  'Số đơn hàng': poNum,
+                  'Đơn hàng': poNum,
+                  'Mã giá bán': priceRecord ? priceRecord['Mã giá bán'] : 'Gsp_N/A',
+                  'Tên sản phẩm': item.name || priceRecord?.['Tên sản phẩm'] || 'Sản phẩm PO',
+                  'Mã sản phẩm': item.code || priceRecord?.['Mã sản phẩm'] || '',
+                  'ĐVT': item.unit || priceRecord?.['ĐVT'] || 'Cái',
+                  'Số lượng': qty,
+                  'quantity': qty,
+                  'Ngày đặt hàng': finalData['Ngày đặt hàng'] || now.toISOString().split('T')[0],
+                  'Khách hàng': cust,
+                  'Đơn giá bán': effSell,
+                  'Đơn giá nhập': buyPrice,
+                  'Thành tiền dòng': effSell * qty,
+                  'Lợi nhuận': (effSell - buyPrice) * qty,
+                  'Hoàn thành': 0,
+                  'createdAt': now.toISOString()
+                });
+              });
+
+              if (newLinesToSave.length > 0) {
+                await onAddPOLines(newLinesToSave);
+                toast.success(`✨ OCR đã tự động nhận diện & tạo ${newLinesToSave.length} dòng PO Lines!`);
+              }
+            }
+          } catch (ocrErr) {
+            console.warn('Silent OCR fallback:', ocrErr);
+          }
+        }
+
+        toast.success(`🎉 Đã lưu trữ tệp [${standardizedName}] lên Google Drive!`, { id: uploadToast });
       } catch (driveErr: any) {
         console.warn('Drive upload error:', driveErr);
         toast.error(driveErr.message || 'Lỗi tải lên Drive, đang lưu dữ liệu...', { id: uploadToast });
@@ -2683,7 +2744,10 @@ function TableView({
           }}
           poHeader={fileUploadModalPO || data[0] || null}
           allPOHeaders={data}
+          pricingData={pricingData}
+          products={products}
           onSelectPO={(po) => setFileUploadModalPO(po)}
+          onAddPOLines={onAddPOLines}
           onUpdatePOHeader={async (updated) => {
             if (onEdit) {
               await onEdit(updated);
