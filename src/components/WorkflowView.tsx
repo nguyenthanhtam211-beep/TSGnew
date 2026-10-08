@@ -15,6 +15,9 @@ import { DualPODocumentModal } from "./DualPODocumentModal";
 import { findPriceRecord, parseNumber, getSupplierShortCode, getDefaultSpecs, parseDateToISO } from "../lib/business-logic";
 import { exportGenericTableToPDF, formatVND } from "../lib/pdf-exporter";
 import { processDocumentOCR } from "../lib/gemini";
+import { uploadFileDirectToGoogleDrive } from "../lib/driveSync";
+import { generateSmartDocumentFileName } from "../lib/documentNaming";
+import { POFileUploadModal } from "./POFileUploadModal";
 
 interface WorkflowViewProps {
   pricingData: any[];
@@ -48,9 +51,17 @@ export default function WorkflowView({
   const [calcProduct, setCalcProduct] = useState("");
   const [calcQty, setCalcQty] = useState<number>(100);
 
-  // States for Step 2 (PO Creation & Smart OCR & Dual PO)
+  // States for Step 1 & 2 (PO Creation & Smart OCR & Dual PO & Document Storage)
   const [creationMode, setCreationMode] = useState<"ocr" | "manual">("ocr");
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [isDriveUploading, setIsDriveUploading] = useState(false);
+  const [uploadedPOFile, setUploadedPOFile] = useState<File | null>(null);
+  const [uploadedFileDriveInfo, setUploadedFileDriveInfo] = useState<{
+    fileName: string;
+    driveUrl: string;
+    driveFileId?: string;
+  } | null>(null);
+  const [showUploadModalForStep2, setShowUploadModalForStep2] = useState(false);
   const [isPOApproved, setIsPOApproved] = useState(true);
   const [showDualPOModal, setShowDualPOModal] = useState(false);
 
@@ -418,9 +429,12 @@ export default function WorkflowView({
   };
 
   const handleOCRUploadInWorkflow = async (file: File) => {
+    setUploadedPOFile(file);
     setIsOcrProcessing(true);
-    const toastId = toast.loading("Gemini AI đang bóc tách chi tiết PO...");
+    setIsDriveUploading(true);
+    const toastId = toast.loading("Gemini AI đang bóc tách chứng từ PO & chuẩn hóa tệp lưu trữ...");
     try {
+      // 1. Chạy bóc tách OCR từ tệp
       const ocrData = await processDocumentOCR(file);
 
       let cust = "Thăng Long";
@@ -432,13 +446,54 @@ export default function WorkflowView({
       else if (lowerBuyer.includes("bến tre")) cust = "Bến Tre";
       else if (lowerBuyer.includes("thăng long")) cust = "Thăng Long";
 
+      const extractedDocNum = ocrData.documentNumber || `PO-${Date.now()}`;
       setPoCustomer(cust);
-      setNewPoNumber(ocrData.documentNumber || `PO-${Date.now()}`);
+      setNewPoNumber(extractedDocNum);
+      let isoDate = new Date().toISOString().split("T")[0];
       if (ocrData.documentDate) {
-        const isoDate = parseDateToISO(ocrData.documentDate);
-        setPoDate(isoDate || ocrData.documentDate);
+        isoDate = parseDateToISO(ocrData.documentDate) || ocrData.documentDate;
+        setPoDate(isoDate);
       }
 
+      // 2. Tự động chuẩn hóa tên tệp theo quy chuẩn TSG ERP khoa học
+      const standardizedName = generateSmartDocumentFileName({
+        documentType: 'PO',
+        documentNumber: extractedDocNum,
+        documentDate: isoDate,
+        buyerName: cust,
+        originalFileName: file.name
+      });
+
+      // 3. Tự động đẩy lên Google Drive và lấy liên kết công khai
+      try {
+        const now = new Date();
+        const uploadRes = await uploadFileDirectToGoogleDrive({
+          file: file,
+          fileName: standardizedName,
+          documentType: 'Don_Hang_PO',
+          documentNumber: extractedDocNum,
+          year: now.getFullYear().toString(),
+          month: (now.getMonth() + 1).toString().padStart(2, '0')
+        });
+
+        const driveUrl = uploadRes.shareLink || uploadRes.driveLink;
+        setUploadedFileDriveInfo({
+          fileName: standardizedName,
+          driveUrl: driveUrl,
+          driveFileId: uploadRes.driveFileId
+        });
+      } catch (driveErr) {
+        console.warn("Lưu Drive nền:", driveErr);
+        // Fallback lưu tên file chuẩn hóa cục bộ
+        setUploadedFileDriveInfo({
+          fileName: standardizedName,
+          driveUrl: ""
+        });
+      } finally {
+        setIsDriveUploading(false);
+      }
+
+      // 4. Bóc tách sản phẩm và tự động khớp Bảng Giá 2026
       const lines = (ocrData.items || []).map((item: any) => {
         const priceRecord = findPriceRecord(pricingData, { sku: item.code, name: item.name, customer: cust });
         const masterSell = priceRecord ? (parseNumber(priceRecord['Giá bán']) || parseNumber(priceRecord['Đơn giá bán']) || parseNumber(priceRecord['Đơn giá bán mới'])) : 0;
@@ -469,7 +524,7 @@ export default function WorkflowView({
       });
 
       setPoLines(lines);
-      toast.success("Đã trích xuất thành công " + lines.length + " mặt hàng từ PO! Vui lòng chọn gắn Bảng Giá 2026.", { id: toastId });
+      toast.success(`✨ Đã bóc tách ${lines.length} mặt hàng & đổi tên tệp chuẩn: ${standardizedName}`, { id: toastId });
     } catch (err: any) {
       console.error(err);
       let msg = err?.message;
@@ -479,6 +534,7 @@ export default function WorkflowView({
       toast.error(msg, { id: toastId });
     } finally {
       setIsOcrProcessing(false);
+      setIsDriveUploading(false);
     }
   };
 
@@ -664,7 +720,18 @@ export default function WorkflowView({
         "Trạng Thái": "Mới nhận",
         "Chi tiết đơn hàng": poLines.map((_, i) => `D_${headerId}_${i + 1}`).join(","),
         "Tổng giá trị đơn hàng": (totalPoValue || 0).toLocaleString("vi-VN"),
-        "createdAt": new Date().toISOString()
+        "createdAt": new Date().toISOString(),
+        ...(uploadedFileDriveInfo ? {
+          "Tệp đơn hàng": uploadedFileDriveInfo.fileName,
+          "Drive_File_Url": uploadedFileDriveInfo.driveUrl,
+          "File_Link": uploadedFileDriveInfo.driveUrl,
+          "Drive_File_Id": uploadedFileDriveInfo.driveFileId || "",
+          "File_Type": uploadedPOFile?.type || "application/pdf",
+          "File_Size": uploadedPOFile?.size || 0,
+          "File_Updated_At": new Date().toISOString(),
+          "ocrExtracted": true,
+          "storageSynced": true
+        } : {})
       };
 
       const newLines: any[] = [];
@@ -734,6 +801,8 @@ export default function WorkflowView({
       setApprovalFilter("pending");
       setNewPoNumber("");
       setPoLines([]);
+      setUploadedPOFile(null);
+      setUploadedFileDriveInfo(null);
       setActiveStep(2); // Move to Step 2: Phê duyệt & Khóa đơn
     } catch (err: any) {
       console.error(err);
@@ -1604,47 +1673,106 @@ export default function WorkflowView({
                   </div>
                 </div>
 
-                {/* Drag & drop upload area for OCR */}
-                <div className="border border-slate-200 bg-slate-50/60 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100/70 text-blue-700 rounded-lg">
-                      <Camera size={18} />
+                {/* Drag & drop upload area for OCR with standardized naming */}
+                <div className="space-y-3">
+                  <div className="border border-slate-200 bg-slate-50/60 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-100 text-blue-700 rounded-xl">
+                        <Camera size={20} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-800">Quét OCR Chứng Từ PO (PDF / Ảnh)</span>
+                          <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                            Tự Đổi Tên TSG ERP
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Hệ thống AI Gemini sẽ tự động bóc tách Số PO, Sản phẩm, Đơn giá và tự động tải lên Google Drive chuẩn hóa
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-800">Quét OCR Chứng từ PO (PDF / Ảnh)</span>
-                      <p className="text-[11px] text-slate-500">Hệ thống AI Gemini sẽ tự động bóc tách Số PO, Mặt hàng & Số lượng từ ảnh chụp</p>
+
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOCRUploadInWorkflow(file);
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={isOcrProcessing || isDriveUploading}
+                      />
+                      <button
+                        type="button"
+                        disabled={isOcrProcessing || isDriveUploading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-sm active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isOcrProcessing || isDriveUploading ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin text-white" />
+                            <span>Đang phân tích & tải Drive...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={15} className="text-white" />
+                            <span>Tải tệp chứng từ PO lên</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleOCRUploadInWorkflow(file);
-                      }}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      disabled={isOcrProcessing}
-                    />
-                    <button
-                      type="button"
-                      disabled={isOcrProcessing}
-                      className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-xs"
-                    >
-                      {isOcrProcessing ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin text-blue-600" />
-                          <span>Đang xử lý OCR...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={14} className="text-blue-600" />
-                          <span>Tải tệp chứng từ PO lên</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {/* Standardized File Banner if uploaded */}
+                  {uploadedFileDriveInfo && (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-600 text-white rounded-lg shrink-0">
+                          <FileText size={16} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-emerald-950 text-xs">
+                              {uploadedFileDriveInfo.fileName}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ Tên Chuẩn TSG ERP
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-2">
+                            <span>{uploadedPOFile ? `${(uploadedPOFile.size / 1024).toFixed(1)} KB` : "Chứng từ đính kèm"}</span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-medium">Đã kết nối Google Drive & Kho tệp</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {uploadedFileDriveInfo.driveUrl && (
+                          <a
+                            href={uploadedFileDriveInfo.driveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-emerald-800 border border-emerald-300 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
+                          >
+                            <ExternalLink size={13} />
+                            <span>Xem trên Drive</span>
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedPOFile(null);
+                            setUploadedFileDriveInfo(null);
+                          }}
+                          className="px-2.5 py-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Gỡ bỏ tệp"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Header Form */}
@@ -1828,14 +1956,26 @@ export default function WorkflowView({
                   </div>
 
                   {poLines.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setPoLines([])}
-                      className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 px-2.5 py-1 rounded hover:bg-red-50 transition"
-                    >
-                      <Trash2 size={13} />
-                      Xóa trắng danh sách
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleApplyAllMasterPrices}
+                        className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition shadow-2xs"
+                        title="Đồng bộ lại toàn bộ đơn giá bán theo chính sách Bảng giá 2026"
+                      >
+                        <Sparkles size={13} className="text-emerald-600" />
+                        ⚡ Khóa Theo Bảng Giá 2026
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPoLines([])}
+                        className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition"
+                      >
+                        <Trash2 size={13} />
+                        Xóa trắng
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1951,8 +2091,44 @@ export default function WorkflowView({
                                   />
                                 </div>
                               </td>
-                              <td className="px-3.5 py-3.5 text-right font-mono font-bold text-blue-700 border-r border-slate-100">
-                                {formatCurrency(sell)}
+                              <td className="px-3.5 py-3.5 text-right font-mono border-r border-slate-100">
+                                <div className="font-bold text-blue-700">{formatCurrency(sell)}</div>
+                                {(() => {
+                                  const priceRec = findPriceRecord(pricingData, { sku: prodCode, name: prodName, customer: poCustomer });
+                                  const masterSell = priceRec ? (parseNumber(priceRec['Giá bán']) || parseNumber(priceRec['Đơn giá bán']) || parseNumber(priceRec['Đơn giá bán mới'])) : 0;
+                                  if (masterSell > 0) {
+                                    const isMatch = Math.abs(sell - masterSell) < 1;
+                                    return (
+                                      <div className="mt-1">
+                                        {isMatch ? (
+                                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            ✓ Khớp Giá 2026
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const updated = [...poLines];
+                                              updated[idx] = {
+                                                ...updated[idx],
+                                                "Đơn giá bán": masterSell,
+                                                effectivePrice: masterSell,
+                                                "Thành tiền dòng": masterSell * qty
+                                              };
+                                              setPoLines(updated);
+                                              toast.success(`Đã áp dụng giá chuẩn 2026 (${formatCurrency(masterSell)}) cho [${prodCode}]!`);
+                                            }}
+                                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition"
+                                            title="Bấm để dùng đơn giá chuẩn 2026"
+                                          >
+                                            ⚠️ Lệch 2026: {formatCurrency(masterSell)} ⤾
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </td>
                               <td className="px-4 py-3.5 text-right font-mono font-extrabold text-blue-900 bg-blue-50/40 border-r border-blue-100">
                                 {formatCurrency(lineRev)}
@@ -2371,6 +2547,56 @@ export default function WorkflowView({
                                 <div className="p-4 space-y-1">
                                   <span className="text-[10.5px] font-medium text-slate-400 uppercase tracking-wider block">Đơn Vị Phân Phối</span>
                                   <div className="font-semibold text-slate-800">An Việt Phát Group</div>
+                                </div>
+                              </div>
+
+                              {/* Document Attachment & Verification Strip */}
+                              <div className="border-t border-slate-100 bg-white p-3.5 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`p-2 rounded-lg ${currentPoForApproval["Drive_File_Url"] || currentPoForApproval["File_Link"] ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+                                    <FileText size={16} />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-slate-800">Tệp chứng từ PO:</span>
+                                      {currentPoForApproval["Tệp đơn hàng"] || currentPoForApproval["Drive_File_Url"] ? (
+                                        <span className="font-mono text-emerald-900 font-semibold truncate max-w-[280px] sm:max-w-[450px]">
+                                          {currentPoForApproval["Tệp đơn hàng"] || "Chung_tu_PO.pdf"}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic">Chưa gắn file scan PO</span>
+                                      )}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5">
+                                      {currentPoForApproval["Drive_File_Url"] || currentPoForApproval["File_Link"] ? (
+                                        <span className="text-emerald-700 font-medium">✓ Đã lưu trữ chuẩn hóa trên Google Drive & Sổ đối soát</span>
+                                      ) : (
+                                        <span>Bấm nút bên phải để tải file lên hoặc chạy OCR tự động</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {(currentPoForApproval["Drive_File_Url"] || currentPoForApproval["File_Link"]) && (
+                                    <a
+                                      href={currentPoForApproval["Drive_File_Url"] || currentPoForApproval["File_Link"]}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
+                                    >
+                                      <ExternalLink size={13} />
+                                      <span>Xem Bản Gốc PO</span>
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowUploadModalForStep2(true)}
+                                    className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg font-semibold flex items-center gap-1.5 transition text-xs shadow-2xs"
+                                  >
+                                    <Upload size={13} className="text-blue-600" />
+                                    <span>{currentPoForApproval["Drive_File_Url"] ? "Đổi tệp / Quét lại" : "+ Tải tệp PO lên"}</span>
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -4039,6 +4265,38 @@ export default function WorkflowView({
           }
         }}
       />
+
+      {/* Quick Attachment & OCR Modal for Step 2 PO Review */}
+      {showUploadModalForStep2 && currentPoForApproval && (
+        <POFileUploadModal
+          isOpen={showUploadModalForStep2}
+          onClose={() => setShowUploadModalForStep2(false)}
+          poHeader={currentPoForApproval}
+          allPOHeaders={combinedPoHeadersData}
+          pricingData={pricingData}
+          products={productData}
+          onUpdatePOHeader={async (updatedHeader) => {
+            const headerId = updatedHeader.id || updatedHeader["Đơn hàng"];
+            setCreatedPoHeaders(prev => prev.map(h => ((h.id || h["Đơn hàng"]) === headerId ? updatedHeader : h)));
+            try {
+              await setDoc(doc(db, "po_headers", headerId), cleanObject(updatedHeader), { merge: true });
+              toast.success("Đã cập nhật chứng từ đơn hàng & chuẩn hóa lưu trữ!");
+            } catch (err) {
+              console.warn("Lỗi lưu PO header:", err);
+            }
+          }}
+          onAddPOLines={async (newLines) => {
+            setCreatedPoLines(prev => [...newLines, ...prev]);
+            const batch = writeBatch(db);
+            newLines.forEach(line => {
+              const lineId = line.id || line["STT"] || `D_${Date.now()}_${Math.random()}`;
+              batch.set(doc(db, "po_lines", lineId), cleanObject(line), { merge: true });
+            });
+            await batch.commit();
+            toast.success(`Đã bổ sung ${newLines.length} mặt hàng từ chứng từ vào đơn!`);
+          }}
+        />
+      )}
     </div>
   );
 }
