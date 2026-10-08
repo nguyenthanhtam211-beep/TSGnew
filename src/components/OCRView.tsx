@@ -492,23 +492,31 @@ export default function OCRView({
         originalFileName: file.name
       });
 
+      let driveLink = '';
+      let driveFileId = '';
+      let savedFileName = finalFileName;
+
       if (onUploadToDrive && file) {
-        onUploadToDrive(file, {
-          documentType: dataToSave.documentType,
-          documentNumber: dataToSave.documentNumber,
-          fileName: finalFileName
-        }).then((res: any) => {
+        try {
+          const res = await onUploadToDrive(file, {
+            documentType: dataToSave.documentType,
+            documentNumber: dataToSave.documentNumber,
+            fileName: finalFileName
+          });
           if (res) {
+            driveLink = res.driveLink || res.shareLink || '';
+            driveFileId = res.driveFileId || '';
+            savedFileName = res.fileName || finalFileName;
             setSavedDriveInfo({
               documentNumber: dataToSave.documentNumber,
-              driveLink: res.driveLink,
+              driveLink: driveLink,
               folderLink: res.folderLink,
               folderPath: res.folderPath
             });
           }
-        }).catch(err => {
+        } catch (err) {
           console.warn("Background upload to Drive skipped/failed:", err);
-        });
+        }
       }
 
       const docType = (dataToSave.documentType || "").toUpperCase();
@@ -536,27 +544,35 @@ export default function OCRView({
 
           return {
             "STT": lineId,
+            "id": lineId,
             "Số đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
+            "Đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
             "Mã giá bán": item.priceCode || "Gsp_N/A",
             "Tên sản phẩm": item.name || "Sản phẩm OCR",
             "Mã của khách": item.code || "",
             "ĐVT": item.unit || "Cái",
             "Số lượng": qty.toString(),
+            "quantity": qty,
             "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
             "Ngày giao": parseDateToISO(dataToSave.deliveryDate || dataToSave.documentDate) || new Date().toISOString().split('T')[0],
             "Thời gian xử lý": "5",
             "Khách hàng": matchedCust,
             "Đơn vị nhận hàng": matchedCust,
             "Nhóm hàng": matchedCust === "Thăng Long" ? "Nguyên liệu" : "Thùng carton",
-            "Đơn giá nhập": (buyPrice || 0).toLocaleString("en-US"),
-            "Thành tiền dòng": (revenue || 0).toLocaleString("en-US"),
+            "Đơn giá nhập": (buyPrice || 0).toLocaleString("vi-VN"),
+            "Thành tiền dòng": (revenue || 0).toLocaleString("vi-VN"),
             "Hoàn thành": "0",
             "Đã giao": "0",
             "Còn lại": qty.toString(),
             "Số lượng khách hàng": "4",
-            "Đơn giá bán": (sellPrice || 0).toLocaleString("en-US"),
-            "Lợi nhuận": (profit || 0).toLocaleString("en-US"),
-            "Lợi nhuận dòng": (profit || 0).toLocaleString("en-US"),
+            "Đơn giá bán": (sellPrice || 0).toLocaleString("vi-VN"),
+            "effectivePrice": sellPrice,
+            "buyPrice": buyPrice,
+            "Lợi nhuận": (profit || 0).toLocaleString("vi-VN"),
+            "Lợi nhuận dòng": (profit || 0).toLocaleString("vi-VN"),
+            "contractNo": item.contractNumber || "",
+            "priceCode": item.priceCode || "Gsp_N/A",
+            "supplier": item.supplier || "Tâm Sen",
             "Các mục mẹ 2": item.contractNumber || "",
             "Tiến độ sản phẩm": "0%"
           };
@@ -564,15 +580,25 @@ export default function OCRView({
 
         const totalOrderVal = linesToInsert.reduce((sum, line) => sum + parseNumber(line["Thành tiền dòng"]), 0);
 
+        const poHeaderId = (dataToSave.documentNumber || `PO-${Date.now()}`).replace(/\//g, "-").trim();
         await onAddPOHeader({
+          "id": poHeaderId,
           "Đơn hàng": dataToSave.documentNumber || `PO-${Date.now()}`,
           "Ngày đặt hàng": parseDateToISO(dataToSave.documentDate) || new Date().toISOString().split('T')[0],
           "Khách hàng": matchedCust,
           "Phân loại": "Đơn hàng thường xuyên",
-          "Tệp đơn hàng": file?.name || "document_ocr.pdf",
+          "Tệp đơn hàng": savedFileName,
+          "Drive_File_Url": driveLink,
+          "File_Link": driveLink,
+          "Drive_File_Id": driveFileId,
+          "File_Type": file?.type || "application/pdf",
+          "File_Size": file?.size || 0,
+          "File_Updated_At": new Date().toISOString(),
+          "ocrExtracted": true,
+          "storageSynced": true,
           "Chi tiết đơn hàng": linesToInsert.map(l => l.STT).join(","),
           "Trạng Thái": "Mới nhận",
-          "Tổng giá trị đơn hàng": (totalOrderVal || 0).toLocaleString("en-US")
+          "Tổng giá trị đơn hàng": (totalOrderVal || 0).toLocaleString("vi-VN")
         });
 
         await onAddPOLines(linesToInsert);
@@ -609,12 +635,19 @@ export default function OCRView({
             "Chi tiết sự cố": "",
             "Nhà cung cấp": item.supplier || "Tâm Sen",
             "Nhóm hàng": matchedCust === "Thăng Long" ? "Nguyên liệu" : "Thùng carton",
-            "Đơn giá nhập": (buyPrice || 0).toLocaleString("en-US"),
-            "Đơn giá bán": (sellPrice || 0).toLocaleString("en-US"),
-            "Doanh thu": (revenue || 0).toLocaleString("en-US"),
-            "Lợi nhuận gộp": (profit || 0).toLocaleString("en-US"),
+            "Đơn giá nhập": (buyPrice || 0).toLocaleString("vi-VN"),
+            "Đơn giá bán": (sellPrice || 0).toLocaleString("vi-VN"),
+            "Doanh thu": (revenue || 0).toLocaleString("vi-VN"),
+            "Lợi nhuận gộp": (profit || 0).toLocaleString("vi-VN"),
             "% Lợi nhuận": `${margin.toFixed(2)}%`,
-            "Tháng": new Date().getMonth() + 1
+            "Tháng": new Date().getMonth() + 1,
+            "Tệp đính kèm": savedFileName,
+            "Drive_File_Url": driveLink,
+            "File_Link": driveLink,
+            "Drive_File_Id": driveFileId,
+            "File_Type": file?.type || "application/pdf",
+            "File_Size": file?.size || 0,
+            "File_Updated_At": new Date().toISOString()
           };
         });
 

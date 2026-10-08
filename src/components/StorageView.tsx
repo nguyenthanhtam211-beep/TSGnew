@@ -123,10 +123,77 @@ export default function StorageView({
   const [editingNoteFileId, setEditingNoteFileId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState<string>('');
 
+  // Unified Files aggregating from file_storage, poHeaderData, and deliveryData
+  const unifiedStorageFiles = useMemo(() => {
+    const map = new Map<string, StorageFile>();
+
+    // 1. Existing files from file_storage collection
+    (files || []).forEach(f => {
+      const key = f.driveFileId || f.fileName || f.fileId || f.id;
+      if (key) map.set(key, f);
+    });
+
+    // 2. Attached PO files from poHeaderData
+    (allData?.poHeaderData || []).forEach((po: any) => {
+      const fileName = po['Tệp đơn hàng'] || po['Tệp đính kèm'] || po['fileName'];
+      const driveUrl = po['Drive_File_Url'] || po['File_Link'] || '';
+      const poNum = po['Đơn hàng'] || po['Số đơn hàng'] || po.id;
+      if (fileName || driveUrl) {
+        const key = po['Drive_File_Id'] || fileName || `po_${poNum}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            id: `po_file_${poNum}`,
+            fileId: po['Drive_File_Id'] || `po_file_${poNum}`,
+            driveFileId: po['Drive_File_Id'],
+            fileName: fileName || `PO_${poNum}.pdf`,
+            documentType: 'PO',
+            documentNumber: poNum,
+            customer: po['Khách hàng'],
+            partnerName: po['Khách hàng'],
+            driveLink: driveUrl,
+            uploadDate: po['File_Updated_At'] || po['createdAt'] || po['Ngày đặt hàng'],
+            syncedToDrive: Boolean(driveUrl),
+            doubleCheckStatus: po['ocrExtracted'] ? 'verified' : 'pending',
+            checkNote: po['ocrExtracted'] ? 'Đã bóc tách OCR & Khớp Bảng giá 2026' : 'Đơn hàng từ hệ thống'
+          });
+        }
+      }
+    });
+
+    // 3. Attached delivery files from deliveryData
+    (allData?.deliveryData || []).forEach((del: any) => {
+      const fileName = del['Tệp đính kèm'] || del['Tệp'];
+      const driveUrl = del['Drive_File_Url'] || del['File_Link'] || '';
+      const pxkNum = del['Số PXK'] || del['Số phiếu'] || del.id;
+      if (fileName || driveUrl) {
+        const key = del['Drive_File_Id'] || fileName || `del_${pxkNum}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            id: `del_file_${pxkNum}`,
+            fileId: del['Drive_File_Id'] || `del_file_${pxkNum}`,
+            driveFileId: del['Drive_File_Id'],
+            fileName: fileName || `PXK_${pxkNum}.pdf`,
+            documentType: 'PXK',
+            documentNumber: pxkNum,
+            customer: del['Khách hàng'],
+            partnerName: del['Khách hàng'],
+            driveLink: driveUrl,
+            uploadDate: del['File_Updated_At'] || del['Ngày giao'],
+            syncedToDrive: Boolean(driveUrl),
+            doubleCheckStatus: 'verified',
+            checkNote: 'Chứng từ giao hàng thực tế'
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [files, allData?.poHeaderData, allData?.deliveryData]);
+
   // Category counts
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: files.length, PO: 0, PXK: 0, INVOICE: 0, HD: 0 };
-    files.forEach(f => {
+    const counts: Record<string, number> = { ALL: unifiedStorageFiles.length, PO: 0, PXK: 0, INVOICE: 0, HD: 0 };
+    unifiedStorageFiles.forEach(f => {
       const dt = (f.documentType || '').toUpperCase();
       if (dt.includes('PO') || dt.includes('ORDER') || dt.includes('ĐƠN')) counts.PO = (counts.PO || 0) + 1;
       else if (dt.includes('PXK') || dt.includes('XUẤT') || dt.includes('GIAO')) counts.PXK = (counts.PXK || 0) + 1;
@@ -134,16 +201,16 @@ export default function StorageView({
       else if (dt.includes('HD') || dt.includes('HỢP') || dt.includes('HOP')) counts.HD = (counts.HD || 0) + 1;
     });
     return counts;
-  }, [files]);
+  }, [unifiedStorageFiles]);
 
   // Double Check Stats
   const checkStats = useMemo(() => {
-    const total = files.length;
-    const verified = files.filter(f => f.doubleCheckStatus === 'verified').length;
-    const pending = files.filter(f => !f.doubleCheckStatus || f.doubleCheckStatus === 'pending').length;
-    const discrepancy = files.filter(f => f.doubleCheckStatus === 'discrepancy').length;
+    const total = unifiedStorageFiles.length;
+    const verified = unifiedStorageFiles.filter(f => f.doubleCheckStatus === 'verified').length;
+    const pending = unifiedStorageFiles.filter(f => !f.doubleCheckStatus || f.doubleCheckStatus === 'pending').length;
+    const discrepancy = unifiedStorageFiles.filter(f => f.doubleCheckStatus === 'discrepancy').length;
     return { total, verified, pending, discrepancy };
-  }, [files]);
+  }, [unifiedStorageFiles]);
 
   // Collections Stats Calculation
   const collectionsStats = useMemo(() => {
@@ -332,7 +399,7 @@ export default function StorageView({
 
   // Files Filter
   const filteredFiles = useMemo(() => {
-    return files.filter(f => {
+    return unifiedStorageFiles.filter(f => {
       const docType = (f.documentType || '').toUpperCase();
       let matchType = selectedType === 'ALL';
       if (!matchType) {
@@ -358,7 +425,7 @@ export default function StorageView({
 
       return matchType && matchStatus && matchSearch;
     });
-  }, [files, selectedType, selectedCheckStatus, searchQuery]);
+  }, [unifiedStorageFiles, selectedType, selectedCheckStatus, searchQuery]);
 
   // Direct Download Handler (1-Click for any Admin)
   const handleDownloadFile = (file: StorageFile) => {
@@ -522,7 +589,7 @@ export default function StorageView({
               )}
             >
               <HardDrive size={15} />
-              <span>Sổ Chứng Từ Scan ({files.length} tệp)</span>
+              <span>Sổ Chứng Từ Scan ({unifiedStorageFiles.length} tệp)</span>
             </button>
             <button
               type="button"
