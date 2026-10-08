@@ -1110,6 +1110,14 @@ function TableView({
 
               if (newLinesToSave.length > 0) {
                 await onAddPOLines(newLinesToSave);
+                const sumAmount = newLinesToSave.reduce((s, l) => s + (parseNumber(l['Thành tiền dòng']) || 0), 0);
+                const sumQty = newLinesToSave.reduce((s, l) => s + (parseNumber(l['Số lượng']) || 0), 0);
+                if ((!parseNumber(finalData['Tổng tiền']) && !parseNumber(finalData['Doanh thu'])) && sumAmount > 0) {
+                  finalData['Tổng tiền'] = sumAmount;
+                  finalData['Doanh thu'] = sumAmount;
+                  finalData['Số lượng'] = sumQty;
+                  finalData['Tổng số lượng'] = sumQty;
+                }
                 toast.success(`✨ OCR đã tự động nhận diện & tạo ${newLinesToSave.length} dòng PO Lines!`);
               }
             }

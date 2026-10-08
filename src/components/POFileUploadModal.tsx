@@ -1,16 +1,28 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, UploadCloud, FileText, Image as ImageIcon, ExternalLink, 
   Share2, Copy, CheckCircle2, Loader2, RefreshCw, Download, 
   Eye, AlertCircle, Sparkles, Check, FileCheck, FolderOpen,
-  Layers, Package, CheckSquare, Edit3, Plus, Trash2
+  Layers, Package, CheckSquare, Edit3, Plus, Trash2, Calendar,
+  Building2, Hash, Tag, ArrowRight
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { uploadFileDirectToGoogleDrive } from '../lib/driveSync';
 import { processDocumentOCR } from '../lib/gemini';
 import { generateSmartDocumentFileName } from '../lib/documentNaming';
-import { findPriceRecord, parseNumber, parseDateToISO, getDefaultSpecs } from '../lib/business-logic';
+import { findPriceRecord, parseNumber, parseDateToISO, getDefaultSpecs, formatVND } from '../lib/business-logic';
 import { Modal, Button } from './ui';
+
+export interface POItemRow {
+  code: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  price: number;
+  amount: number;
+  specs?: string;
+  isMatched2026?: boolean;
+}
 
 interface POFileUploadModalProps {
   isOpen: boolean;
@@ -47,8 +59,12 @@ export function POFileUploadModal({
   
   // OCR states
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
-  const [extractedOcrData, setExtractedOcrData] = useState<any | null>(null);
-  const [autoOcrEnabled, setAutoOcrEnabled] = useState(true);
+  
+  // Normalized editable fields
+  const [docNumber, setDocNumber] = useState<string>('');
+  const [docCustomer, setDocCustomer] = useState<string>('');
+  const [docDate, setDocDate] = useState<string>('');
+  const [items, setItems] = useState<POItemRow[]>([]);
 
   const [uploadResult, setUploadResult] = useState<{
     fileName: string;
@@ -62,18 +78,23 @@ export function POFileUploadModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync prop changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (poHeader) {
       setSelectedPO(poHeader);
+      setDocNumber(poHeader['Đơn hàng'] || poHeader['Số đơn hàng'] || '');
+      setDocCustomer(poHeader['Khách hàng'] || poHeader['RP_Khách hàng'] || '');
+      setDocDate(poHeader['Ngày đặt hàng'] || poHeader['Ngày đặt'] || new Date().toISOString().split('T')[0]);
     }
   }, [poHeader]);
 
   if (!isOpen) return null;
 
-  const poNumber = selectedPO?.['Đơn hàng'] || selectedPO?.['Số đơn hàng'] || '';
-  const customerName = selectedPO?.['Khách hàng'] || selectedPO?.['RP_Khách hàng'] || '';
   const existingFile = selectedPO?.['Tệp đơn hàng'] || selectedPO?.['Tệp đính kèm'] || '';
   const existingDriveUrl = selectedPO?.['Drive_File_Url'] || selectedPO?.['File_Link'] || '';
+
+  // Calculate totals
+  const totalQuantity = items.reduce((sum, it) => sum + (parseNumber(it.quantity) || 0), 0);
+  const totalAmount = items.reduce((sum, it) => sum + (parseNumber(it.amount) || (parseNumber(it.quantity) * parseNumber(it.price))), 0);
 
   const handleFileChange = async (file: File) => {
     const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
@@ -85,7 +106,6 @@ export function POFileUploadModal({
       return;
     }
 
-    // Check max size: 25MB
     if (file.size > 25 * 1024 * 1024) {
       toast.error('Dung lượng tệp quá lớn! Vui lòng chọn tệp dưới 25MB.');
       return;
@@ -93,9 +113,7 @@ export function POFileUploadModal({
 
     setSelectedFile(file);
     setUploadResult(null);
-    setExtractedOcrData(null);
 
-    // If image, create preview
     if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
       setImagePreviewUrl(url);
@@ -103,28 +121,85 @@ export function POFileUploadModal({
       setImagePreviewUrl(null);
     }
 
-    // Trigger OCR in background if enabled
-    if (autoOcrEnabled) {
-      runOcrOnSelectedFile(file);
-    }
+    // Trigger OCR automatically
+    runOcrOnSelectedFile(file);
   };
 
   const runOcrOnSelectedFile = async (fileToScan: File) => {
     setIsOcrProcessing(true);
-    const toastId = toast.loading('Gemini AI Vision đang tự động quét bóc tách nội dung PO...');
+    const toastId = toast.loading('AI Vision đang bóc tách và chuẩn hóa thông tin PO...');
     try {
       const ocrRes = await processDocumentOCR(fileToScan);
-      setExtractedOcrData(ocrRes);
 
-      const itemsCount = (ocrRes.items || []).length;
-      if (itemsCount > 0) {
-        toast.success(`✨ Đã nhận dạng được ${itemsCount} sản phẩm từ file chứng từ!`, { id: toastId });
+      // 1. Chuẩn hóa mã đơn hàng
+      if (ocrRes.documentNumber && (!docNumber || docNumber === 'Chưa có' || docNumber.startsWith('PO_MOI_'))) {
+        setDocNumber(ocrRes.documentNumber.trim());
+      }
+
+      // 2. Chuẩn hóa khách hàng
+      if (ocrRes.buyerName && (!docCustomer || docCustomer === 'Khách hàng mới')) {
+        const rawBuyer = ocrRes.buyerName.toLowerCase();
+        let normalizedCust = ocrRes.buyerName;
+        if (rawBuyer.includes('thanh hóa') || rawBuyer.includes('thanh hoá')) {
+          normalizedCust = 'Thanh Hoá';
+        } else if (rawBuyer.includes('thăng long')) {
+          normalizedCust = 'Thăng Long';
+        } else if (rawBuyer.includes('bắc sơn')) {
+          normalizedCust = 'Bắc Sơn';
+        }
+        setDocCustomer(normalizedCust);
+      }
+
+      // 3. Chuẩn hóa ngày đặt hàng
+      if (ocrRes.documentDate) {
+        setDocDate(parseDateToISO(ocrRes.documentDate));
+      }
+
+      // 4. Chuẩn hóa danh sách sản phẩm theo Bảng Giá 2026
+      if (ocrRes.items && Array.isArray(ocrRes.items) && ocrRes.items.length > 0) {
+        const targetCust = docCustomer || ocrRes.buyerName || '';
+        const parsedItems: POItemRow[] = ocrRes.items.map((it: any) => {
+          const rawName = (it.name || '').trim();
+          const rawCode = (it.code || '').trim();
+          
+          // Match với Bảng Giá 2026
+          const priceRecord = findPriceRecord(pricingData, {
+            sku: rawCode || rawName,
+            name: rawName,
+            customer: targetCust
+          });
+
+          const masterSell = priceRecord 
+            ? (parseNumber(priceRecord['Giá bán']) || parseNumber(priceRecord['Đơn giá bán']) || parseNumber(priceRecord['Đơn giá bán mới'])) 
+            : 0;
+          
+          const effSell = parseNumber(it.price) > 0 ? parseNumber(it.price) : (masterSell > 0 ? masterSell : 0);
+          const qty = parseNumber(it.quantity) || 1;
+          const unit = (it.unit || (priceRecord ? priceRecord['ĐVT'] : 'Cái')).trim();
+          const prodName = priceRecord ? (priceRecord['Tên sản phẩm'] || rawName) : rawName;
+          const prodCode = priceRecord ? (priceRecord['Mã sản phẩm'] || rawCode) : rawCode;
+          const specs = it.specs || (priceRecord ? priceRecord['Quy cách'] : getDefaultSpecs(prodName, prodCode, unit));
+
+          return {
+            code: prodCode,
+            name: prodName,
+            unit,
+            quantity: qty,
+            price: effSell,
+            amount: effSell * qty,
+            specs,
+            isMatched2026: !!priceRecord
+          };
+        });
+
+        setItems(parsedItems);
+        toast.success(`✨ Đã nhận diện & chuẩn hóa ${parsedItems.length} sản phẩm theo Bảng Giá 2026!`, { id: toastId });
       } else {
         toast.success('Đã hoàn tất phân tích văn bản chứng từ.', { id: toastId });
       }
     } catch (err: any) {
       console.warn('Lỗi quét OCR:', err);
-      toast.dismiss(toastId);
+      toast.error('Không thể hoàn tất quét OCR tự động. Vui lòng nhập thông tin thủ công.', { id: toastId });
     } finally {
       setIsOcrProcessing(false);
     }
@@ -147,53 +222,107 @@ export function POFileUploadModal({
     setIsDragging(false);
   };
 
+  const updateItem = (index: number, field: keyof POItemRow, val: any) => {
+    const next = [...items];
+    const row = { ...next[index], [field]: val };
+    
+    // Auto recalculate amount
+    if (field === 'quantity' || field === 'price') {
+      const q = field === 'quantity' ? parseNumber(val) : parseNumber(row.quantity);
+      const p = field === 'price' ? parseNumber(val) : parseNumber(row.price);
+      row.amount = q * p;
+    }
+
+    // Auto match SKU if name changes
+    if (field === 'name') {
+      const matched = pricingData.find(p => 
+        (p['Tên sản phẩm'] && p['Tên sản phẩm'].toLowerCase().includes(String(val).toLowerCase())) ||
+        (p['Mã sản phẩm'] && p['Mã sản phẩm'].toLowerCase().includes(String(val).toLowerCase()))
+      );
+      if (matched) {
+        row.code = matched['Mã sản phẩm'] || row.code;
+        row.unit = matched['ĐVT'] || row.unit;
+        if (!row.price || row.price === 0) {
+          row.price = parseNumber(matched['Đơn giá bán']) || 0;
+          row.amount = row.price * (parseNumber(row.quantity) || 1);
+        }
+        row.isMatched2026 = true;
+      }
+    }
+
+    next[index] = row;
+    setItems(next);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const addNewItem = () => {
+    setItems([
+      ...items,
+      {
+        code: '',
+        name: '',
+        unit: 'Cái',
+        quantity: 1,
+        price: 0,
+        amount: 0,
+        isMatched2026: false
+      }
+    ]);
+  };
+
   const handleUploadAndSave = async () => {
     if (!selectedFile) {
-      toast.error('Vui lòng chọn tệp PDF hoặc Hình ảnh cần cập nhật!');
+      toast.error('Vui lòng chọn tệp chứng từ cần tải lên!');
       return;
     }
 
-    if (!poNumber) {
-      toast.error('Không xác định được mã đơn hàng PO!');
+    const finalPoNum = docNumber.trim() || selectedPO?.['Đơn hàng'] || selectedPO?.['Số đơn hàng'];
+    if (!finalPoNum) {
+      toast.error('Vui lòng nhập Mã đơn hàng PO!');
       return;
     }
 
     setIsUploading(true);
-    setUploadProgress('Đang chuẩn bị tệp và xác thực Google Drive...');
+    setUploadProgress('Đang chuẩn hóa tên tệp và tải lên Google Drive...');
 
     try {
       const now = new Date();
       const year = now.getFullYear().toString();
       const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const finalCustomer = docCustomer.trim() || selectedPO?.['Khách hàng'] || 'Chưa rõ';
+      const finalDate = docDate || selectedPO?.['Ngày đặt hàng'] || now.toISOString().split('T')[0];
 
-      // Tự động chuẩn hóa tên tệp theo quy chuẩn thông minh TSG ERP
-      const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.'));
+      // Đổi tên tệp thông minh theo quy chuẩn TSG ERP: PO_[Số]_[Ngày]_[Khách]
       const standardizedName = generateSmartDocumentFileName({
         documentType: 'PO',
-        documentNumber: poNumber,
-        documentDate: selectedPO?.['Ngày đặt hàng'] || selectedPO?.['Ngày đặt'] || now.toISOString().split('T')[0],
-        buyerName: customerName,
+        documentNumber: finalPoNum,
+        documentDate: finalDate,
+        buyerName: finalCustomer,
         originalFileName: selectedFile.name
       });
-
-      setUploadProgress('Đang tải tệp lên Google Drive...');
 
       const uploadRes = await uploadFileDirectToGoogleDrive({
         file: selectedFile,
         fileName: standardizedName,
         documentType: 'Don_Hang_PO',
-        documentNumber: poNumber,
+        documentNumber: finalPoNum,
         year,
         month
       });
 
-      setUploadProgress('Đang kích hoạt quyền chia sẻ công khai & lưu trữ...');
-
+      setUploadProgress('Đang cập nhật Đơn hàng PO & Dòng sản phẩm...');
       const driveLink = uploadRes.shareLink || uploadRes.driveLink;
 
-      // Cập nhật PO Header record
+      // Cập nhật PO Header
       const updatedPO = {
         ...selectedPO,
+        'Đơn hàng': finalPoNum,
+        'Số đơn hàng': finalPoNum,
+        'Khách hàng': finalCustomer,
+        'Ngày đặt hàng': finalDate,
         'Tệp đơn hàng': standardizedName,
         'Drive_File_Url': driveLink,
         'File_Link': driveLink,
@@ -203,21 +332,29 @@ export function POFileUploadModal({
         'File_Updated_At': now.toISOString()
       };
 
+      if (totalAmount > 0) {
+        updatedPO['Tổng tiền'] = totalAmount;
+        updatedPO['Doanh thu'] = totalAmount;
+      }
+      if (totalQuantity > 0) {
+        updatedPO['Số lượng'] = totalQuantity;
+        updatedPO['Tổng số lượng'] = totalQuantity;
+      }
+
       await onUpdatePOHeader(updatedPO);
       setSelectedPO(updatedPO);
 
-      // Nếu có kết quả OCR trích xuất được sản phẩm, tạo tự động PO Lines tương ứng
+      // Thêm dòng PO Lines nếu có
       let importedLinesCount = 0;
-      if (extractedOcrData && extractedOcrData.items && extractedOcrData.items.length > 0 && onAddPOLines) {
-        setUploadProgress('Đang đồng bộ dòng sản phẩm từ OCR vào Chi tiết đơn hàng...');
+      if (items.length > 0 && onAddPOLines) {
+        const headerId = String(finalPoNum).replace(/\//g, '-').trim();
         const newLinesToSave: any[] = [];
-        const headerId = String(poNumber).replace(/\//g, '-').trim();
 
-        extractedOcrData.items.forEach((item: any, idx: number) => {
+        items.forEach((item, idx) => {
           const priceRecord = findPriceRecord(pricingData, { 
             sku: item.code || item.name, 
             name: item.name, 
-            customer: customerName 
+            customer: finalCustomer 
           });
 
           const masterSell = priceRecord ? (parseNumber(priceRecord['Giá bán']) || parseNumber(priceRecord['Đơn giá bán']) || parseNumber(priceRecord['Đơn giá bán mới'])) : (item.price || 0);
@@ -233,8 +370,8 @@ export function POFileUploadModal({
           newLinesToSave.push({
             'id': lineId,
             'STT': lineId,
-            'Số đơn hàng': poNumber,
-            'Đơn hàng': poNumber,
+            'Số đơn hàng': finalPoNum,
+            'Đơn hàng': finalPoNum,
             'Mã giá bán': priceRecord ? (priceRecord['Mã giá'] || priceRecord['Mã giá bán']) : 'Gsp_N/A',
             'Tên sản phẩm': prodName,
             'Mã sản phẩm': prodCode,
@@ -243,9 +380,9 @@ export function POFileUploadModal({
             'Số lượng': qty,
             'quantity': qty,
             'Quy cách': specs,
-            'Ngày đặt hàng': selectedPO?.['Ngày đặt hàng'] || now.toISOString().split('T')[0],
-            'Khách hàng': customerName,
-            'Đơn vị nhận hàng': customerName,
+            'Ngày đặt hàng': finalDate,
+            'Khách hàng': finalCustomer,
+            'Đơn vị nhận hàng': finalCustomer,
             'Đơn giá bán': effSell,
             'Đơn giá nhập': masterBuy,
             'Thành tiền dòng': effSell * qty,
@@ -275,18 +412,16 @@ export function POFileUploadModal({
         onUploadSuccess(result);
       }
 
-      // Tự động sao chép link chia sẻ vào clipboard
       try {
         await navigator.clipboard.writeText(driveLink);
         setCopiedLink(true);
-        toast.success(
-          importedLinesCount > 0 
-            ? `🎉 Đã đổi tên chuẩn [${standardizedName}], tải lên Drive và tự động tạo ${importedLinesCount} dòng PO Lines!` 
-            : `🎉 Đã đổi tên chuẩn [${standardizedName}] và tải lên Google Drive thành công!`
-        );
-      } catch {
-        toast.success(`🎉 Đã tải lên Google Drive với tên chuẩn: ${standardizedName}`);
-      }
+      } catch (_) {}
+
+      toast.success(
+        importedLinesCount > 0 
+          ? `🎉 Đã lưu ${importedLinesCount} sản phẩm vào PO [${finalPoNum}] & đồng bộ Drive!`
+          : `🎉 Đã tải lên Google Drive & lưu PO [${finalPoNum}] thành công!`
+      );
 
     } catch (err: any) {
       console.error('Lỗi khi tải file lên Drive:', err);
@@ -297,34 +432,31 @@ export function POFileUploadModal({
     }
   };
 
-
-
   const handleCopyShareLink = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
       setCopiedLink(true);
-      toast.success('Đã sao chép link chia sẻ Google Drive!');
+      toast.success('Đã sao chép link Google Drive!');
       setTimeout(() => setCopiedLink(false), 2500);
     } catch {
-      toast.error('Không thể tự động sao chép link');
+      toast.error('Không thể tự động sao chép');
     }
   };
 
   const isPdf = (name: string) => name.toLowerCase().endsWith('.pdf');
-  const isImg = (name: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
 
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
-      title="Cập Nhật PO Đơn Hàng Bằng File PDF / Ảnh"
-      subtitle="Lưu trữ đám mây Google Drive an toàn & tự động tạo đường link chia sẻ"
+      title="Tiếp Nhận & Quét Đơn Hàng PO"
+      subtitle="Bóc tách thông tin tự động bằng AI • Khớp Bảng giá 2026 • Lưu trữ Google Drive"
       size="xl"
       footer={
         <div className="flex items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-2 text-[11px] text-ink-muted">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <FolderOpen size={14} className="text-slate-400" />
-            <span>Thư mục Drive: <strong>TSG_Business_Documents / Don_Hang_PO</strong></span>
+            <span>Thư mục: <strong>Don_Hang_PO</strong> trên Google Drive</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -332,138 +464,100 @@ export function POFileUploadModal({
               variant="secondary"
               onClick={onClose}
             >
-              {uploadResult ? 'Hoàn tất' : 'Hủy bỏ'}
+              {uploadResult ? 'Đóng' : 'Hủy bỏ'}
             </Button>
 
             {!uploadResult && (
               <Button
                 variant="primary"
-                disabled={!selectedFile || isUploading}
+                disabled={!selectedFile || isUploading || isOcrProcessing}
                 onClick={handleUploadAndSave}
                 loading={isUploading}
-                icon={!isUploading ? <UploadCloud size={14} /> : undefined}
+                icon={!isUploading ? <CheckCircle2 size={15} /> : undefined}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
               >
-                ⚡ Tải Lên Drive & Cập Nhật PO
+                ⚡ Lưu & Ghi Nhận Vào Đơn Hàng PO
               </Button>
             )}
           </div>
         </div>
       }
     >
-      {/* Modal Body */}
-      <div className="space-y-5">
-          {/* Target PO Selection / Card */}
-          <div className="bg-blue-50/70 p-4 rounded-xl border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center font-black text-xs shrink-0 border border-blue-200">
-                PO
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-blue-950 font-mono tracking-tight">
-                    {poNumber || 'Chưa chọn đơn hàng'}
-                  </span>
-                  {selectedPO?.['Phân loại'] && (
-                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">
-                      {selectedPO['Phân loại']}
-                    </span>
-                  )}
+      <div className="space-y-4">
+        {/* Upload success summary */}
+        {uploadResult && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <Check size={18} />
                 </div>
-                <p className="text-xs font-medium text-blue-800 mt-0.5">
-                  Khách hàng: <strong>{customerName || 'Chưa có thông tin'}</strong>
-                </p>
-              </div>
-            </div>
-
-            {/* If allPOHeaders is provided and user wants to switch PO */}
-            {allPOHeaders.length > 0 && onSelectPO && (
-              <div className="sm:max-w-xs w-full">
-                <label className="text-[10px] font-bold text-blue-700 uppercase tracking-wide block mb-1">
-                  Đổi sang đơn hàng khác
-                </label>
-                <select
-                  value={poNumber}
-                  onChange={(e) => {
-                    const found = allPOHeaders.find(p => (p['Đơn hàng'] || p['Số đơn hàng']) === e.target.value);
-                    if (found) {
-                      setSelectedPO(found);
-                      onSelectPO(found);
-                      setUploadResult(null);
-                    }
-                  }}
-                  className="w-full text-xs font-bold font-mono px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg focus:outline-none focus:border-blue-500"
-                >
-                  {allPOHeaders.map((p, idx) => {
-                    const code = p['Đơn hàng'] || p['Số đơn hàng'];
-                    const cust = p['Khách hàng'] || '';
-                    return (
-                      <option key={idx} value={code}>
-                        {code} - {cust}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Current Attached File Status */}
-          {(existingFile || existingDriveUrl) && !uploadResult && (
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 overflow-hidden">
-                <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-                  {isPdf(existingFile) ? <FileText size={16} className="text-rose-600" /> : <ImageIcon size={16} className="text-blue-600" />}
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-xs font-bold text-slate-800 truncate" title={existingFile}>
-                    Tệp hiện tại: {existingFile || 'Chứng từ PO đã đính kèm'}
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-950">
+                    Đã ghi nhận đơn hàng PO & Lưu trữ Google Drive thành công!
+                  </h4>
+                  <p className="text-xs text-emerald-700 font-mono mt-0.5">
+                    {uploadResult.fileName}
                   </p>
-                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                    {existingDriveUrl ? 'Đã liên kết Google Drive' : 'Lưu cục bộ'} • Chọn tệp mới bên dưới để thay thế
-                  </span>
                 </div>
               </div>
-
-              {existingDriveUrl && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleCopyShareLink(existingDriveUrl)}
-                    className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                    title="Sao chép link chia sẻ"
-                  >
-                    <Share2 size={13} />
-                    <span className="hidden sm:inline">Chia sẻ</span>
-                  </button>
-                  <a
-                    href={existingDriveUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-xs font-bold transition-all flex items-center gap-1"
-                    title="Xem trên Google Drive"
-                  >
-                    <ExternalLink size={13} />
-                    <span className="hidden sm:inline">Mở file</span>
-                  </a>
-                </div>
-              )}
             </div>
-          )}
 
-          {/* Drag & Drop File Upload Area */}
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onClick={() => fileInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-              isDragging
-                ? 'border-blue-500 bg-blue-50/50 scale-[0.99]'
-                : selectedFile
-                ? 'border-emerald-400 bg-emerald-50/30'
-                : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/60'
-            }`}
-          >
+            <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-emerald-200">
+              <input
+                type="text"
+                readOnly
+                value={uploadResult.driveLink}
+                className="w-full text-xs font-mono text-slate-700 bg-transparent outline-none truncate select-all"
+              />
+              <button
+                type="button"
+                onClick={() => handleCopyShareLink(uploadResult.driveLink)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
+                  copiedLink
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                }`}
+              >
+                {copiedLink ? <Check size={13} /> : <Copy size={13} />}
+                <span>{copiedLink ? 'Đã chép' : 'Sao chép link'}</span>
+              </button>
+              <a
+                href={uploadResult.driveLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0"
+              >
+                <ExternalLink size={13} />
+                <span>Mở Drive</span>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Previous File Link (if already exists and no new upload yet) */}
+        {!selectedFile && existingDriveUrl && !uploadResult && (
+          <div className="p-2.5 px-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 truncate">
+              <FileText size={15} className="text-slate-500 shrink-0" />
+              <span className="text-slate-600 truncate">
+                Tệp hiện tại: <strong className="text-slate-800">{existingFile || 'Chứng từ PO'}</strong>
+              </span>
+            </div>
+            <a
+              href={existingDriveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 shrink-0 ml-2"
+            >
+              <ExternalLink size={13} /> Mở file
+            </a>
+          </div>
+        )}
+
+        {/* File Dropzone: Compact when file selected, normal when empty */}
+        {!uploadResult && (
+          <div>
             <input
               ref={fileInputRef}
               type="file"
@@ -476,322 +570,278 @@ export function POFileUploadModal({
               }}
             />
 
-            {selectedFile ? (
-              <div className="space-y-3 w-full max-w-md">
-                <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
-                  {selectedFile.type.startsWith('image/') ? (
-                    <ImageIcon size={24} />
-                  ) : (
-                    <FileText size={24} />
-                  )}
+            {!selectedFile ? (
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-blue-500 bg-blue-50/50'
+                    : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/60'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
+                  <UploadCloud size={22} />
                 </div>
-
-                <div>
-                  <p className="text-sm font-bold text-slate-900 truncate" title={selectedFile.name}>
-                    {selectedFile.name}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedFile.type || 'Chứng từ'}
-                  </p>
-                </div>
-
-                {imagePreviewUrl && (
-                  <div className="max-h-44 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-xs p-1">
-                    <img 
-                      src={imagePreviewUrl} 
-                      alt="Xem trước ảnh PO" 
-                      className="w-full h-full object-contain max-h-40 mx-auto rounded-lg"
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-center gap-2 pt-1">
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold flex items-center gap-1">
-                    <CheckCircle2 size={13} /> Sẵn sàng tải lên Google Drive
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(null);
-                      setImagePreviewUrl(null);
-                    }}
-                    className="text-xs text-slate-400 hover:text-rose-600 font-semibold underline ml-2 cursor-pointer"
-                  >
-                    Chọn lại
-                  </button>
-                </div>
+                <p className="text-xs font-bold text-slate-800">
+                  Kéo thả hoặc bấm để chọn tệp chứng từ PO (.PDF, .PNG, .JPG)
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Gemini AI sẽ tự động đọc mã đơn hàng, đối tác và bóc tách bảng sản phẩm
+                </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                  <UploadCloud size={28} />
+              /* Slim file badge bar when file is selected */
+              <div className="p-2.5 px-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    {selectedFile.type.startsWith('image/') ? <ImageIcon size={16} /> : <FileText size={16} />}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-slate-900 truncate" title={selectedFile.name}>
+                      {selectedFile.name}
+                    </p>
+                    <span className="text-[10px] text-slate-500">
+                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Sẵn sàng tải lên Drive
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800">
-                    Kéo thả file PDF hoặc Hình ảnh vào đây
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Hoặc bấm để duyệt tệp từ máy tính của bạn (hỗ trợ .pdf, .jpg, .png, .webp tối đa 25MB)
-                  </p>
-                </div>
-                <div className="flex items-center justify-center gap-3 pt-2">
-                  <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-200 flex items-center gap-1">
-                    <FileText size={12} /> File PDF (Scan/Hợp đồng)
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200 flex items-center gap-1">
-                    <ImageIcon size={12} /> Hình ảnh (Chụp/Scan)
-                  </span>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => runOcrOnSelectedFile(selectedFile)}
+                    disabled={isOcrProcessing}
+                    className="p-1 px-2 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-100/70 border border-blue-200 rounded-md transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className={isOcrProcessing ? 'animate-spin' : ''} />
+                    <span>Quét lại</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setImagePreviewUrl(null);
+                      setItems([]);
+                    }}
+                    className="text-xs text-slate-400 hover:text-rose-600 font-semibold p-1 cursor-pointer"
+                    title="Chọn tệp khác"
+                  >
+                    <X size={15} />
+                  </button>
                 </div>
               </div>
             )}
           </div>
+        )}
 
-          {/* OCR Processing & Recognition Status Banner */}
-          {isOcrProcessing && (
-            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-3 animate-pulse">
-              <Loader2 size={20} className="text-indigo-600 animate-spin shrink-0" />
+        {/* OCR Processing Indicator */}
+        {isOcrProcessing && (
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-2.5 animate-pulse">
+            <Loader2 size={18} className="text-indigo-600 animate-spin shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <Sparkles size={13} className="text-indigo-600" />
+                AI đang bóc tách và tự động đối soát Bảng Giá 2026...
+              </p>
+              <p className="text-[10.5px] text-indigo-700 mt-0.5">
+                Đang chuẩn hóa mã SKU, đơn vị tính và số lượng từ văn bản.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Uploading progress indicator */}
+        {isUploading && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2.5">
+            <Loader2 size={18} className="text-blue-600 animate-spin shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-blue-900">{uploadProgress}</p>
+              <p className="text-[10.5px] text-blue-600">Hệ thống đang đồng bộ với Google Drive...</p>
+            </div>
+          </div>
+        )}
+
+        {/* STREAMLINED REVIEW & APPROVAL CARD */}
+        {(selectedFile || items.length > 0) && !uploadResult && (
+          <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden space-y-3">
+            {/* 1. Header Information Bar (Compact 3-column) */}
+            <div className="p-3 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <p className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-indigo-600" />
-                  Gemini AI Vision đang đọc và bóc tách dữ liệu từ file...
-                </p>
-                <p className="text-[11px] text-indigo-700 mt-0.5">
-                  Tự động nhận diện Mã đơn hàng, Tên sản phẩm, ĐVT, Số lượng và khớp với Bảng Giá 2026.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* OCR Result Preview Card */}
-          {extractedOcrData && extractedOcrData.items && extractedOcrData.items.length > 0 && !uploadResult && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-xs">
-                    <CheckSquare size={14} />
-                  </span>
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-900">
-                      Tự động trích xuất: {extractedOcrData.items.length} mặt hàng từ chứng từ
-                    </h5>
-                    <p className="text-[10.5px] text-slate-500">
-                      Số PO: <strong>{extractedOcrData.documentNumber || poNumber}</strong> • Ngày đặt: {extractedOcrData.documentDate || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                  ✨ Sẵn sàng tạo PO Lines
-                </span>
-              </div>
-
-              {/* Interactive In-line Editing Table for OCR Verification */}
-              <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-2xs">
-                <div className="p-2.5 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between text-xs">
-                  <span className="font-bold text-blue-950 flex items-center gap-1.5">
-                    <Edit3 size={13} className="text-blue-600" />
-                    Bảng kiểm tra & chỉnh sửa dữ liệu OCR (Kiểm soát 100% trước khi lưu):
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentItems = [...(extractedOcrData.items || [])];
-                      currentItems.push({
-                        code: '',
-                        name: '',
-                        unit: 'Cái',
-                        quantity: 1,
-                        price: 0
-                      });
-                      setExtractedOcrData({ ...extractedOcrData, items: currentItems });
-                    }}
-                    className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-blue-700 font-bold hover:bg-blue-50 text-[10.5px] transition-all flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus size={11} /> Thêm dòng
-                  </button>
-                </div>
-
-                <div className="max-h-52 overflow-y-auto">
-                  <table className="w-full text-left text-[11px]">
-                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
-                      <tr>
-                        <th className="py-2 px-3 w-[45%]">Sản phẩm (Khớp Bảng Giá 2026)</th>
-                        <th className="py-2 px-2 text-center w-16">ĐVT</th>
-                        <th className="py-2 px-3 text-right w-24">Số lượng</th>
-                        <th className="py-2 px-3 text-right w-28">Đơn giá bán</th>
-                        <th className="py-2 px-2 text-center w-10">Xóa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {extractedOcrData.items.map((it: any, idx: number) => {
-                        return (
-                          <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
-                            {/* Product Name & SKU Input with Price Catalog Match */}
-                            <td className="py-1.5 px-2">
-                              <div className="space-y-1">
-                                <input
-                                  type="text"
-                                  value={it.name || ''}
-                                  placeholder="Tên sản phẩm..."
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    const updated = [...extractedOcrData.items];
-                                    const matched = pricingData.find(p => 
-                                      (p['Tên sản phẩm'] && p['Tên sản phẩm'].toLowerCase().includes(val.toLowerCase())) ||
-                                      (p['Mã sản phẩm'] && p['Mã sản phẩm'].toLowerCase().includes(val.toLowerCase()))
-                                    );
-                                    updated[idx] = {
-                                      ...updated[idx],
-                                      name: val,
-                                      code: matched ? matched['Mã sản phẩm'] : updated[idx].code,
-                                      price: matched ? parseNumber(matched['Đơn giá bán'] || 0) : updated[idx].price
-                                    };
-                                    setExtractedOcrData({ ...extractedOcrData, items: updated });
-                                  }}
-                                  className="w-full px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-md text-xs font-semibold text-slate-900 outline-none transition-all"
-                                />
-                                {it.code && (
-                                  <div className="text-[10px] text-blue-600 font-mono font-medium flex items-center gap-1">
-                                    <span>Mã: {it.code}</span>
-                                    {pricingData.some(p => p['Mã sản phẩm'] === it.code) && (
-                                      <span className="text-emerald-600 font-bold">✓ Khớp Giá 2026</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Unit */}
-                            <td className="py-1.5 px-1 text-center">
-                              <input
-                                type="text"
-                                value={it.unit || 'Cái'}
-                                onChange={(e) => {
-                                  const updated = [...extractedOcrData.items];
-                                  updated[idx] = { ...updated[idx], unit: e.target.value };
-                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
-                                }}
-                                className="w-full text-center px-1 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 outline-none"
-                              />
-                            </td>
-
-                            {/* Quantity */}
-                            <td className="py-1.5 px-2 text-right">
-                              <input
-                                type="number"
-                                min="1"
-                                value={it.quantity || 1}
-                                onChange={(e) => {
-                                  const updated = [...extractedOcrData.items];
-                                  updated[idx] = { ...updated[idx], quantity: parseNumber(e.target.value) || 1 };
-                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
-                                }}
-                                className="w-full text-right px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-slate-900 outline-none focus:border-blue-500"
-                              />
-                            </td>
-
-                            {/* Unit Price */}
-                            <td className="py-1.5 px-2 text-right">
-                              <input
-                                type="number"
-                                min="0"
-                                value={it.price || 0}
-                                onChange={(e) => {
-                                  const updated = [...extractedOcrData.items];
-                                  updated[idx] = { ...updated[idx], price: parseNumber(e.target.value) || 0 };
-                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
-                                }}
-                                className="w-full text-right px-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-emerald-700 outline-none focus:border-blue-500"
-                              />
-                            </td>
-
-                            {/* Remove row button */}
-                            <td className="py-1.5 px-1 text-center">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = extractedOcrData.items.filter((_: any, i: number) => i !== idx);
-                                  setExtractedOcrData({ ...extractedOcrData, items: updated });
-                                }}
-                                className="p-1 text-slate-300 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors cursor-pointer"
-                                title="Xóa dòng này"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Success Box after Upload */}
-          {uploadResult && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 animate-fadeIn">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <Check size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-950">
-                      Đã tải lên Google Drive & Kích hoạt link chia sẻ thành công!
-                    </h4>
-                    <p className="text-[11px] text-emerald-700">
-                      Tệp: <strong>{uploadResult.fileName}</strong>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shareable Link Box */}
-              <div className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-emerald-200">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <Hash size={11} className="text-blue-600" /> Số Đơn Hàng (PO)
+                </label>
                 <input
                   type="text"
-                  readOnly
-                  value={uploadResult.driveLink}
-                  className="w-full text-xs font-mono text-slate-700 bg-transparent outline-none truncate select-all"
+                  value={docNumber}
+                  onChange={(e) => setDocNumber(e.target.value)}
+                  placeholder="Nhập số PO..."
+                  className="w-full text-xs font-bold font-mono px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <Building2 size={11} className="text-indigo-600" /> Khách Hàng
+                </label>
+                <input
+                  type="text"
+                  value={docCustomer}
+                  onChange={(e) => setDocCustomer(e.target.value)}
+                  placeholder="Khách hàng..."
+                  className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <Calendar size={11} className="text-emerald-600" /> Ngày Đặt Hàng
+                </label>
+                <input
+                  type="date"
+                  value={docDate}
+                  onChange={(e) => setDocDate(e.target.value)}
+                  className="w-full text-xs font-semibold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* 2. Streamlined Product Table */}
+            <div className="px-3">
+              <div className="flex items-center justify-between pb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Package size={13} className="text-blue-600" />
+                  Danh mục sản phẩm ({items.length} mặt hàng)
+                </span>
                 <button
                   type="button"
-                  onClick={() => handleCopyShareLink(uploadResult.driveLink)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
-                    copiedLink
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
-                  }`}
+                  onClick={addNewItem}
+                  className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 transition-all flex items-center gap-1 cursor-pointer"
                 >
-                  {copiedLink ? <Check size={13} /> : <Copy size={13} />}
-                  <span>{copiedLink ? 'Đã chép' : 'Sao chép link'}</span>
+                  <Plus size={12} /> Thêm dòng
                 </button>
-                <a
-                  href={uploadResult.driveLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0"
-                >
-                  <ExternalLink size={13} />
-                  <span>Mở Google Drive</span>
-                </a>
               </div>
-            </div>
-          )}
 
-          {/* Progress Indicator */}
-          {isUploading && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
-              <Loader2 size={20} className="text-blue-600 animate-spin shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-blue-900">{uploadProgress}</p>
-                <p className="text-[11px] text-blue-600">Vui lòng chờ trong giây lát...</p>
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-600 font-semibold sticky top-0 border-b border-slate-200">
+                    <tr>
+                      <th className="py-2 px-2.5 w-[42%]">Sản phẩm (Khớp Bảng Giá 2026)</th>
+                      <th className="py-2 px-1.5 text-center w-16">ĐVT</th>
+                      <th className="py-2 px-2 text-right w-20">Số lượng</th>
+                      <th className="py-2 px-2 text-right w-24">Đơn giá</th>
+                      <th className="py-2 px-2.5 text-right w-28">Thành tiền</th>
+                      <th className="py-2 px-1 text-center w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-slate-400 text-xs italic">
+                          Chưa có sản phẩm nào. Bấm "Thêm dòng" hoặc tải tệp để AI tự động trích xuất.
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                          {/* Product name & SKU */}
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="text"
+                              value={row.name}
+                              placeholder="Tên sản phẩm..."
+                              onChange={(e) => updateItem(idx, 'name', e.target.value)}
+                              className="w-full px-2 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-500 rounded text-xs font-medium text-slate-900 outline-none"
+                            />
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px]">
+                              {row.code && (
+                                <span className="font-mono text-slate-500">SKU: {row.code}</span>
+                              )}
+                              {row.isMatched2026 && (
+                                <span className="text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-200">
+                                  ✓ Giá 2026
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Unit */}
+                          <td className="py-1.5 px-1 text-center">
+                            <input
+                              type="text"
+                              value={row.unit}
+                              onChange={(e) => updateItem(idx, 'unit', e.target.value)}
+                              className="w-full text-center px-1 py-1 bg-slate-50 focus:bg-white border border-slate-200 rounded text-xs font-medium text-slate-700 outline-none"
+                            />
+                          </td>
+
+                          {/* Quantity */}
+                          <td className="py-1.5 px-1.5 text-right">
+                            <input
+                              type="number"
+                              min="1"
+                              value={row.quantity}
+                              onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                              className="w-full text-right px-1.5 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-500 rounded text-xs font-bold font-mono text-slate-900 outline-none"
+                            />
+                          </td>
+
+                          {/* Price */}
+                          <td className="py-1.5 px-1.5 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              value={row.price}
+                              onChange={(e) => updateItem(idx, 'price', e.target.value)}
+                              className="w-full text-right px-1.5 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-blue-500 rounded text-xs font-bold font-mono text-slate-900 outline-none"
+                            />
+                          </td>
+
+                          {/* Amount */}
+                          <td className="py-1.5 px-2 text-right">
+                            <span className="text-xs font-bold font-mono text-emerald-700 block truncate">
+                              {formatVND(row.amount || (row.quantity * row.price))}
+                            </span>
+                          </td>
+
+                          {/* Remove */}
+                          <td className="py-1.5 px-1 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(idx)}
+                              className="p-1 text-slate-300 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Xóa dòng"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
+
+              {/* 3. Summary row */}
+              {items.length > 0 && (
+                <div className="py-2.5 px-3 mt-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between text-xs font-medium">
+                  <span className="text-slate-600">
+                    Tổng sản phẩm: <strong className="text-slate-900">{items.length}</strong> • Tổng sản lượng: <strong className="text-slate-900">{totalQuantity.toLocaleString('vi-VN')}</strong>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500">Tổng doanh thu PO:</span>
+                    <strong className="text-sm font-black text-emerald-700 font-mono">
+                      {formatVND(totalAmount)}
+                    </strong>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
