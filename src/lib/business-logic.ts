@@ -760,4 +760,74 @@ export function getPackagingIndustrySpecs(name: string = "", code: string = "", 
   ];
 }
 
+/**
+ * Tự động khớp nối các mặt hàng trên Biên bản giao hàng (BBGH/PXK) với các dòng của Đơn hàng PO (PO Lines)
+ * Sử dụng thuật toán so khớp chính xác mã, tên chuẩn hóa và điểm tương đồng mờ (Fuzzy matching)
+ */
+export function matchPODItemsWithPOLines(podItems: any[], poLines: any[]): any[] {
+  if (!Array.isArray(podItems) || podItems.length === 0) return [];
+  if (!Array.isArray(poLines) || poLines.length === 0) {
+    return podItems.map(item => ({
+      ...item,
+      matchedPoLineStt: undefined,
+      matchedPoLine: null,
+      matchConfidence: 0
+    }));
+  }
+
+  return podItems.map(item => {
+    const itemName = normalizeString(item.name || "");
+    const itemCode = normalizeString(item.code || "");
+    let bestLine: any = null;
+    let bestScore = 0;
+
+    for (const line of poLines) {
+      if (line.isDeleted) continue;
+      const lineStt = String(line["STT"] || line.id || "").trim();
+      const lineCode = normalizeString(line["Mã của khách"] || line["Mã sản phẩm"] || line["Mã hàng"] || line["SKU"] || "");
+      const lineName = normalizeString(line["Tên sản phẩm"] || line["Tên hàng"] || "");
+
+      let score = 0;
+
+      // 1. So khớp chính xác mã sản phẩm
+      if (itemCode && lineCode && itemCode === lineCode) {
+        score += 80;
+      } else if (itemCode && lineCode && (itemCode.includes(lineCode) || lineCode.includes(itemCode))) {
+        score += 50;
+      }
+
+      // 2. So khớp chính xác tên sản phẩm
+      if (itemName && lineName && itemName === lineName) {
+        score += 90;
+      } else if (itemName && lineName) {
+        // So khớp từng từ (Token overlap)
+        const itemTokens = itemName.split(/\s+/).filter(t => t.length > 1);
+        const lineTokens = lineName.split(/\s+/).filter(t => t.length > 1);
+        if (itemTokens.length > 0 && lineTokens.length > 0) {
+          const common = itemTokens.filter(t => lineTokens.includes(t));
+          const overlapRatio = (common.length * 2) / (itemTokens.length + lineTokens.length);
+          score += Math.round(overlapRatio * 60);
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestLine = line;
+      }
+    }
+
+    const confidence = Math.min(100, bestScore);
+    const isMatched = confidence >= 30;
+
+    return {
+      ...item,
+      matchedPoLineStt: isMatched && bestLine ? (bestLine["STT"] || bestLine.id) : undefined,
+      matchedPoLine: isMatched ? bestLine : null,
+      matchedPoLineName: isMatched && bestLine ? (bestLine["Tên sản phẩm"] || bestLine["Sản phẩm"]) : undefined,
+      matchConfidence: confidence
+    };
+  });
+}
+
+
 

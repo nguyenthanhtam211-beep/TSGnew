@@ -265,11 +265,22 @@ export async function processDocumentOCR(file: File, customApiKey?: string): Pro
 
   const prompt = `Bạn là một chuyên gia OCR tài liệu doanh nghiệp hàng đầu của Tập đoàn Tâm Sen (TSG). Hãy phân tích kỹ lưỡng tài liệu đính kèm (hình ảnh hoặc PDF) và trích xuất thông tin chính xác.
 
-ĐẶC BIỆT LƯU Ý VỀ SỐ ĐƠN HÀNG (PO):
-1. Nếu là "BIÊN BẢN GIAO HÀNG" hoặc "PHIẾU XUẤT KHO" (PXK): 
-   - Số hiệu ở góc trên bên phải là "documentNumber" (Số PXK).
+ĐẶC BIỆT LƯU Ý VỀ PHÂN LOẠI TÀI LIỆU & SỐ ĐƠN HÀNG (PO / PXK / BBGH):
+1. Nếu là "BIÊN BẢN GIAO HÀNG", "BIÊN BẢN BÀN GIAO" hoặc "PHIẾU XUẤT KHO" (PXK): 
+   - documentType: "PXK"
+   - Số hiệu ở góc trên là "documentNumber" (Số PXK hoặc Số Biên bản).
    - BẮT BUỘC tìm số ĐƠN ĐẶT HÀNG (Số PO) nằm trong văn bản (ví dụ: "Theo đơn đặt hàng số...", "Căn cứ PO số...", "06/TS/26", v.v.) và điền vào trường "documentReference".
-2. Nếu là "ĐƠN ĐẶT HÀNG": Số đơn hàng là "documentNumber", trường "documentReference" để trống.
+2. Nếu là "ĐƠN ĐẶT HÀNG" (Purchase Order): 
+   - documentType: "PO"
+   - Số đơn hàng là "documentNumber", trường "documentReference" để trống.
+
+QUAN TRỌNG VỀ TÍNH PHÁP LÝ & BẰNG CHỨNG GIAO HÀNG (PROOF OF DELIVERY - POD):
+- hasReceiverSignature: (true/false) Kiểm tra xem ở mục "Người nhận hàng" / "Thủ kho bên nhận" / "Đại diện bên mua" ĐÃ CÓ CHỮ KÝ TAY hay chưa.
+- hasBuyerStamp: (true/false) Kiểm tra xem có CON DẤU MỘC ĐỎ (tròn hoặc vuông) của bên mua/khách hàng hay không.
+- hasShipperSignature: (true/false) Kiểm tra xem có chữ ký của người giao hàng / lái xe hay không.
+- receiverName: Họ tên người nhận hàng / thủ kho (nếu có viết rõ dưới chữ ký).
+- licensePlate: Biển số xe vận chuyển (ví dụ: 29C-123.45, 30F-987.65) nếu có ghi trên phiếu.
+- handwrittenNotes: Bất kỳ bút phê viết tay nào (ví dụ: "Giao thiếu 2 thùng", "Hàng ướt góc", "Đã nhận đủ", v.v.).
 
 QUAN TRỌNG VỀ THUẾ & MÃ SỐ THUẾ (Tax & VAT):
 - buyerTaxCode: Mã số thuế bên mua / khách hàng
@@ -279,11 +290,16 @@ QUAN TRỌNG VỀ THUẾ & MÃ SỐ THUẾ (Tax & VAT):
 - totalAmountWithVat: Tổng cộng tiền thanh toán đã bao gồm thuế VAT
 
 QUAN TRỌNG VỀ BẢNG KÊ SẢN PHẨM / HÀNG HÓA (items):
-1. BẮT BUỘC đọc tất cả các cột trong bảng kê hàng hóa (Tên hàng hóa, Quy cách, Ký hiệu, Mã vật tư, ĐVT, Số lượng, Đơn giá, Thành tiền).
-2. Tên sản phẩm (name): Điền tên sản phẩm ĐẦY ĐỦ NGUYÊN VĂN bao gồm chủng loại, nhãn hiệu, thông số kỹ thuật.
-3. Mã sản phẩm (code): Trích xuất mã sản phẩm, ký hiệu mã vật tư nếu có.
+1. BẮT BUỘC đọc tất cả các dòng trong bảng kê hàng hóa.
+2. Tên sản phẩm (name): Điền tên sản phẩm ĐẦY ĐỦ NGUYÊN VĂN bao gồm chủng loại, nhãn hiệu, thông số.
+3. Mã sản phẩm (code): Mã sản phẩm, ký hiệu mã vật tư nếu có.
 4. Quy cách (specs): Kích thước, định lượng (gsm), quy cách đóng gói.
-5. Số lượng (quantity), Đơn giá (price), Thành tiền (amount), ĐVT (unit).
+5. ĐVT (unit): Đơn vị tính (Thùng, Kiện, Cái, Ram, Hộp...).
+6. Số lượng:
+   - quantity / dispatchedQty: Số lượng theo lệnh xuất / giao.
+   - receivedQty: Số lượng thực tế khách nhận (nếu có cột thực nhận, nếu không ghi rõ thì bằng quantity).
+   - discrepancyQty: Chênh lệch (dispatchedQty - receivedQty).
+7. Đơn giá (price), Thành tiền (amount), Ghi chú (notes).
 
 Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
 {
@@ -299,6 +315,13 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
   "sellerName": string,
   "sellerTaxCode": string,
   "sellerAddress": string,
+  "receiverName": string,
+  "hasReceiverSignature": boolean,
+  "hasBuyerStamp": boolean,
+  "hasShipperSignature": boolean,
+  "carrierName": string,
+  "licensePlate": string,
+  "handwrittenNotes": string,
   "vatRate": string | number,
   "vatAmount": number,
   "totalAmountWithVat": number,
@@ -310,6 +333,9 @@ Hãy xuất kết quả chính xác theo định dạng JSON với cấu trúc:
       "specs": string,
       "unit": string,
       "quantity": number,
+      "dispatchedQty": number,
+      "receivedQty": number,
+      "discrepancyQty": number,
       "price": number,
       "amount": number,
       "notes": string
@@ -551,4 +577,60 @@ Hãy xuất kết quả chính xác theo định dạng JSON hợp lệ:
   } catch (_) {}
   throw new Error(errMsg);
 }
+
+/**
+ * Trích xuất chuyên sâu Biên bản giao hàng (BBGH) / Phiếu xuất kho (PXK)
+ * Tự động chuẩn hóa chữ ký, con dấu, biển số xe, bảng kê sản phẩm
+ */
+export async function processDeliveryOrderOCR(file: File, customApiKey?: string): Promise<any> {
+  const rawData = await processDocumentOCR(file, customApiKey);
+
+  // Normalize items
+  const items = Array.isArray(rawData?.items) ? rawData.items.map((it: any, idx: number) => {
+    const dispatched = Number(it.dispatchedQty || it.quantity || 0);
+    const received = it.receivedQty !== undefined && it.receivedQty !== null ? Number(it.receivedQty) : dispatched;
+    const discrepancy = it.discrepancyQty !== undefined ? Number(it.discrepancyQty) : (dispatched - received);
+
+    return {
+      index: it.index || (idx + 1),
+      code: String(it.code || '').trim(),
+      name: String(it.name || '').trim(),
+      specs: String(it.specs || '').trim(),
+      unit: String(it.unit || 'Cái').trim(),
+      dispatchedQty: dispatched,
+      receivedQty: received,
+      discrepancyQty: discrepancy,
+      price: Number(it.price || 0),
+      amount: Number(it.amount || 0),
+      notes: String(it.notes || '').trim()
+    };
+  }) : [];
+
+  return {
+    documentType: rawData.documentType || 'PXK',
+    documentTypeName: rawData.documentTypeName || 'Phiếu xuất kho kiêm BBGH',
+    documentNumber: String(rawData.documentNumber || '').trim(),
+    documentReference: String(rawData.documentReference || '').trim(),
+    documentDate: String(rawData.documentDate || '').trim(),
+    deliveryDate: String(rawData.deliveryDate || rawData.documentDate || '').trim(),
+    buyerName: String(rawData.buyerName || '').trim(),
+    buyerTaxCode: String(rawData.buyerTaxCode || '').trim(),
+    buyerAddress: String(rawData.buyerAddress || '').trim(),
+    sellerName: String(rawData.sellerName || '').trim(),
+    sellerTaxCode: String(rawData.sellerTaxCode || '').trim(),
+    sellerAddress: String(rawData.sellerAddress || '').trim(),
+    receiverName: String(rawData.receiverName || '').trim(),
+    hasReceiverSignature: Boolean(rawData.hasReceiverSignature),
+    hasBuyerStamp: Boolean(rawData.hasBuyerStamp),
+    hasShipperSignature: Boolean(rawData.hasShipperSignature),
+    carrierName: String(rawData.carrierName || '').trim(),
+    licensePlate: String(rawData.licensePlate || '').trim(),
+    handwrittenNotes: String(rawData.handwrittenNotes || '').trim(),
+    vatRate: rawData.vatRate || 0,
+    vatAmount: Number(rawData.vatAmount || 0),
+    totalAmountWithVat: Number(rawData.totalAmountWithVat || 0),
+    items
+  };
+}
+
 

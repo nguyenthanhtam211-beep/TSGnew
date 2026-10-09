@@ -18,6 +18,7 @@ import { processDocumentOCR } from "../lib/gemini";
 import { uploadFileDirectToGoogleDrive } from "../lib/driveSync";
 import { generateSmartDocumentFileName } from "../lib/documentNaming";
 import { POFileUploadModal } from "./POFileUploadModal";
+import { DeliveryFileUploadModal } from "./DeliveryFileUploadModal";
 import { dbEngine } from "../lib/dbEngine";
 import { Modal, Button } from "./ui";
 
@@ -99,6 +100,17 @@ export default function WorkflowView({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [poToDelete, setPoToDelete] = useState<any | null>(null);
   const [isDeletingPO, setIsDeletingPO] = useState(false);
+
+  // Delivery OCR Modal states (Step 4 & Universal Router)
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [deliveryModalDefaultPO, setDeliveryModalDefaultPO] = useState<string>("");
+  const [sideBySideDoc, setSideBySideDoc] = useState<{
+    poScanUrl?: string;
+    deliveryScanUrl?: string;
+    poNumber?: string;
+    pxkNumber?: string;
+    productName?: string;
+  } | null>(null);
 
   // Clean object helper to ensure Firestore never receives `undefined`
   const cleanObject = (obj: any) => {
@@ -456,6 +468,27 @@ export default function WorkflowView({
     try {
       // 1. Chạy bóc tách OCR từ tệp
       const ocrData = await processDocumentOCR(file);
+
+      // Universal Document Router: Phát hiện Biên bản giao hàng (BBGH) / Phiếu xuất kho (PXK)
+      if (
+        ocrData.documentType === 'PXK' || 
+        ocrData.documentTypeName?.toLowerCase().includes('phiếu xuất') || 
+        ocrData.documentTypeName?.toLowerCase().includes('biên bản')
+      ) {
+        toast.dismiss(toastId);
+        toast('💡 Hệ thống phát hiện chứng từ là Biên bản giao hàng / Phiếu xuất kho (PXK). Đang chuyển hướng bạn sang Bước 4 (Xuất kho & BBBG)...', {
+          icon: '🚚',
+          duration: 5000
+        });
+        setIsOcrProcessing(false);
+        setIsDriveUploading(false);
+        if (ocrData.documentReference) {
+          setDeliveryModalDefaultPO(ocrData.documentReference);
+        }
+        setActiveStep(4);
+        setIsDeliveryModalOpen(true);
+        return;
+      }
 
       let cust = "Thăng Long";
       const lowerBuyer = (ocrData.buyerName || "").toLowerCase();
@@ -1380,6 +1413,198 @@ export default function WorkflowView({
     } catch (err) {
       console.error(err);
       toast.error("Không thể xử lý giao hàng!", { id: loadToast });
+    }
+  };
+
+  // --------------------------------------------------
+  // Xử lý lưu đợt giao hàng đa sản phẩm từ OCR Biên bản giao hàng (BBGH/PXK)
+  // --------------------------------------------------
+  const handleSaveDeliveryBatch = async (batchData: {
+    pxkNumber: string;
+    bbbgNumber?: string;
+    poNumber: string;
+    customer: string;
+    deliveryDate: string;
+    carrier: string;
+    receiverSigner: string;
+    licensePlate?: string;
+    hasReceiverSignature: boolean;
+    hasBuyerStamp: boolean;
+    handwrittenNotes?: string;
+    driveFileUrl?: string;
+    driveFileId?: string;
+    items: {
+      poLineStt: string;
+      productName: string;
+      productCode?: string;
+      unit: string;
+      dispatchedQty: number;
+      receivedQty: number;
+      notes?: string;
+    }[];
+  }) => {
+    const loadToast = toast.loading(`Đang ghi nhận ${batchData.items.length} mặt hàng xuất kho qua phiếu ${batchData.pxkNumber}...`);
+    try {
+      const formattedActualDate = batchData.deliveryDate.includes("-") 
+        ? batchData.deliveryDate.split("-").reverse().join("/") 
+        : batchData.deliveryDate;
+      const monthNum = parseInt(batchData.deliveryDate.split("-")[1]) || (new Date().getMonth() + 1);
+
+      const newDeliveryRecords: any[] = [];
+      const batch = writeBatch(db);
+
+      for (let i = 0; i < batchData.items.length; i++) {
+        const item = batchData.items[i];
+        // Tìm dòng PO tương ứng
+        const poLine = combinedPoLinesData.find(l => 
+          !l.isDeleted && (
+            String(l["STT"] || l.id) === String(item.poLineStt) ||
+            (String(l["Tên sản phẩm"] || l["Sản phẩm"]).trim().toLowerCase() === item.productName.trim().toLowerCase() &&
+             String(l["Số đơn hàng"] || l["Đơn hàng"]).trim().toLowerCase() === batchData.poNumber.trim().toLowerCase())
+          )
+        );
+
+        const buyPrice = poLine ? (parseNumber(poLine["Đơn giá nhập"]) || parseNumber(poLine.buyPrice)) : 0;
+        const sellPrice = poLine ? (parseNumber(poLine["Đơn giá bán"]) || parseNumber(poLine.effectivePrice)) : 0;
+        const deliveredQty = item.receivedQty > 0 ? item.receivedQty : item.dispatchedQty;
+        const revenue = sellPrice * deliveredQty;
+        const profit = (sellPrice - buyPrice) * deliveredQty;
+
+        const deliveryId = `DEL-${Date.now()}_${i + 1}`;
+        const hasDiff = item.dispatchedQty !== item.receivedQty || Boolean(batchData.handwrittenNotes);
+
+        const deliveryPayload = {
+          "STT": combinedDeliveryData.length + i + 1,
+          "id": deliveryId,
+          "Chi tiết đơn hàng": poLine ? (poLine["STT"] || poLine.id) : item.poLineStt,
+          "Ngày giao": formattedActualDate,
+          "Đơn hàng": batchData.poNumber,
+          "Mã sản phẩm": item.productCode || (poLine ? poLine["Mã của khách"] : item.productName),
+          "Tên sản phẩm": item.productName,
+          "ĐVT": item.unit || (poLine ? poLine["ĐVT"] : "Cái"),
+          "Số lượng giao": item.dispatchedQty,
+          "Số lượng đặt": poLine ? parseNumber(poLine["Số lượng"]) : item.dispatchedQty,
+          "Số lượng thực nhận": deliveredQty,
+          "Đã giao": deliveredQty,
+          "Còn lại": poLine ? Math.max(0, parseNumber(poLine["Số lượng"]) - deliveredQty) : 0,
+          "Tiến độ giao": poLine ? `${Math.round((deliveredQty / parseNumber(poLine["Số lượng"])) * 100)}%` : "100%",
+          "Status": "Hoàn thành",
+          "Số PXK": batchData.pxkNumber,
+          "Số BBBG": batchData.bbbgNumber || `BBBG-${batchData.pxkNumber}`,
+          "Người ký nhận": batchData.receiverSigner,
+          "Khách hàng": batchData.customer,
+          "Nhà cung cấp": batchData.carrier,
+          "Biển số xe": batchData.licensePlate || "",
+          "hasReceiverSignature": batchData.hasReceiverSignature,
+          "hasBuyerStamp": batchData.hasBuyerStamp,
+          "Sự cố": hasDiff ? "1" : "0",
+          "Chi tiết sự cố": batchData.handwrittenNotes || (item.dispatchedQty !== item.receivedQty ? `Chênh lệch: xuất ${item.dispatchedQty}, nhận ${item.receivedQty}` : ""),
+          "Nhóm hàng": poLine ? poLine["Nhóm hàng"] : "Bao bì",
+          "Đơn giá nhập": (buyPrice || 0).toLocaleString("vi-VN"),
+          "Đơn giá bán": (sellPrice || 0).toLocaleString("vi-VN"),
+          "Doanh thu": (revenue || 0).toLocaleString("vi-VN"),
+          "Lợi nhuận gộp": (profit || 0).toLocaleString("vi-VN"),
+          "% Lợi nhuận": poLine && sellPrice > 0 ? `${((sellPrice - buyPrice) / sellPrice * 100).toFixed(2)}%` : "0%",
+          "AccountingStatus": "Chưa thu tiền",
+          "InvoiceStatus": "Chưa xuất",
+          "Tháng": monthNum,
+          "fileUrl": batchData.driveFileUrl || "",
+          "driveFileUrl": batchData.driveFileUrl || "",
+          "driveFileId": batchData.driveFileId || "",
+          "createdAt": new Date().toISOString()
+        };
+
+        const cleanDeliv = cleanObject(deliveryPayload);
+        newDeliveryRecords.push(cleanDeliv);
+
+        // Firestore set
+        const deliveryRef = doc(db, "deliveries", deliveryId);
+        batch.set(deliveryRef, cleanDeliv);
+        dbEngine.save("deliveries", cleanDeliv).catch(e => console.warn(e));
+
+        // Tìm kế hoạch giao hàng tương ứng
+        const matchedPlan = combinedDeliveryPlanData.find(p => 
+          !p.isDeleted && 
+          p["Trạng thái"] !== "Đã giao" && 
+          (
+            (poLine && String(p["Chi tiết đơn hàng"]).trim() === String(poLine["STT"] || poLine.id).trim()) ||
+            (String(p["Đơn hàng"]).trim() === batchData.poNumber.trim() && 
+             String(p["Sản phẩm"]).trim().toLowerCase() === item.productName.trim().toLowerCase())
+          )
+        );
+
+        if (matchedPlan) {
+          const planRef = doc(db, "delivery_plans", matchedPlan["Kế hoạch ID"] || matchedPlan["Mã kế hoạch"] || matchedPlan.id);
+          batch.update(planRef, { "Trạng thái": "Đã giao" });
+        }
+
+        // Cập nhật PO Line nếu giao đủ
+        if (poLine) {
+          const existingDeliveredForLine = combinedDeliveryData
+            .filter(d => !d.isDeleted && d["Chi tiết đơn hàng"] === (poLine["STT"] || poLine.id))
+            .reduce((sum, d) => sum + parseNumber(d["Số lượng giao"] || d["Số lượng thực nhận"]), 0);
+          const totalDeliveredForLine = existingDeliveredForLine + deliveredQty;
+          const ordered = parseNumber(poLine["Số lượng"]);
+          if (totalDeliveredForLine >= ordered) {
+            const poLineRef = doc(db, "po_lines", poLine.id || poLine["STT"]);
+            batch.update(poLineRef, { "Hoàn thành": 1 });
+          }
+        }
+      }
+
+      setCreatedDeliveries(prev => [...newDeliveryRecords, ...prev]);
+
+      Promise.race([
+        batch.commit(),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]).catch(err => console.warn("Background batch delivery commit:", err));
+
+      toast.success(`🎉 Đã xuất thành công ${newDeliveryRecords.length} mặt hàng theo PXK ${batchData.pxkNumber}!`, { id: loadToast });
+      setActiveStep(5); // Tự động chuyển sang Bước 5 để kế toán đối soát
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Lỗi xuất kho: ${err.message || 'Không thể lưu đợt giao'}`, { id: loadToast });
+    }
+  };
+
+  // 1-Click Backorder: Tự động tạo đợt giao bù khi đối soát phát hiện giao thiếu
+  const handleCreateBackorder = async (rec: any) => {
+    if (!rec || rec.diffVsOrder >= 0) return;
+    const shortQty = Math.abs(rec.diffVsOrder);
+    const poNum = rec.line["Số đơn hàng"] || rec.line["Đơn hàng"];
+    const prodName = rec.line["Tên sản phẩm"] || rec.line["Sản phẩm"];
+    const lineStt = rec.line["STT"] || rec.line.id;
+    const customer = rec.line["Khách hàng"] || "";
+
+    const loadToast = toast.loading(`Đang lập kế hoạch giao bù ${shortQty.toLocaleString("vi-VN")} ${prodName}...`);
+    try {
+      const planId = `KH-BU-${Date.now()}`;
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 3);
+      const formattedDate = `${String(futureDate.getDate()).padStart(2, '0')}/${String(futureDate.getMonth() + 1).padStart(2, '0')}/${futureDate.getFullYear()}`;
+
+      const newPlan = cleanObject({
+        "Kế hoạch ID": planId,
+        "id": planId,
+        "Đơn hàng": poNum,
+        "Khách hàng": customer,
+        "Sản phẩm": prodName,
+        "Chi tiết đơn hàng": lineStt,
+        "Số lượng kế hoạch": shortQty,
+        "Ngày giao kế hoạch": formattedDate,
+        "Trạng thái": "Chờ điều độ (Giao bù)",
+        "Ghi chú": `Đợt giao bù tự động do giao thiếu ${shortQty.toLocaleString("vi-VN")} theo đối soát 3 bên`,
+        "createdAt": new Date().toISOString()
+      });
+
+      setCreatedPlans(prev => [newPlan, ...prev]);
+      await setDoc(doc(db, "delivery_plans", planId), newPlan);
+      await dbEngine.save("delivery_plans", newPlan).catch(e => console.warn(e));
+
+      toast.success(`✨ Đã tạo đợt giao bù ${shortQty.toLocaleString("vi-VN")} cho ${prodName} (Mã: ${planId})! Xem tại Bước 3.`, { id: loadToast });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Không thể tạo đợt giao bù: ${err.message || err}`, { id: loadToast });
     }
   };
 
@@ -3744,9 +3969,31 @@ export default function WorkflowView({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left side: list of planned delivery jobs */}
               <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div>
-                  <h3 className="font-bold text-slate-800 text-base">Danh sách kế hoạch giao hàng đang vận hành</h3>
-                  <p className="text-xs text-slate-500">Chọn kế hoạch dưới đây để xác nhận thực giao và tạo Phiếu xuất kho (PXK)</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                      <span>Danh sách kế hoạch giao hàng đang vận hành</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700">
+                        {activeDeliveryPlans.length} kế hoạch
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Chọn kế hoạch bên dưới để xuất PXK thủ công, hoặc quét tự động file scan Biên bản giao hàng bằng AI
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryModalDefaultPO("");
+                      setIsDeliveryModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-[0.98] shrink-0"
+                  >
+                    <Camera size={16} />
+                    <span>📸 Quét OCR Biên Bản Giao Hàng / PXK</span>
+                    <Sparkles size={13} className="text-emerald-200" />
+                  </button>
                 </div>
 
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -4151,18 +4398,27 @@ export default function WorkflowView({
                         <th className="px-3.5 py-3 text-right">Hụt KH</th>
                         <th className="px-3.5 py-3 text-center">Hiện Trạng</th>
                         <th className="px-3.5 py-3 text-center">Sự Cố</th>
+                        <th className="px-3.5 py-3 text-center w-36">Thao Tác Đối Soát</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                       {filteredReconciliation.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="text-center py-10 text-slate-400 font-normal">
+                          <td colSpan={12} className="text-center py-10 text-slate-400 font-normal">
                             Không có kết quả đối soát nào khớp với bộ lọc đang chọn!
                           </td>
                         </tr>
                       ) : (
                         filteredReconciliation.map((rec, index) => {
                           const hasIncidentFlag = rec.incidents.length > 0;
+                          const poNum = rec.line["Số đơn hàng"] || rec.line["Đơn hàng"];
+                          const matchedPoHeader = combinedPoHeadersData.find(h => 
+                            (h["Số đơn hàng"] || h["Đơn hàng"] || h.poNumber) === poNum
+                          );
+                          const poScanUrl = matchedPoHeader?.fileUrl || matchedPoHeader?.driveUrl || "";
+                          const firstDelivWithScan = rec.deliveries.find((d: any) => d.fileUrl || d.driveFileUrl);
+                          const deliveryScanUrl = firstDelivWithScan?.driveFileUrl || firstDelivWithScan?.fileUrl || "";
+
                           return (
                             <tr key={index} className="hover:bg-[#FBFBFD] transition">
                               <td className="px-3.5 py-3 text-center font-mono text-slate-400">{rec.line["STT"]}</td>
@@ -4219,6 +4475,44 @@ export default function WorkflowView({
                                 ) : (
                                   <span className="text-slate-300 font-medium">-</span>
                                 )}
+                              </td>
+                              <td className="px-3.5 py-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {/* 1-Click Backorder when short */}
+                                  {rec.diffVsOrder < 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCreateBackorder(rec)}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10.5px] shadow-2xs transition active:scale-[0.97]"
+                                      title={`Tạo đợt giao bù ${Math.abs(rec.diffVsOrder).toLocaleString('vi-VN')} cho đợt tiếp theo`}
+                                    >
+                                      <RefreshCw size={11} />
+                                      <span>+ Giao bù</span>
+                                    </button>
+                                  )}
+
+                                  {/* Side-by-side View Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSideBySideDoc({
+                                        poScanUrl,
+                                        deliveryScanUrl,
+                                        poNumber: String(poNum),
+                                        pxkNumber: String(rec.deliveries[0]?.["Số PXK"] || ""),
+                                        productName: String(rec.line["Tên sản phẩm"] || rec.line["Sản phẩm"])
+                                      });
+                                    }}
+                                    className={`p-1.5 rounded-lg border transition ${
+                                      deliveryScanUrl || poScanUrl
+                                        ? "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                                        : "text-slate-400 bg-slate-50 hover:bg-slate-100 border-slate-200"
+                                    }`}
+                                    title="Đối chiếu song song bản Scan PO và Scan BBGH"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -4657,6 +4951,126 @@ export default function WorkflowView({
             <p className="text-slate-600 leading-relaxed">
               ⚠️ <strong>Cảnh báo:</strong> Sau khi xóa, đơn hàng này sẽ biến mất khỏi danh sách phê duyệt, danh sách PO Lines và báo cáo tài chính. Không thể hoàn tác hành động này.
             </p>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Quét OCR & Xác Nhận Biên Bản Giao Hàng (BBGH / PXK) */}
+      <DeliveryFileUploadModal
+        isOpen={isDeliveryModalOpen}
+        onClose={() => setIsDeliveryModalOpen(false)}
+        allPOHeaders={combinedPoHeadersData}
+        allPOLines={combinedPoLinesData}
+        allDeliveryPlans={combinedDeliveryPlanData}
+        defaultPONumber={deliveryModalDefaultPO}
+        onSaveDeliveryBatch={handleSaveDeliveryBatch}
+      />
+
+      {/* Modal Đối Soát Song Song (Side-by-side Visual Audit: Scan PO ⟷ Scan BBGH) */}
+      {sideBySideDoc && (
+        <Modal
+          open={Boolean(sideBySideDoc)}
+          onClose={() => setSideBySideDoc(null)}
+          title="Đối Chiếu Song Song Chứng Từ (Side-by-Side Visual Audit)"
+          subtitle={`PO: ${sideBySideDoc.poNumber || 'N/A'} ⟷ PXK: ${sideBySideDoc.pxkNumber || 'N/A'} • ${sideBySideDoc.productName || ''}`}
+          icon={<Eye className="text-blue-600" size={20} />}
+          size="xl"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <div className="text-xs text-slate-500 italic">
+                *Kiểm tra chữ ký tươi của thủ kho và con dấu mộc đỏ pháp lý của công ty mua hàng
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setSideBySideDoc(null)}
+              >
+                Đóng đối chiếu
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[65vh]">
+            {/* Left Column: PO Scan */}
+            <div className="border border-slate-200 rounded-xl p-3 flex flex-col bg-slate-50/50 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <FileText size={15} className="text-blue-600" />
+                  1. Bản Scan Đơn Đặt Hàng Gốc (PO)
+                </span>
+                {sideBySideDoc.poScanUrl && (
+                  <a
+                    href={sideBySideDoc.poScanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    <span>Mở ngoài</span>
+                    <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+
+              <div className="flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center p-2">
+                {sideBySideDoc.poScanUrl ? (
+                  <iframe 
+                    src={sideBySideDoc.poScanUrl.includes("drive.google.com") && !sideBySideDoc.poScanUrl.includes("preview") 
+                      ? sideBySideDoc.poScanUrl.replace("/view", "/preview") 
+                      : sideBySideDoc.poScanUrl}
+                    title="Bản scan PO gốc"
+                    className="w-full h-full border-0 rounded"
+                  />
+                ) : (
+                  <div className="text-center p-6 space-y-2">
+                    <FileText size={40} className="text-slate-300 mx-auto" />
+                    <p className="text-xs font-semibold text-slate-600">Chưa có bản scan PO gốc</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs">
+                      Tải lên bản scan hoặc ảnh chụp đơn đặt hàng có dấu duyệt tại Bước 1 (Báo giá & PO)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Delivery Order / POD Scan */}
+            <div className="border border-slate-200 rounded-xl p-3 flex flex-col bg-slate-50/50 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Truck size={15} className="text-emerald-600" />
+                  2. Bản Scan Biên Bản Giao Hàng (BBGH / POD)
+                </span>
+                {sideBySideDoc.deliveryScanUrl && (
+                  <a
+                    href={sideBySideDoc.deliveryScanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    <span>Mở ngoài</span>
+                    <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+
+              <div className="flex-1 bg-white rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center p-2">
+                {sideBySideDoc.deliveryScanUrl ? (
+                  <iframe 
+                    src={sideBySideDoc.deliveryScanUrl.includes("drive.google.com") && !sideBySideDoc.deliveryScanUrl.includes("preview") 
+                      ? sideBySideDoc.deliveryScanUrl.replace("/view", "/preview") 
+                      : sideBySideDoc.deliveryScanUrl}
+                    title="Bản scan Biên bản giao hàng"
+                    className="w-full h-full border-0 rounded"
+                  />
+                ) : (
+                  <div className="text-center p-6 space-y-2">
+                    <Truck size={40} className="text-slate-300 mx-auto" />
+                    <p className="text-xs font-semibold text-slate-600">Chưa có bản scan BBGH thực tế</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs">
+                      Dùng tính năng <strong>"Quét OCR Biên Bản Giao Hàng"</strong> ở Bước 4 để tải ảnh/file scan có chữ ký và mộc đỏ
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </Modal>
       )}
