@@ -18,6 +18,8 @@ import { processDocumentOCR } from "../lib/gemini";
 import { uploadFileDirectToGoogleDrive } from "../lib/driveSync";
 import { generateSmartDocumentFileName } from "../lib/documentNaming";
 import { POFileUploadModal } from "./POFileUploadModal";
+import { dbEngine } from "../lib/dbEngine";
+import { Modal, Button } from "./ui";
 
 interface WorkflowViewProps {
   pricingData: any[];
@@ -30,6 +32,7 @@ interface WorkflowViewProps {
   deliveryPlanData: any[];
   onProductClick?: (productId: string) => void;
   onPoClick?: (poNumber: string) => void;
+  onDeletePoHeader?: (po: any) => Promise<void> | void;
 }
 
 export default function WorkflowView({
@@ -42,7 +45,8 @@ export default function WorkflowView({
   productData,
   deliveryPlanData,
   onProductClick,
-  onPoClick
+  onPoClick,
+  onDeletePoHeader
 }: WorkflowViewProps) {
   const [activeStep, setActiveStep] = useState<number>(1);
 
@@ -79,6 +83,22 @@ export default function WorkflowView({
   const [createdPoLines, setCreatedPoLines] = useState<any[]>([]);
   const [createdPlans, setCreatedPlans] = useState<any[]>([]);
   const [createdDeliveries, setCreatedDeliveries] = useState<any[]>([]);
+
+  // States for duplicate PO detection & deletion
+  const [duplicatePrompt, setDuplicatePrompt] = useState<{
+    isOpen: boolean;
+    existingPO: any;
+    newPoNum: string;
+    customer: string;
+    date: string;
+    file?: File | null;
+    lines: any[];
+    isSavingTrigger?: boolean;
+  } | null>(null);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [poToDelete, setPoToDelete] = useState<any | null>(null);
+  const [isDeletingPO, setIsDeletingPO] = useState(false);
 
   // Clean object helper to ensure Firestore never receives `undefined`
   const cleanObject = (obj: any) => {
@@ -524,6 +544,30 @@ export default function WorkflowView({
       });
 
       setPoLines(lines);
+
+      // Kiểm tra trùng file hoặc mã PO đã tồn tại trong hệ thống
+      const duplicatePO = combinedPoHeadersData.find(h => {
+        const existingPo = (h["Đơn hàng"] || h["Số đơn hàng"] || h["id"] || "").trim().toLowerCase();
+        const existingFile = (h["Tệp đơn hàng"] || "").trim().toLowerCase();
+        return (existingPo && existingPo === extractedDocNum.trim().toLowerCase()) ||
+               (existingFile && file.name && existingFile.includes(file.name.toLowerCase()));
+      });
+
+      if (duplicatePO) {
+        setDuplicatePrompt({
+          isOpen: true,
+          existingPO: duplicatePO,
+          newPoNum: extractedDocNum,
+          customer: cust,
+          date: isoDate,
+          file: file,
+          lines: lines,
+          isSavingTrigger: false
+        });
+        toast.error(`⚠️ Đơn hàng "${extractedDocNum}" hoặc tệp "${file.name}" đã tồn tại trong hệ thống!`, { id: toastId });
+        return;
+      }
+
       toast.success(`✨ Đã bóc tách ${lines.length} mặt hàng & đổi tên tệp chuẩn: ${standardizedName}`, { id: toastId });
     } catch (err: any) {
       console.error(err);
@@ -677,49 +721,42 @@ export default function WorkflowView({
     }, 0);
   }, [poLines]);
 
-  const handleSavePO = async () => {
-    if (!newPoNumber.trim()) {
-      toast.error("Vui lòng điền Số đơn hàng (PO)!");
-      return;
-    }
-    if (!poCustomer) {
-      toast.error("Vui lòng chọn khách hàng!");
-      return;
-    }
-    if (poLines.length === 0) {
-      toast.error("Vui lòng thêm ít nhất một dòng sản phẩm!");
-      return;
-    }
-
-    const trimmedPoNum = newPoNumber.trim();
-    const isDuplicate = combinedPoHeadersData.some(h => {
-      const existingPo = (h["Đơn hàng"] || h["Số đơn hàng"] || h["id"] || "").trim().toLowerCase();
-      return existingPo === trimmedPoNum.toLowerCase();
-    });
-
-    if (isDuplicate) {
-      const confirmOverwrite = window.confirm(
-        `Cảnh báo: Đơn hàng "${trimmedPoNum}" đã tồn tại trong hệ thống. Bạn có chắc chắn muốn tiếp tục lưu và ghi đè/cập nhật đơn hàng này không?`
-      );
-      if (!confirmOverwrite) {
-        return;
-      }
-    }
-
-    const loadToast = toast.loading("Đang lưu Đơn hàng (PO)...");
+  const executeSavePO = async (
+    poNumToSave: string, 
+    custToSave: string, 
+    dateToSave: string, 
+    linesToSave: any[], 
+    isOverwrite: boolean = false
+  ) => {
+    const trimmedPoNum = poNumToSave.trim();
+    const loadToast = toast.loading(isOverwrite ? `Đang cập nhật/ghi đè Đơn hàng ${trimmedPoNum}...` : `Đang lưu Đơn hàng ${trimmedPoNum}...`);
     try {
-      const headerId = newPoNumber.replace(/\//g, "-").trim();
-      const formattedDate = poDate ? poDate.split("-").reverse().join("/") : new Date().toLocaleDateString("vi-VN");
+      const headerId = trimmedPoNum.replace(/\//g, "-").trim();
+      const formattedDate = dateToSave ? (dateToSave.includes("-") ? dateToSave.split("-").reverse().join("/") : dateToSave) : new Date().toLocaleDateString("vi-VN");
       
+      let totalPoValue = 0;
+      let totalPoQty = 0;
+      linesToSave.forEach(l => {
+        const qty = parseNumber(l["Số lượng"] || l.quantity || 1);
+        const sell = l.effectivePrice !== undefined ? l.effectivePrice : parseNumber(l["Đơn giá bán"] || l.poPrice || 0);
+        totalPoQty += qty;
+        totalPoValue += sell * qty;
+      });
+
       const poHeaderPayload = {
         "id": headerId,
-        "Đơn hàng": newPoNumber.trim(),
+        "Đơn hàng": trimmedPoNum,
+        "Số đơn hàng": trimmedPoNum,
         "Ngày đặt hàng": formattedDate,
-        "Khách hàng": poCustomer,
+        "Khách hàng": custToSave,
         "Phân loại": poType || "Đơn hàng thường xuyên",
         "Trạng Thái": "Mới nhận",
-        "Chi tiết đơn hàng": poLines.map((_, i) => `D_${headerId}_${i + 1}`).join(","),
+        "Chi tiết đơn hàng": linesToSave.map((_, i) => `D_${headerId}_${i + 1}`).join(","),
         "Tổng giá trị đơn hàng": (totalPoValue || 0).toLocaleString("vi-VN"),
+        "Tổng tiền": totalPoValue,
+        "Doanh thu": totalPoValue,
+        "Số lượng": totalPoQty,
+        "Tổng số lượng": totalPoQty,
         "createdAt": new Date().toISOString(),
         ...(uploadedFileDriveInfo ? {
           "Tệp đơn hàng": uploadedFileDriveInfo.fileName,
@@ -737,25 +774,25 @@ export default function WorkflowView({
       const newLines: any[] = [];
       const batch = writeBatch(db);
 
-      // 1. Save PO Header
+      // 1. Save PO Header in Firestore
       const poHeaderRef = doc(db, "po_headers", headerId);
       batch.set(poHeaderRef, cleanObject(poHeaderPayload));
 
-      // 2. Save PO Lines
-      for (let i = 0; i < poLines.length; i++) {
-        const line = poLines[i];
+      // 2. Save PO Lines in Firestore
+      for (let i = 0; i < linesToSave.length; i++) {
+        const line = linesToSave[i];
         const lineId = `D_${headerId}_${i + 1}`;
-        const sellPrice = line.effectivePrice !== undefined ? line.effectivePrice : parseNumber(line["Đơn giá bán"]);
-        const buyPrice = line.buyPrice !== undefined ? line.buyPrice : parseNumber(line["Đơn giá nhập"]);
-        const qty = parseNumber(line["Số lượng"]) || 1;
+        const sellPrice = line.effectivePrice !== undefined ? line.effectivePrice : parseNumber(line["Đơn giá bán"] || line.poPrice || 0);
+        const buyPrice = line.buyPrice !== undefined ? line.buyPrice : parseNumber(line["Đơn giá nhập"] || 0);
+        const qty = parseNumber(line["Số lượng"] || line.quantity) || 1;
         const lineRev = sellPrice * qty;
         const lineProfit = (sellPrice - buyPrice) * qty;
 
         const linePayload = {
           "id": lineId,
           "STT": lineId,
-          "Số đơn hàng": newPoNumber.trim(),
-          "Đơn hàng": newPoNumber.trim(),
+          "Số đơn hàng": trimmedPoNum,
+          "Đơn hàng": trimmedPoNum,
           "Mã giá bán": line.priceCode || line["Mã giá bán"] || "Gsp_082",
           "Tên sản phẩm": line["Tên sản phẩm"] || line.masterProductName || line.name || "Sản phẩm PO",
           "Mã sản phẩm": line["Mã sản phẩm"] || line.code || line.masterProductCode || "",
@@ -765,8 +802,8 @@ export default function WorkflowView({
           "quantity": qty,
           "Ngày đặt hàng": formattedDate,
           "Ngày giao": line.deliveryDate || formattedDate,
-          "Khách hàng": poCustomer,
-          "Đơn vị nhận hàng": poCustomer,
+          "Khách hàng": custToSave,
+          "Đơn vị nhận hàng": custToSave,
           "Nhóm hàng": line["Nhóm hàng"] || "Nguyên liệu",
           "Đơn giá nhập": buyPrice,
           "Đơn giá bán": sellPrice,
@@ -787,17 +824,26 @@ export default function WorkflowView({
       }
 
       // Optimistic update local states so next step has the data immediately
-      setCreatedPoHeaders(prev => [poHeaderPayload, ...prev]);
-      setCreatedPoLines(prev => [...newLines, ...prev]);
+      setCreatedPoHeaders(prev => [poHeaderPayload, ...prev.filter(h => (h["Đơn hàng"] || h.id) !== trimmedPoNum && h.id !== headerId)]);
+      setCreatedPoLines(prev => [...newLines, ...prev.filter(l => (l["Số đơn hàng"] || l["Đơn hàng"]) !== trimmedPoNum && !String(l.id).startsWith(`D_${headerId}`))]);
 
-      // Fire Firestore commit with fallback timeout so UI never hangs
+      // Fire Firestore commit with fallback timeout
       Promise.race([
         batch.commit(),
         new Promise(resolve => setTimeout(resolve, 600))
       ]).catch(err => console.warn("Background commit notice:", err));
 
-      toast.success(`Đã lưu Đơn hàng ${newPoNumber}! Chuyển sang Bước 2 để Thẩm định giá & Phê duyệt.`, { id: loadToast });
-      setSelectedPoForApproval(newPoNumber.trim());
+      // Save to dbEngine local persistent cache
+      await dbEngine.save("po_headers", poHeaderPayload);
+      await dbEngine.saveBatch("po_lines", newLines);
+
+      toast.success(
+        isOverwrite 
+          ? `Đã cập nhật/ghi đè Đơn hàng ${trimmedPoNum}! Chuyển sang Bước 2 để Phê duyệt.`
+          : `Đã lưu Đơn hàng ${trimmedPoNum}! Chuyển sang Bước 2 để Phê duyệt.`, 
+        { id: loadToast }
+      );
+      setSelectedPoForApproval(trimmedPoNum);
       setApprovalFilter("pending");
       setNewPoNumber("");
       setPoLines([]);
@@ -808,6 +854,142 @@ export default function WorkflowView({
       console.error(err);
       toast.error(`Lỗi khi lưu đơn hàng: ${err.message || 'Chưa thể lưu'}`, { id: loadToast });
     }
+  };
+
+  const handleCancelDuplicate = () => {
+    setDuplicatePrompt(null);
+    setUploadedPOFile(null);
+    setUploadedFileDriveInfo(null);
+    setPoLines([]);
+    setNewPoNumber("");
+    toast.success("Đã hủy bỏ tải đơn hàng trùng lặp.");
+  };
+
+  const handleOverwriteDuplicate = async () => {
+    if (!duplicatePrompt) return;
+    const { newPoNum, customer, date, lines } = duplicatePrompt;
+    setDuplicatePrompt(null);
+    await executeSavePO(newPoNum, customer, date, lines, true);
+  };
+
+  const handleCreateWithNewCode = async () => {
+    if (!duplicatePrompt) return;
+    const { newPoNum, customer, date, lines, isSavingTrigger } = duplicatePrompt;
+    const newCode = `${newPoNum}_V2`;
+    setNewPoNumber(newCode);
+    setDuplicatePrompt(null);
+    if (isSavingTrigger) {
+      await executeSavePO(newCode, customer, date, lines, false);
+    } else {
+      toast.success(`Đã đổi mã đơn hàng sang: ${newCode}`);
+    }
+  };
+
+  const handleDeletePO = async (targetPO: any) => {
+    if (!targetPO) return;
+    setIsDeletingPO(true);
+    const poNum = targetPO["Đơn hàng"] || targetPO["Số đơn hàng"] || targetPO.id;
+    const headerId = targetPO.id || String(poNum).replace(/\//g, "-").trim();
+    const loadToast = toast.loading(`Đang xóa đơn hàng ${poNum}...`);
+
+    try {
+      // 1. Delete from dbEngine
+      await dbEngine.delete("po_headers", headerId);
+      if (poNum && poNum !== headerId) {
+        await dbEngine.delete("po_headers", String(poNum).replace(/\//g, "_"));
+      }
+
+      // 2. Find and delete related lines
+      const relatedLines = combinedPoLinesData.filter(l => 
+        (l["Số đơn hàng"] && String(l["Số đơn hàng"]).trim().toLowerCase() === String(poNum).trim().toLowerCase()) ||
+        (l["Đơn hàng"] && String(l["Đơn hàng"]).trim().toLowerCase() === String(poNum).trim().toLowerCase()) ||
+        (l.id && String(l.id).startsWith(`D_${headerId}`)) ||
+        (l["STT"] && String(l["STT"]).startsWith(`D_${headerId}`))
+      );
+
+      for (const line of relatedLines) {
+        const lineKey = line.id || line["STT"] || line.STT;
+        if (lineKey) {
+          await dbEngine.delete("po_lines", lineKey);
+        }
+      }
+
+      // 3. Batch delete in Firestore directly
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "po_headers", headerId));
+      relatedLines.forEach(l => {
+        const lId = l.id || l["STT"];
+        if (lId) batch.delete(doc(db, "po_lines", lId));
+      });
+      await Promise.race([
+        batch.commit(),
+        new Promise(r => setTimeout(r, 800))
+      ]);
+
+      // 4. Update local states
+      setCreatedPoHeaders(prev => prev.filter(h => (h["Đơn hàng"] || h.id) !== poNum && h.id !== headerId));
+      setCreatedPoLines(prev => prev.filter(l => (l["Số đơn hàng"] || l["Đơn hàng"]) !== poNum && !String(l.id).startsWith(`D_${headerId}`)));
+
+      if (onDeletePoHeader) {
+        await onDeletePoHeader(targetPO);
+      }
+
+      // 5. Select next available PO in Step 2
+      const remainingPOs = filteredPoHeadersForApproval.filter(h => 
+        (h["Đơn hàng"] || h.id) !== poNum && h.id !== headerId
+      );
+      if (remainingPOs.length > 0) {
+        setSelectedPoForApproval(remainingPOs[0]["Đơn hàng"] || remainingPOs[0].id);
+      } else {
+        setSelectedPoForApproval("");
+      }
+
+      setShowDeleteModal(false);
+      setPoToDelete(null);
+      toast.success(`Đã xóa vĩnh viễn đơn hàng ${poNum} và ${relatedLines.length} sản phẩm liên quan!`, { id: loadToast });
+    } catch (err: any) {
+      console.error("Delete PO error:", err);
+      toast.error(`Lỗi khi xóa đơn hàng: ${err?.message || "Không thể xóa"}`, { id: loadToast });
+    } finally {
+      setIsDeletingPO(false);
+    }
+  };
+
+  const handleSavePO = async () => {
+    if (!newPoNumber.trim()) {
+      toast.error("Vui lòng điền Số đơn hàng (PO)!");
+      return;
+    }
+    if (!poCustomer) {
+      toast.error("Vui lòng chọn khách hàng!");
+      return;
+    }
+    if (poLines.length === 0) {
+      toast.error("Vui lòng thêm ít nhất một dòng sản phẩm!");
+      return;
+    }
+
+    const trimmedPoNum = newPoNumber.trim();
+    const duplicateHeader = combinedPoHeadersData.find(h => {
+      const existingPo = (h["Đơn hàng"] || h["Số đơn hàng"] || h["id"] || "").trim().toLowerCase();
+      return existingPo === trimmedPoNum.toLowerCase();
+    });
+
+    if (duplicateHeader) {
+      setDuplicatePrompt({
+        isOpen: true,
+        existingPO: duplicateHeader,
+        newPoNum: trimmedPoNum,
+        customer: poCustomer,
+        date: poDate,
+        file: uploadedPOFile,
+        lines: poLines,
+        isSavingTrigger: true
+      });
+      return;
+    }
+
+    await executeSavePO(trimmedPoNum, poCustomer, poDate, poLines, false);
   };
 
   const handleApprovePOFromStep2 = async (poHeader: any) => {
@@ -2442,16 +2624,37 @@ export default function WorkflowView({
                                 : "bg-white hover:bg-[#FBFBFD] border-slate-200/70 shadow-2xs"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono font-bold text-xs text-slate-900">{poNum}</span>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                                isApproved
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                                  : "bg-amber-50 text-amber-700 border-amber-200/60"
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-                                {isApproved ? "Đã duyệt" : "Chờ duyệt"}
-                              </span>
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="font-mono font-bold text-xs text-slate-900 truncate">{poNum}</span>
+                                {combinedPoHeadersData.filter(h => (h["Đơn hàng"] || h["Số đơn hàng"] || h.id || "").trim().toLowerCase() === poNum.trim().toLowerCase()).length > 1 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold border border-amber-200 shrink-0">
+                                    ⚠️ Trùng
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                                  isApproved
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                                    : "bg-amber-50 text-amber-700 border-amber-200/60"
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isApproved ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                                  {isApproved ? "Đã duyệt" : "Chờ duyệt"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPoToDelete(header);
+                                    setShowDeleteModal(true);
+                                  }}
+                                  className="p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                  title="Xóa đơn hàng này"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between text-xs">
@@ -2903,6 +3106,19 @@ export default function WorkflowView({
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPoToDelete(currentPoForApproval);
+                                      setShowDeleteModal(true);
+                                    }}
+                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-semibold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition active:scale-[0.98] cursor-pointer"
+                                    title="Xóa vĩnh viễn đơn hàng này và các dòng sản phẩm liên quan khỏi hệ thống"
+                                  >
+                                    <Trash2 size={15} />
+                                    <span>Xóa Đơn Hàng</span>
+                                  </button>
+
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -4296,6 +4512,153 @@ export default function WorkflowView({
             toast.success(`Đã bổ sung ${newLines.length} mặt hàng từ chứng từ vào đơn!`);
           }}
         />
+      )}
+
+      {/* Modal Cảnh Báo Trùng Đơn Hàng / Tệp Chứng Từ */}
+      {duplicatePrompt && (
+        <Modal
+          open={duplicatePrompt.isOpen}
+          onClose={handleCancelDuplicate}
+          title="Phát Hiện Trùng Đơn Hàng / Tệp Chứng Từ"
+          subtitle="Tệp hoặc mã PO này đã tồn tại trong hệ thống. Vui lòng chọn cách xử lý bên dưới."
+          icon={<AlertTriangle className="text-amber-500" size={20} />}
+          size="md"
+          footer={
+            <div className="flex items-center justify-between gap-2 w-full">
+              <Button
+                variant="secondary"
+                onClick={handleCancelDuplicate}
+              >
+                Hủy bỏ
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleOverwriteDuplicate}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Ghi đè / Cập nhật đơn cũ
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateWithNewCode}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  Tạo đơn mới với mã khác
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-3.5">
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">
+                  Đơn Hàng Hiện Có Trong Hệ Thống:
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-bold">
+                  Đã tồn tại
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Số Đơn Hàng:</span>
+                  <strong className="font-mono text-slate-900">{duplicatePrompt.existingPO["Đơn hàng"] || duplicatePrompt.newPoNum}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Khách Hàng:</span>
+                  <strong className="text-slate-900">{duplicatePrompt.existingPO["Khách hàng"] || "Chưa rõ"}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Ngày Đặt:</span>
+                  <span className="text-slate-700">{duplicatePrompt.existingPO["Ngày đặt hàng"] || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Tệp đính kèm:</span>
+                  <span className="text-slate-700 truncate block font-mono text-[11px]" title={duplicatePrompt.existingPO["Tệp đơn hàng"]}>
+                    {duplicatePrompt.existingPO["Tệp đơn hàng"] || "Chưa có file"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+              <span className="font-bold text-slate-800">Thông tin tệp / dữ liệu vừa quét:</span>
+              <p className="text-slate-600">
+                Tệp: <strong className="text-slate-900">{duplicatePrompt.file?.name || "Chứng từ tải lên"}</strong>
+              </p>
+              <p className="text-slate-600">
+                Số mặt hàng bóc tách được: <strong className="text-blue-700">{duplicatePrompt.lines.length} sản phẩm</strong>
+              </p>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              💡 <strong>Gợi ý:</strong> Bạn có thể chọn <em>"Hủy bỏ"</em> nếu vừa quét nhầm file trùng; hoặc chọn <em>"Ghi đè"</em> để cập nhật lại bảng sản phẩm; hoặc chọn <em>"Tạo đơn mới với mã khác"</em> để lưu thành bản ghi PO độc lập.
+            </p>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Xác Nhận Xóa Đơn Hàng */}
+      {showDeleteModal && poToDelete && (
+        <Modal
+          open={showDeleteModal}
+          onClose={() => {
+            if (!isDeletingPO) {
+              setShowDeleteModal(false);
+              setPoToDelete(null);
+            }
+          }}
+          title="Xác Nhận Xóa Đơn Hàng"
+          subtitle="Hành động này sẽ xóa vĩnh viễn đơn hàng và các dòng sản phẩm liên quan."
+          icon={<Trash2 className="text-rose-600" size={20} />}
+          size="sm"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button
+                variant="secondary"
+                disabled={isDeletingPO}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setPoToDelete(null);
+                }}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="primary"
+                loading={isDeletingPO}
+                onClick={() => handleDeletePO(poToDelete)}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                Xác nhận xóa vĩnh viễn
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-xs">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">
+                  Đơn Hàng Sắp Xóa:
+                </span>
+                <span className="font-mono font-bold text-rose-900 bg-rose-100 px-2 py-0.5 rounded text-[11px]">
+                  {poToDelete["Đơn hàng"] || poToDelete.id}
+                </span>
+              </div>
+              <p className="text-slate-700">
+                Khách hàng: <strong>{poToDelete["Khách hàng"] || "Chưa rõ"}</strong>
+              </p>
+              <p className="text-slate-700">
+                Ngày đặt: <strong>{poToDelete["Ngày đặt hàng"] || "N/A"}</strong>
+              </p>
+            </div>
+
+            <p className="text-slate-600 leading-relaxed">
+              ⚠️ <strong>Cảnh báo:</strong> Sau khi xóa, đơn hàng này sẽ biến mất khỏi danh sách phê duyệt, danh sách PO Lines và báo cáo tài chính. Không thể hoàn tác hành động này.
+            </p>
+          </div>
+        </Modal>
       )}
     </div>
   );

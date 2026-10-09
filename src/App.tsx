@@ -1048,6 +1048,7 @@ export default function App() {
             deliveryPlanData={enrichedDeliveryPlanData}
             onProductClick={(val) => setSelectedProductDetails(val)}
             onPoClick={(val) => setSelectedPoDetails(val)}
+            onDeletePoHeader={async (po) => await handleDeleteFromFirestore("po_headers", po)}
           />
         )}
         {activeTab === "assistant" && <AssistantView />}
